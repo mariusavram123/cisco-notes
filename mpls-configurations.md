@@ -390,7 +390,7 @@ interface g0/3
 ```
 - 4.
 
-- PE1:
+- PE1: - Tunnel is unidirectional - you can create the tunnel only on one end 
 
 ```
 interface tunnel 1
@@ -401,7 +401,7 @@ interface tunnel 1
  tunnel mpls traffic-eng path-option 1 dynamic # USE CSPF algorithm to calculate the best path based on OSPF topology
 ```
 
-- PE2: 
+- PE2: - This is made only if you want to route the traffic back using the tunnel also
 
 ```
 interface tunnel 1
@@ -428,7 +428,159 @@ show ip rsvp interface
 show mpls traffic-eng tunnels
 ```
 
+## Static routing in MPLS TE
 
+- See mpls-te-topology-full.png for more information
 
+- Configure OSPF between CE and PE routers:
 
+- CE1:
 
+```
+router ospf 1
+ network 192.168.11.0 0.0.0.255 area 0
+ network 10.10.10.0 0.0.0.255 area 0
+```
+
+- PE1:
+
+```
+router ospf 1
+ network 10.10.10.0 0.0.0.255 area 0
+ip route 192.168.12.0 255.255.255.0 tunnel 1
+ping 192.168.12.1 # return traffic does not come through the tunnel) - routed back using regular ospf
+```
+
+- CE2:
+
+```
+router ospf 1
+ network 192.168.12.0 0.0.0.255 area 0
+ network 10.10.80.0 0.0.0.255 area 0
+```
+
+- PE2:
+
+```
+router ospf 1
+ network 10.10.80.0 0.0.0.255 area 0
+ip route 192.168.11.0 255.255.255.0 tunnel 1
+```
+
+- Show commands:
+
+- PE1:
+
+```
+show interfaces tunnel 1
+show mpls forwarding-table
+show mpls forwarding-table 192.168.12.0 detail
+```
+
+## MPLS TE autoroute anounce
+
+- On PE1 router - full tunnel interface configuration:
+
+```
+interface tunnel 1
+ ip unnumbered l0
+ tunnel mode mpls traffic-eng
+ tunnel destination 2.0.0.2
+ tunnel mpls traffic-eng bandwidth 1000
+ tunnel mpls traffic-eng path-option 1 dynamic
+ tunnel mpls traffic-eng autoroute anounce
+  # influence which metric is taked by default in consideration when routing traffic through the tunnel
+ tunnel mpls traffic-eng path-selection metric ?
+  igp    te
+```
+
+- On PE2 - to make the tunnel bidirectional
+
+```
+interface tunnel 1
+ ip unnumbered l0
+ tunnel mode mpls traffic-eng
+ tunnel destination 1.0.0.1
+ tunnel mpls traffic-eng bandwidth 1000
+ tunnel mpls traffic-eng path-option 1 dynamic
+ tunnel mpls traffic-eng autoroute anounce
+```
+
+- Show commands:
+
+```
+show mpls forwarding-table
+```
+## MPLS TE autoroute destination
+
+- On PE1 router - full interface tunnel 1 configuration
+
+```
+interface tunnel 1
+ ip unnumbered l0
+ tunnel mode mpls traffic-eng
+ tunnel destination 1.0.0.1
+ tunnel mpls traffic-eng bandwidth 1000
+ tunnel mpls traffic-eng path-option 1 dynamic
+ tunnel mpls traffic-eng autoroute destination
+```
+
+- On PE2 - to make the tunnel bidirectional
+
+```
+interface tunnel 1
+ ip unnumbered l0
+ tunnel mode mpls traffic-eng
+ tunnel destination 1.0.0.1
+ tunnel mpls traffic-eng bandwidth 1000
+ tunnel mpls traffic-eng path-option 1 dynamic
+ tunnel mpls traffic-eng autoroute destination
+```
+- Show commands
+
+```
+show mpls forwarding-table
+
+show ip route | in tunnel 1
+
+show running-config interface tunnel1
+```
+
+## Set routes using policy based routing to announce routes in MPLS TE
+
+- Create a route map that matches the traffic destined to 192.168.12.0/24 and set the exit interface tunnel 1 on PE1
+
+```
+ip access-list extended CE2Customer
+ permit ip any 192.168.12.0 0.0.0.255
+ exit
+ 
+route-map PBR_CE2Customer_Tu1 permit 10
+ match ip address CE2Customer
+ set interface Tunnel 1
+ exit
+
+interface g0/1
+ ip policy route-map PBR_CE2Customer_Tu1
+```
+
+- Show commands:
+
+```
+show route-map
+```
+
+## Set metric for MPLS TE routes to influence the path taken by MPLS TE traffic:
+
+- PE1 (g0/3) + P3 (f0/5) + P4 (g0/7)
+
+```
+interface g0/3
+ mpls traffic-eng administrative-weight 1
+```
+
+- PE1 - verify the path taked by the tunnel traffic
+
+```
+show mpls traffic-eng tunnels tunnel 1
+```
