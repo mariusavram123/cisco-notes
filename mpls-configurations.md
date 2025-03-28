@@ -343,4 +343,92 @@ interface g0/1.10
  encapsulation dot1q 10
  ip address 192.168.11.5 255.255.255.0
 ```
+## Configuring OSPF underlay config for MPLS TE (TE = Traffic Engineering)
+
+- Please check the mpls-te-topology.png for the topology information
+
+- First make sure you configured the routers (IP addresses, loopback addresses), enable OSPF between routers, enable MPLS on the router's interfaces
+
+    - 1. Enable MPLS TE support globally and on all relevant interfaces(on all routers that do MPLS)
+    
+    - 2. Configure OSPF underlay and enable TE extensions(on all routers that do MPLS)
+    
+    - 3. Enable and configure RSVP-TE for TE signalling(on all MPLS-enabled interfaces)
+    
+    - 4. Create TE tunnel interface
+    
+- 1.
+    
+```
+conf t
+mpls traffic-eng tunnels
+
+interface g0/2
+ mpls traffic-eng tunnels
+ 
+interface g0/3
+ mpls traffic-eng tunnels
+```
+
+- 2.
+
+```
+conf t
+router ospf 1
+ mpls traffic-eng area 0
+ mpls traffic-eng router-id l0
+```
+
+- 3.
+
+```
+interface g0/2
+ ip rsvp bandwidth 500000 # in kilobytes per second
+ 
+interface g0/3
+ ip rpvp bandwidth 500000 # in kylobites per second
+```
+- 4.
+
+- PE1:
+
+```
+interface tunnel 1
+ ip unnumbered l0
+ tunnel-mode mpls traffic-eng
+ tunnel destination 2.0.0.2
+ tunnel mpls traffic-eng bandwidth 1000 # in kylobites per second
+ tunnel mpls traffic-eng path-option 1 dynamic # USE CSPF algorithm to calculate the best path based on OSPF topology
+```
+
+- PE2: 
+
+```
+interface tunnel 1
+ ip unnumbered l0
+ tunnel-mode mpls traffic-eng
+ tunnel destination 1.0.0.1
+ tunnel mpls traffic-eng bandwidth 1000
+ tunnel mpls traffic-eng path-option 1 dynamic
+```
+
+- Show commands for OSPF in MPLS TE
+
+- OSPF uses an Type 10 LSA (Opaque LSA) for MPLS TE
+
+```
+show ip ospf mpls traffic-eng link
+
+show ip ospf database opaque-area
+
+show mpls traffic-eng topology 1.0.0.1
+
+show ip rsvp interface
+
+show mpls traffic-eng tunnels
+```
+
+
+
+
 
