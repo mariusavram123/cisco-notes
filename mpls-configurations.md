@@ -228,6 +228,20 @@ show ip cef vrf GREEN 192.168.12.0
 show mpls forwarding-table
 ```
 
+- Traceroute in my lab:
+
+```
+CE1#traceroute 192.168.12.1
+Type escape sequence to abort.
+Tracing the route to 192.168.12.1
+VRF info: (vrf in name/id, vrf out name/id)
+  1 10.10.10.2 2 msec 2 msec 1 msec
+  2 10.10.20.2 [MPLS: Labels 17/21 Exp 0] 2 msec 4 msec 2 msec
+  3 10.10.40.1 [AS 65002] [MPLS: Label 21 Exp 0] 2 msec 1 msec 1 msec
+  4 10.10.40.2 [AS 65002] 1 msec 5 msec * 
+CE1#
+```
+
 ## MPLS layer 2 VPNs
 
 - Configure AToM to transport Ethernet frames over MPLS
