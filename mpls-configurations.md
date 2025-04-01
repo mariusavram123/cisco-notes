@@ -127,6 +127,15 @@ interface g0/4
  mpls ip
 ```
 
+- You can also enable MPLS on all OSPF-participating interfaces
+
+  - PE1, PE2, P1, P2
+
+```
+router ospf 1
+ mpls ldp autoconfig
+```
+
 ## Configure VRFs and on PE routers
 
 - PE1:
