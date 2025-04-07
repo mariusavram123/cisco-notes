@@ -7,7 +7,6 @@
 ```
 dnf makecache
 dnf install -y epel-release kernel-modules-extra
-dnf install -y frr
 ```
 
 - The default frr version from almalinux repository does not have the ldpd daemon includes, so it will not start. 
@@ -496,3 +495,9 @@ router bgp 65004
  exit-address-family
 exit
 ```
+
+### Problem: For now the BGP connection between the PE routers (alma2 and alma 5) are not coming up. There seems to be a lot of TCP retransmissions. 
+
+### The problem seems to be that some of the protocols used do not have support for MPLS in the linux kernel 
+
+### Also ping does not have support for MPLS in linux
