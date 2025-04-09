@@ -182,6 +182,8 @@ show ip arp ?
 
 - The next step is to send the packet at layer 2 to be processed
 
+    - TODO: WHY is the Layer2 encapsulation taking place at Layer 3, shouldn't be the layer 2 who adds the MAC addresses to the packets?
+
 - The next router receive the packet based on the destination MAC address, analyzes the destination IP address 
 
 - Locates the network entry in it's routing table, identifies the exit interface
@@ -271,4 +273,74 @@ conf t
 - The subinterface number does not have to match with the VLAN ID, but if it does, it helps with the operational support
 
 ### Switched virtual interfaces
+
+- Catalyst switches have the possibility to configure IP addresses on SVIs (switched virtual interfaces), also known as VLAN interfaces
+
+- The SVI is defined by defining a VLAN on the switch and then creating an interface on that VLAN (interface vlan 10)
+
+- The switch should have at least one interface in that VLAN in up state in order for the SVI interface to come up
+
+- If a switch is a multilayer switch then the SVI can be used for routing packets without the need for an external router
+
+- Creating and configuring a VLAN (SVI) interface
+
+```
+conf t
+ vlan 10
+  name PCS
+ interface vlan 10
+  ip address 10.0.0.100 255.255.255.0
+  ipv6 address 2001:db8:10::1/64
+  no shutdown
+ interface vlan 99
+  ip address 10.0.99.100 255.255.255.0
+  ipv6 address 2001:db8:99::1/64
+  no shutdown
+```
+
+### Routed switch ports
+
+- Some network designs require point-to-point links between switches for routing
+
+- Example:
+    
+    - Connecting a switch to a router using a transit VLAN, associate the port on the switch with vlan 2001, and then install a SVI for vlan 2001
+    
+- Possible problems:
+
+    - Spanning tree may impact the topology
+    
+    - VLAN 2001 may exist somewhere else in the switched realm
+    
+- On a multilayer switch, switch port can be converted to a routed port
+
+```
+conf t
+ interface g0/1
+  no switchport
+  ip address 10.20.20.1 255.255.255.0
+  ipv6 address 2001:db8:20::1/64
+  no shutdown
+```
+
+### verification of IP addresses
+
+- Verify the IP addresses on the interfaces:
+
+```
+show ip interface <interface ID>
+show ip interface brief
+show ip interface vlan <vlan id>
+show ip interface brief | exclude unassigned # Exclude the ports that do not have IP addresses assigned
+```
+
+- Viewing the IPv6 addresses on the interfaces:
+
+```
+show ipv6 interface <interface ID>
+show ipv6 interface brief
+show ipv6 interface vlan <vlan id>
+show ipv6 interface brief | exclude unassinged|GigabitEthernet # to exclude unassigned addresses
+```
+
 
