@@ -87,6 +87,25 @@ conf t
  mac address-table static 52:54:00:e7:ac:ff vlan 10 interface e0/1
 ```
 
+- Configure MAC address table aging-time (default 300 seconds)
+
+- If aging-time is set to 0, the entries never expire. They are removed only manually
+
+```
+conf t 
+ mac address-table aging-time 150
+```
+
+- Disable MAC address dynamic learning on a switch
+
+```
+conf t
+ no mac-address learning vlan 10,12-14
+ exit
+ 
+show mac address-table learning
+```
+
 - Clear the dynamic MAC address table
 
 ```
