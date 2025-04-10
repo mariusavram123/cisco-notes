@@ -276,3 +276,11 @@ sdm prefer ?
 
 - The switch must then be restarted with the `reload` command
 
+- Every switch in the stack must be configured with the same SDM templates
+
+- View the current SDM template
+
+```
+show sdm prefer
+```
+
