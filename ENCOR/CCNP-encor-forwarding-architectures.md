@@ -212,4 +212,67 @@
 
 ### Hardware CEF
 
+- The ASICs in hardware-based routers are expensive to design, produce and troubleshoot
+
+- ASICs allow for very high packet rates but they are limited in their functionality because they are hardwired to perform specific tasks
+
+- The routers are equiped with NPUs that are designed to overcome the inflexibility of the ASICs
+
+- NPUs are programmable in their hardware, and their firmware can be changed with relative ease
+
+- The main advantage of distributed forwarding architectures is that packet throughput performance is greatly improved by offloading the packet swithing responsabilities to the line cards
+
+- Packet switching in distributed architecture platforms is done via distributed CEF (dCEF)
+
+- dCEF is a mechanism in which the CEF data structures are downloaded to forwarding ASICs and the CPUs of all line cards so that they can participate in packet switching
+
+- This allows the switching to be done at the distributed level thus increasing the packet throughput of the router
+
+- Software CEF is not used in hardware-based platforms to perform packet swithing, as in software-based platforms, but it is used to program hardware CEF
+
+### Stateful Swithover(SSO)
+
+- Routers designed for high availability include hardware redundancy such as dual power supplies and route processors (RPs)
+
+- An RP is responsible for learning the network topology and building the routing table (RIB)
+
+- An RP failure can trigger routing protocol adjacencies to reset resulting in packet loss and network instability
+
+- During an RP failure it may be more desirable to hide the failure and allow the router to continue forwarding packets using the previously programmed CEF table entries rather than temporarly drop packets while waiting for the secondary RP to reestablish the routing protocol adjacencies and rebuild the forwarding table
+
+- *Stateful switchover (SSO)* is a redundancy feature that allows a Cisco router with 2 RPs to synchronize router configuration and control plane state information
+
+- The process of mirroring information between RPs is referred to as *checkpointing*
+
+- SSO-enabled routers always checkpoint line card operation and Layer 2 protocol states
+
+- During a switchover, the standby RP imediately takes control and prevents basic problems such as interface link flaps
+
+- However Layer 3 packet forwarding is disrupted without additional configuration
+
+- The RP switchover triggers a routing protocol adjacency flap that clears the routing table
+
+- When the routing table is cleared the CEF entries are purged, and traffic is no longer routed until the network topology is relearned and the forwarding table is reprogrammed
+
+- Enabling **nonstop forwarding (NSF)** or **nonstop routing (NSR)** high availability capabilities informs the routers to maintain CEF entries for a short duration and continue forwarding packets through an RP until the control plane recovers
+
+### SDM templates
+
+- The capacity of MAC addresses that a switch needs compared with the number of routes that it holds depends on where it is deployed into the network
+
+- The memory used for TCAM table is limited and statically allocated during the bootup sequence of the switch
+
+- When a section of a hardware resource is full all processing overflow is send to the CPU, which seriously impact the performance on the switch
+
+- The allocation ratios between various TCAM tables are stored and can be modified with Switching Database Manager (SDM) templates
+
+- Multiple Cisco switches exist, and the SDM template can be configured on Catalyst 9000 series switches with the following command:
+
+```
+sdm prefer ?
+	vlan
+	advanced
+```
+
+- The switch must then be restarted with the `reload` command
 
