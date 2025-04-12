@@ -120,6 +120,12 @@
 
 - This allows some features like ACLs to be processed at the same speed even if they have 10 entries or 500 entries
 
+- Show the TCAM utilisation:
+
+```
+show platform tcam utilisation
+```
+
 ### Centralised forwarding
 
 - Given the low cost of general purpose CPUs, the price for sofrware-based routers become more affordable but at the expense of the total throughput
@@ -272,6 +278,9 @@
 sdm prefer ?
 	vlan
 	advanced
+	access
+	default
+	dual-ipv4-and-ipv6
 ```
 
 - The switch must then be restarted with the `reload` command
@@ -283,4 +292,3 @@ sdm prefer ?
 ```
 show sdm prefer
 ```
-
