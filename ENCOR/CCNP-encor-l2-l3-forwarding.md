@@ -342,7 +342,7 @@ conf t
   no shutdown
 ```
 
-### verification of IP addresses
+### Verification of IP addresses
 
 - Verify the IP addresses on the interfaces:
 
@@ -361,5 +361,3 @@ show ipv6 interface brief
 show ipv6 interface vlan <vlan id>
 show ipv6 interface brief | exclude unassinged|GigabitEthernet # to exclude unassigned addresses
 ```
-
-

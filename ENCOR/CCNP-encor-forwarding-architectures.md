@@ -164,11 +164,41 @@ show platform tcam utilisation
 		
 		- CEF uses the FIB to make IP destination prefix-based switching decisions
 		
+		- View the CEF FIB:
+		```
+		show ip cef
+		
+		show ip cef 1.1.1.1/32
+		
+		show ip cef 1.1.1.1/32 detail
+		```
+		
+		- Clearing the CEF table:
+		```
+		clear cef table ipv4
+		```
+		
+		- Configure load-sharing method for CEF, per interface
+		```
+		conf t
+		 int g0/0
+		  ip load-sharing per-packet
+		```
+		
 	- **Adjacency table**
 	
 		- Adjacency table - also known as Adjacency Information Base (AIB) contains the directly connected next hop IP addresses and their corresponding next-hop MAC addresses, as well as the ingress interface's MAC address
 		
 		- The Adjacency table is populated with data from the ARP table or other Layer 2 protocol tables
+		
+		- List the entries in the adjacency table:
+		```
+		show adjacency
+		```
+		- List detailed adjacencies
+		```
+		show adjacency detail
+		```
 		
 - Steps to build the CEF table from the routing table:
 
@@ -291,4 +321,12 @@ sdm prefer ?
 
 ```
 show sdm prefer
+```
+
+### Verifying the processes used by a router
+
+```
+show processes cpu
+
+show processes cpu | include Ip Input
 ```
