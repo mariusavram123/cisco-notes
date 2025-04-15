@@ -246,6 +246,24 @@ show platform tcam utilisation
 
 - If a router receives a packet with TTL 0, the packet is discarded
 
+- Allow CEF to perform ARP/neighbor resolution without sending packets to the CPU (enabled by default)
+
+```
+ip cef optimize neighbor resolution
+```
+
+- View all CEF related default configs:
+
+```
+show running-config all | include cef
+```
+
+- View CEF configs per interface:
+
+```
+show cef interface g0/0
+```
+
 ### Hardware CEF
 
 - The ASICs in hardware-based routers are expensive to design, produce and troubleshoot
