@@ -310,6 +310,36 @@ show cef interface g0/0
 
 - Enabling **nonstop forwarding (NSF)** or **nonstop routing (NSR)** high availability capabilities informs the routers to maintain CEF entries for a short duration and continue forwarding packets through an RP until the control plane recovers
 
+- Configure SSO:
+
+```
+conf t
+ redundancy
+  mode sso
+```
+
+### Graceful restart configuration for routing protocols
+
+- On Cisco equipments, for IGP, graceful restart capability is configured with `nsf` command 
+
+```
+conf t
+ router ospf 1
+  nsf ? # Graceful restart
+ 
+ router eigrp 1
+  nsf? # Graceful restart
+  
+ router isis
+  nsf # Graceful restart
+  
+ router bpg 69420
+  bgp graceful-restart ? # Graceful restart 
+  
+ mpls ldp ?
+  graceful-restart
+```
+
 ### SDM templates
 
 - The capacity of MAC addresses that a switch needs compared with the number of routes that it holds depends on where it is deployed into the network
@@ -341,10 +371,46 @@ sdm prefer ?
 show sdm prefer
 ```
 
+- Show a sdm template without applying it:
+
+```
+show sdm prefer ?
+ lanbase-routing
+ default
+ dual-ipv4-and-ipv6
+ qos
+ 
+show sdm prefer lanbase-routing
+```
+- Set the preferred SDM template:
+
+```
+conf t
+ sdm prefer dual-ipv4-and-ipv6
+ exit 
+
+reload
+```
+
 ### Verifying the processes used by a router
+
+- Verifying what processes use CPU
 
 ```
 show processes cpu
 
 show processes cpu | include Ip Input
 ```
+
+- Verifying TCAM utilisation
+
+```
+show platform tcam utilization
+```
+
+- Verify MAC address table count
+
+```
+show mac address-table count
+```
+
