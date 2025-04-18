@@ -171,4 +171,46 @@ conf t
 
 ### Building the STP topology
 
+- In the topology the configuration of all switches does not include any customizations for STP
+
+- The focus is primarly for VLAN 1 but VLANs 10, 20 and 99 also exist in the topology
+
+![STP topology](./basic-stp-topology.png)
+
+### Root bridge election
+
+- The first step with STP is to identify the root bridge
+
+- As a switch initializes, it assumes that it is the root bridge and uses the local bridge identifier and the root bridge identifier
+
+- Then it listens to it's neighbor's configuration BPDU and does the following:
+
+	- If the neighbor's configuration BPDU is inferior to it's own BPDU, the switch ignores that BPDU
+	
+	- If the neighbor's configuration BPDU is preferred to it's own BPDU, the switch updates it's BPDUs to include the new root bridge identifier along with a new root path cost that correlates to the total path cost to reach the new root bridge. This process continues until all switches in a topology have identified the new root bridge switch.
+	
+- STP deems a switch more preferrable if the priority of the bridge identifier is lower than the priority of other switch's configuration BPDUs
+
+- If the priority is the same, then the switch prefers the BPDU with the lowest system MAC
+
+- Generally older switches have a lower MAC address and are considered more preferable 
+
+- Configuration changes can be made for optimizing placement of the root switch in a Layer 2 topology
+
+- In our topology. SW1 can be identified as root bridge because it's system MAC address (0062.ec9d.c500) is the lowest in the topology
+
+- You can verify which is the spanning tree root using the following command:
+
+```
+show spanning-tree root
+```
+
+- The output includes the VLAN number, root bridge identifier, root path cost, hello time, max age time, and forwarding delay
+
+- Because SW1 is the root bridge, all ports are designated ports so the Root Port field is empty
+
+- This is one way to verify that the connected switch is the root switch for the VLAN
+
+- Root bridge priority for VLAN 1 is 32769 and not 32768. The priority in the configuration BPDU packets is actually the priority plus the value of sys_id_ext(which is the VLAN number)
+
 
