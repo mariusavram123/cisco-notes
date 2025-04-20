@@ -324,3 +324,173 @@ conf t
 
 ### STP topology changes
 
+- In a stable Layer2 topology, configuration BPDUs always flow from the root bridge towards the edge switches
+
+- Changes in the topology (for example switch failure, link failure or links becoming active) have an impact on all switches in the Layer 2 topology
+
+- The switch that detects link status change sends a topology change notification(TCN) BPDU towards the root bridge out of it's RP(root port)
+
+- If an upstream switch receives the TCN, it sends out an acknowledgement and forwards the TCN out of it's RP to the root bridge
+
+- Upon receipt of the TCN, the root bridge creates a new Configuration BPDU, with the Topology Change flag set, and it is then flooded to all the switches
+
+- When a switch receives a configuration BPDU with Topology Change flag set, all switches change their MAC address timer to the forwarding delay timer(with a default of 15 seconds)
+
+- This flushes out the MAC addresses for devices that have not communicated in that 15-second window but maintains the MAC addresses for devices that are actively communicating
+
+- Flushing the MAC address table prevents the switch from sending traffic to a host that is no longer reachable by that port
+
+- A side effect of flushing the MAC address table is that it temporarly increases the unknown unicast flooding while it is rebuild
+
+- This can impact hosts because of their CSMA/CD behaviour
+
+- The MAC address timer is then reset to normal (300 seconds by default) after the second configuration BPDU is received
+
+- TCNs are generated on a VLAN basis, so the impact of TCNs directly correlates to the number of hosts in a VLAN
+
+- As the number of hosts increase, the most likely TCN generation is to occur and the more hosts are impacted by the broadcasts
+
+- Topology changes should be checked as part of the troubleshooting process
+
+- Seeing the Topology changes:
+
+```
+show spanning-tree vlan <id> detail
+```
+
+- The output of this command shows the topology change count and time since the last change has occured
+
+- A sudden or continuous increase of TCNs indicates a potential problem and should be investigated further for flapping ports or events on a connected switch
+
+- The process of determining why TCNs are occuring involves checking a port to see whether it is connected to a host or another switch
+
+- If it is connected to another switch you need to connect to that switch and repeat the process of examining the STP details
+
+- You may need to examine CDP tables or the network documentation
+
+- You can execute the `show spanning-tree vlan <id> detail` command again to find the last switch in the topology to identify the problematic port
+
+- Topology change schema
+
+![Schema](./STP-Topology-change.jpg)
+
+
+### Converging with direct link failures
+
+- When a switch loses power or reboots, or when a cable is removed from a port, the Layer 1 signalling places the port into a down state, which can notify other processes(such as STP)
+
+- STP considers such an event a direct link failure and can react in one of three ways depending on the topology
+
+- Topology for direct link failure convergence scenarios:
+
+![Direct-link-failure](./direct-link-failure-topology.png)
+
+#### Direct link failure scenario 1
+
+- In the first scenario the link between SW2 and SW3 fails. SW2's Gi1/0/3 is the DP, and SW3 Gi1/0/2 port is in a blocking state
+
+- Because SW3's Gi1/0/2 is already in the blocking state, there is no impact to traffic between the two switches as they both transmit data through SW1
+
+- Both SW2 and SW3 will advertise a TCN towards the root switch, which results in the Layer 2 Topology flushing it's MAC address table (Same scenario as topology change schema)
+
+![Link-fail-1](./direct-link-failure-1.png)
+
+#### Direct link failure scenario 2
+
+- The link between SW1 and SW3 fails. Network traffic from SW1 or SW2 towards SW3 is affected because SW3's G1/0/2 port is in a blocking state
+
+- Failure scenario and events that occur to stabilize STP topology
+
+![Direct-link-failure2](./direct-link-failure-2.png)
+
+- **Phase1**: SW1 detects a link failure on it's Gi1/0/3 interface and SW3 detects a link failure on it's Gi1/0/1 interface
+
+- **Phase2**: Normally SW1 would generate a TCN flag out of it's root port but it is the root bridge so it does not. SW1 would advertise a TCN if it were not the root bridge
+
+	- SW3 removes it's best BPDU received from SW1 on it's Gi1/0/1 interface because it is now in a down state
+	
+	- At this point SW3 would attempt to send a TCN towards the root switch to notify it of a topology change. However it's root port is down
+	
+- **Phase3**: SW1 advertises a configuration BPDU with Topology Change flag out of all it's ports
+
+	- This BPDU is received and relayed to all switches in the environment
+	
+	- If other switches were connected to SW1, they would receive a configuration BPDU with the Topology Change Flag set as well. These packets have an impact for all switches in the same Layer 2 domain
+	
+- **Phase4**: SW2 and SW3 receive the configuration BPDU with the Topology Change flag
+
+	- These switches then reduce the MAC address age timer to the forward delay timer to flush out older MAC entries
+	
+	- In this phase, SW2 does not know what changed in the topology
+	
+- **Phase5**: SW3 must wait until it hears from the root bridge again or the Max Age timer expires before it can reset the port state and start to listen for BPDUs on it's Gi1/0/2 interface(which was in the blocking state previously)
+
+- The total convergence time for SW3 is 30 seconds: 15 seconds for the listening state and 15 seconds for the learning state before SW3 Gi1/0/2 can be made the RP
+
+![Scenario2](./topology-change-2.jpg)
+
+
+#### Direct link failure scenario 3
+
+- In the third scenario the link between SW1 and SW2 fails
+
+- Network traffic from SW1 or SW3 towards SW2 is impacted because SW3 Gi1/0/2 is in a blocking state
+
+![Direct-link-failure3](./direct-link-failure-3.png)
+
+- **Phase1**: SW1 detects a link failure on it's Gi1/0/1 interface. SW2 detects failure on it's Gi1/0/3 interface
+
+- **Phase2**: Normally SW1 would generate a TCN flag out of it's Root Port, but it is the root bridge, so it does . SW1 would advertise a TCN if it were not the root bridge
+
+	- SW2 removes it's best BPDU received from SW1 on it's Gi1/0/1 interface as it is now in a down state
+	
+	- At this point, SW2 would attempt to send a TCN towards the root switch to notify it of a topology change; however it's root port is down
+	
+- **Phase3**: SW1 advertises a configuration BPDU with the Topology Change flag out of all it's ports
+
+	- This BPDU is then received and relayed to SW3
+	
+	- SW3 cannot relay this to SW2 as it's Gi1/0/2 port is still in blocking state
+	
+	- SW2 assumes that it is now the root bridge and advertises configuration BPDUs with itself as the root 
+	
+- **Phase4**: SW3 receives the configuration BPDU with Topology Change from SW1
+
+	- SW3 reduces the MAC address age timer to the forward delay to flush out older MAC entries
+	
+	- SW3 receives SW2 inferior BPDUs and discards them as it is still receiving superior BPDUs from SW1
+	
+- **Phase5**: The Max Age timer on SW3 expires, and now SW3's Gi1/0/2 port transitions from blocking to listening state
+
+	- SW3 can now forward the next configuration BPDU it receives from SW1 to SW2
+	
+- **Phase6**: SW2 receives SW1's configuration BPDU via SW3 and recognizes it as superior
+
+	- It marks it's Gi1/0/3 interface as the root port and transitions it to the listening state
+	
+- The total convergence time on SW3 is 52 seconds: 
+	
+	- 20 seconds for the Max Age timer on SW3
+	
+	- 2 seconds for the configuration BPDU from SW3
+	
+	- 15 seconds for the listening state
+	
+	- 15 seconds for the learning state
+	
+- The steps scheme:
+
+![Scenario3](./Topology-change3.jpg)
+
+	
+#### Indirect failures
+
+- There are some failure scenarios where STP communication between switches is impaired or filtered while the network link remains up
+
+- The situation is known as *indirect link failure*, and timers are required to detect and remediate the topology
+
+- Impediment or data corruption on the link between SW1 and SW3 along with the logic to resolve the loss of network traffic:
+
+
+
+
