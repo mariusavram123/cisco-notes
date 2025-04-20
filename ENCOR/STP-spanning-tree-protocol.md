@@ -213,4 +213,114 @@ show spanning-tree root
 
 - Root bridge priority for VLAN 1 is 32769 and not 32768. The priority in the configuration BPDU packets is actually the priority plus the value of sys_id_ext(which is the VLAN number)
 
+- Can be confirmed by looking at VLAN 10 which haves priority 32778, which is 10 higher than 32768
+
+![Command output](./spanning-tree-root.png)
+
+- The advertised root path cost is always the value calculated on the local switch
+
+- As the BPDU is received, the local root path cost is the advertised root path cost plus the local interface port cost
+
+- The root path cost is always 0 on the root bridge
+
+![Path advertisements](./path-cost-advertisements.png)
+
+### Locating root ports
+
+- After the switches have identified the root bridge they must determine their root ports (RP)
+
+- The root bridge continue to advertise configuration BPDUs out of all it's ports
+
+- The switch compares the BPDU information to identify the root port(RP)
+
+- RP selection logic (the next criterion is used in the event of a tie)
+
+	1. The interface associated with the **lowest path cost** to the root bridge is more preferred
+	
+	2. The interface associated to the **lowest system priority of the advertising(neighbor)** switch is preferred next
+	
+	3. The interface associated to the **lowest system MAC address of the advertising(neighbor)** switch is preferred next
+	
+	4. When multiple links are associated to the same switch, the **lowest port priority from the advertising(neighbor)** switch is preffered (lowest neighbor port priority)
+	
+	5. When multiple links are associated to the same switch, the **lowest port number from the advertising(neighbor)** switch is preferred
+	
+- The root bridge can be identified for a specific VLAN using the command `show spanning-tree root` and examining the CDP or LLDP neighbor information to identify the host name of the RP switch
+
+### Locating Blocked Designated Switch Ports
+
+- Now that the root bridge and RPs have been identified, all other ports are considered designated ports
+
+- However if two non-root switches are connected to each-other on their designated ports, one of these switch ports must be set to a blocking state to prevent a forwarding loop
+
+- In our topology there will be the following links:
+
+	- SW2 Gi1/0/3 -> SW3 Gi1/0/2
+	
+	- SW4 Gi1/0/5 -> SW3 Gi1/0/4
+	
+	- SW4 Gi1/0/6 -> SW5 Gi1/0/5
+	
+- The logic to calculate which ports should be blocked between two non-root switches is the following:
+
+	1. The interface is a designated port and must not be considered an RP
+	
+	2. The switch with the **lowest path cost** to the root bridge forwards packets and the one with the higher path cost blocks
+	
+	3. The **system priority of the local switch** is compared with the **system priority of the remote switch**. The local port is moved to a blocked state if the **remote system priority is lower** than that of the local switch
+	
+	4. The **system MAC address of the local switch** is compared to the **system MAC address of the remote switch**. The local designated port is moved to a blocked state if the remote system MAC address is lower than that of the local switch. If the links are connected to the same switch they move on to the next step (lowest port number of the neighbor switch)
+	
+- All three links (SW2 Gi10/3 -> SW3 Gi1/0/2, SW4 Gi1/0/5 -> SW5 Gi1/0/4, SW4 Gi1/0/6 -> SW5 Gi1/0/5) would use step 4 of the process just listed to identify which ports will move to a blocking state
+
+- SW3 Gi1/0/2, SW5 Gi1/0/5 and SW5 Gi1/0/6 ports will all transition to a blocking state because the MAC addresses are lower for SW2 and SW4
+
+- The command `show spanning-tree vlan <id>` provides useful information for locating the port states
+
+- These port types are expected on Catalyst switches:
+
+	- **Point-to-point (P2P)**: This port type connects to another network device (PC or RSTP switch)
+	
+	- **P2P edge**: This port type specifies that portfast is enabled on this port
+	
+- If on the command `show spanning-tree vlan <id>`, the type field includes *TYPE_Inc-, this indicates a port configuration mismatch between the Catalyst switch and the switch it is connected to.
+
+- Common issues are the port type being incorrect and the port mode (access vs trunk) being misconfigured
+
+![Type Inc](./stp-type-inc.png)
+
+- Assigning a port type for a interface
+
+```
+conf t
+ interface e0/2
+  spanning-tree link-type point-to-point # or
+  spanning-tree link-type shared # usually shared is used if the port is connected to a hub
+```
+
+- In our topology all ports on SW2 are in a forwarding state, but port Gi1/0/2 on SW3 is in a blocking (BLK) state
+
+- Specifically SW3's G1/0/2 has been designated as an alternate port to reach the root in the event that Gi1/0/1 connection fails
+
+- The reason that SW3's Gi1/0/2 port rather than SW2 Gi1/0/3 was placed into a blocking state is that SW2's system MAC address(0081.c4ff.8d00) is lower than SW3's system MAC address(189c.5d11.9980) 
+
+- This can be deduced by looking at the system MAC address in the output of `show spanning-tree vlan 1` command
+
+### Verification of VLANs on trunk links
+
+- All interfaces that participate in a VLAN are listed in the output of the command `show spanning-tree`.
+
+- Using this command can be a daunting task for trunk ports that carry multiple VLANs
+
+- The output includes the STP state for every VLAN on an interface for every switch interface
+
+- The command `show spanning-tree interface <interface_id> <detail>` reduces the output to the STP state for the specified interface
+
+- The optional `detail` keyword provides information on port cost, port priority, number of transitions, link type and count of BPDUs send or received for every VLAN supported on that interface
+
+- If a VLAN is missing from a trunk port you can check the trunk port configuration for accuracy: `show interfaces trunk`
+
+- A common problem is that a VLAN may be missing from the allowed VLANs list on that trunk interface
+
+### STP topology changes
 
