@@ -629,7 +629,7 @@ show spanning-tree vlan <id> detail
 
 - Topology
 
-![Topology](./STP-tuning-topology.png)
+![Topology](./STP-tuning.png)
 
 - **Root Bridge Placement**
 
@@ -641,4 +641,96 @@ show spanning-tree vlan <id> detail
 
 - Configuring the system priority:
 
+- Method 1
+
+```ios
+conf t
+ spanning-tree vlan <id> priority <priority> in increments of 4096
+```
+
+- The priority is a value between 0 and 61440
+
+- Method 2
+
+```ios
+conf t
+ spanning-tree vlan <id> root <primary|secondary> diameter <diameter>
+```
+
+- Showing the spanning-tree topology:
+
+```ios
+show spanning-tree vlan 1
+
+show spanning-tree
+```
+
+- Debugging some STP messages:
+
+```ios
+debug spanning-tree events
+```
+
+- This command executes a script that sets the priority to certain values
+
+	- Primary sets the priority to 24576 (If you already have a switch with a lower priority the primary keyword is going to set the priority with 4096 less than the actual root bridge)
+	
+	- Secondary sets the priority to 28672 (It does not look at already assigned priorities)
+	
+- The optional diameter keyword makes it possible to tune the Spanning Tree Protocol (STP) convergence and modifies the timers
+
+- It should reference the maximum number of Layer 2 hops between each switch and the root bridge
+
+- The timers do not need to be modified on other switches because they are carried throughout the topology the root bridge's bridge protocol data units (BPDUs)
+
+- The placement of the root bridge is an important decision design and often should be chosen to minimize the number of hosts to the furthest switch in the topology
+
+- The design should consider where redundant connections exist, connections that will be blocked, and the ability(performance) for the root switch to handle cross-switch traffic
+
+- Generally, root switches are at Layer 2/Layer 3 boundary
+
+- The best way to prevent errorneous devices for taking over the STP root role is to set the priority to 0 for the primary root switch and to 4096 for the secondary root switch
+
+- In addition, root guard should be used
+
+#### Modifying STP Root Port and Blocked Switch Port locations
+
+- The STP port cost is used in calculating the STP tree
+
+- When a switch generates the BPDUs, the total path cost includes only the calculated metric to the root and does not include cost of the port out which the BPDU is advertised
+
+- The receiving switch adds the port cost for the interface on which the BPDU was received in conjunction with the value of the total path cost in the BPDU
+
+- SW1 advertises it's BPDU to SW3 with a total path cost of 0. SW3 receives the BPDU and adds it's STP port cost of 4 to the local path cost of the BPDU(0), resulting in a value of 4
+
+- SW3 then advertises the BPDU towards SW5 with a total path cost of 4, to which SW5 then adds it's STP port cost of 4
+
+- SW5 therefore reports a total path cost of 8 to reach the root bridge via SW3
+
+![Path advertisement](./path-cost-advertisement.png)
+
+- SW1 being the root bridge there is no cost reported in the output of `show spanning-tree vlan 1` output 
+
+![SW1](./spann-vlan-1-sw1.png)
+
+- SW3 output (using ethernet interfaces in the lab)
+
+![SW3](./spann-vlan1-sw3.png)
+
+- SW5 output (using ethernet interfaces in the lab)
+
+![SW5](./spann-vlan1-sw5.png)
+
+- By changing the STP port costs for VLAN1 you can modify the STP forwarding path
+
+- Modifying STP port cost
+
+```ios
+conf t
+ spanning-tree [vlan <id>] cost <cost>
+```
+
+- You can lower a path that is currently an alternate port while making it designated, or you can raise the cost on a port that is designated to turn it into a blocking port
+
+- The spanning-tree command modifies the cost for all VLANs unless the optional VLAN keyword is used to specify a VLAN
 
