@@ -491,6 +491,154 @@ show spanning-tree vlan <id> detail
 
 - Impediment or data corruption on the link between SW1 and SW3 along with the logic to resolve the loss of network traffic:
 
+![Indirect-failure](./indirect-link-failure.png)
 
+- Convergence with indirect link failure:
+
+- **Phase1**: An event occurs that impairs or corrupts data on the link. SW1 and SW3 still report a linkup condition
+
+- **Phase2**: SW3 stops receiving configuration BPDUs on it's RP. It keeps a cached entry for the RP on Gi1/0/1
+
+	- SW1's configuration BPDUs that are being transmitted via SW2 are discarded as it's Gi1/0/2 interface is in a blocking state
+	
+	- Once SW3's Max Age timer expires and flushes the RP's cached entry, SW3 transition Gi1/0/2 from blocking to listening state
+	
+- **Phase3**: SW2 continues to advertise SW1's configuration BPDUs towards SW3
+
+- **Phase4**: SW3 receives SW1's configuration BPDU via SW2 on it's Gi1/0/2 interface. This port is now marked as the RP and continues to transition to the listening and learning states
+
+- The total time for reconvergence on SW2 is 52 seconds:
+
+	- 20 seconds for the Max Age timer on SW3
+	
+	- 2 seconds for the configuration BPDU advertisement on SW2
+	
+	- 15 seconds for the listening state on SW3
+	
+	- 15 seconds for the learning state on SW3
+	
+![Indirect-link-procedure](./indirect-link-procedure.jpg)
+
+### Rapid Spanning Tree Protocol
+
+- 802.1D did a decent job in preventing Layer 2 loops, but it used only one topology tree which introduced scalability issues
+
+- Some larger environments with multiple VLANs need different STP topologies for traffic engineering purposes(for example load balancing, traffic steering)
+
+- Cisco created Per-VLAN Spanning-Tree(PVST) and Per-VLAN Spanning-Tree plus (PVST+) to allow more flexibility
+
+- PVST and PVST+ were proprietary spanning protocols
+
+- The concepts in these protocols were incorporated with other enhancements to provide faster convergence into the IEEE 802.1W specification, known as Rapid Spanning Tree Protocol (RSTP)
+
+- RSTP (802.1W) Port States:
+
+	- **Discarding**: The switch port is enabled, but the port does not forward any traffic to ensure that a loop is not created
+	
+		- This state combines traditional STP states disabled, listening and blocking
+	
+	- **Learning**: The switch port modifies the MAC address table with any network traffic it receives. The switch does not forward any network traffic besides BPDUs
+	
+	- **Forwarding**:The switch port forwards all traffic and updates the MAC address table as expected
+	
+		- This is the final state for a switch port to forward network traffic
+		
+- A switch tries to establish a RSTP handshake with the device connected to the other end of the cable
+
+- If a handshake does not occur, the other device is assumed to be non-RSTP compatible, and the port defaults to regular 802.1D behaviour
+
+- This means that host devices such as computers, printers and so on still encounder a significant transmission delay(30 seconds) after the network link is established
+
+- RSTP (802.1W) Port Roles:
+
+	- **Root Port**(RP): A network port that connects to the root switch or an upstream switch in the spanning-tree topology
+	
+		- There should be only one Root Port per VLAN on a switch
+	
+	- **Designated Port**(DP): A network port that receives and forwards frames to other switches 
+	
+		- Designated Ports provide connectivity to downstream devices and switches
+		
+		- There should be only one active designated port on a link
+	
+	- **Alternate Port**(AP): A network port that provides alternate connectivity toward the root switch through a different switch
+	
+	- **Backup Port**(BP): A network port that provides link redundancy towards the current root switch.
+	
+		- The backup port cannot guarantee connectivity to the root bridge in the event that the upstream switch fails
+		
+		- A backup port only exists only when multiple links connect to the same switches
+		
+- RSTP (802.1W) Port Types:
+
+	- **Edge port**: A port at the edge of the network where hosts connect to the Layer2 Topology
+	
+		- These ports dirrectly correlate to ports that have portfast feature enabled
+		
+	- **Root Port**: A port that haves the best path cost toward the root bridge. There can be only one root port on a switch
+	
+	- **Point-to-point port**: Any port that connects to another RSTP switch with full duplex 
+	
+		- Full-duplex links do not permit more that two devices on a network segment, so determining whether a link is full duplex is the fastest way to check the feasibility of being connected to a switch
+		
+		- Multi-access Layer 2 devices such as hubs can only connect at half duplex. If a port can only connect via half duplex, it must operate under traditional 802.1D forwarding states
+		
+### Building the RSTP topology
+
+- With RSTP, switches exchange handshakes with other RSTP switches to transition through the following STP states faster
+
+- When two switches first connect, they establish a bidirectional handshake across the shared link to identify the root bridge
+
+- This is straightforward for an environment with only two switches; however, large environments require greater care to avoid creating a forwarding loop
+
+- RSTP used a synchronization process to add a switch to the RSTP topology without introducing a forwarding loop
+
+- The synchronization process starts when two switches (such as SW1 and SW2) are first connected
+
+- Same topology (the one with 5 switches) is used for RSTP election process
+
+- The process proceeds as follows
+
+	1. As the first two switches connect to each-other, they verify that they are connected to a point-to-point link by checking the full-duplex status
+	
+	2. They establish a handshake with each-other to advertise a proposal(in configuration BPDUs) that their interface should be the DP for that port
+	
+	3. There can be only one DP per segment, so each switch identifies whether it is the superior or inferior switch, using the same logic as 802.1D for the system identifier (that is the lowest priority and then the lowest MAC address). SW1(0062.ec9d.c500) is the superior switch to SW2(0081.c4ff.8b00)
+	
+	4. The inferior switch (SW2) recognizes that it is inferior and mark it's local port Gi1/0/1 as the RP. At the same time, it moves all non-edge ports to a discarding state. At this point in time, the switch has stopped all local switching for non-edge ports.
+	
+	5. The inferior switch (SW2) sends an agreement(configuration BPDU) to the root bridge (SW1), which signinfies to the root bridge (SW1) that synchronization is ocurring on that switch
+	
+	6. The inferior switch (SW2) moves it's RP (Gi1/0/1) to a forwarding state. The superior switch moves it's DP (Gi1/0/2) to a forwarding state too
+	
+	7. The inferior switch (SW2) repeats the process for any downstream switches connected to it
+	
+- The RSTP convergence process can occur quickly, but if a downstream switch fails to acknowledge the proposal, the RSTP must default to 802.1D behaviour to prevent a forwarding loop
+
+## Advanced STP tuning 
+
+	1. STP Topology Tuning
+	
+	2. Additional STP Protection Mechanisms
+
+### STP Topology Tuning
+
+- A properly designed network strategically places the root bridge on a specific switch and modifies which ports should be the designated ports (that is in forwarding state) and which ports should be alternate ports (that is, discarding/blocking state)
+
+- Design considerations factor in hardware platform, resiliency and network topology
+
+- Topology
+
+![Topology](./STP-tuning-topology.png)
+
+- **Root Bridge Placement**
+
+- Ideally the root bridge is placed on a core switch, and a secondary root bridge is designated to minimize changes to the overall spanning tree
+
+- Root bridge placement is accomplished by lowering the system priority of the root bridge to the lowest value possible, raising the secondary root bridge to a value slighly higher than that of the root bridge, and (ideally) increasing the system priority on all other switches
+
+- This ensures consistent placement of the root bridge
+
+- Configuring the system priority:
 
 
