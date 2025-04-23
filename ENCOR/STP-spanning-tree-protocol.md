@@ -721,16 +721,458 @@ debug spanning-tree events
 
 ![SW5](./spann-vlan1-sw5.png)
 
-- By changing the STP port costs for VLAN1 you can modify the STP forwarding path
+- By changing the STP port costs for a specific VLAN (per interface) you can modify the STP forwarding path
 
 - Modifying STP port cost
 
 ```ios
 conf t
- spanning-tree [vlan <id>] cost <cost>
+ int g1/0/1
+  spanning-tree [vlan <id>] cost <cost>
 ```
 
 - You can lower a path that is currently an alternate port while making it designated, or you can raise the cost on a port that is designated to turn it into a blocking port
 
 - The spanning-tree command modifies the cost for all VLANs unless the optional VLAN keyword is used to specify a VLAN
 
+- Set the cost for a port in our topology on SW3
+
+```ios
+conf t
+ interface gi1/0/1
+  spanning-tree cost 1
+```
+
+- Modifying the port cost to 1 on SW3's port gi1/0/1 impacts the port state between SW2 and SW3
+
+- SW2 receives a BPDU from SW3 with a cost of 5, and SW3 receives a BPDU from SW2 with a cost of 8
+
+- Now SW3's Gi1/0/2 is no longer an alternate port but is now a designated port
+
+- SW2's Gi1/0/3 was changed from a designated port to an alternate port
+
+#### Modifying STP Port Priority
+
+- The STP port priority impacts which port is used as alternate port when multiple links are used between switches
+
+- In out topology, shutting down the link between SW3 and SW5 forces SW5 to choose one of the links connected to SW4 as a root port
+
+- This change makes SW5's Gi1/0/4 port RP (root port) towards SW4
+
+- Remember that system ID and port cost are the same, so the next check is port priority followed by port number
+
+- Both the port priority and port number are controlled by the upstream switch
+
+- You can modify the port priority on SW4's Gi1/0/6 (towards SW5's Gi1/0/5 port) with the command
+
+- SW4
+
+```ios
+conf t
+ int gi1/0/6
+  spanning-tree [vlan <id>] port-priority <priority>
+  spanning-tree port-priority 64
+```
+
+- The optional vlan keyword allows you to change the port-priority on a VLAN-by-VLAN basis
+
+- Now SW4's Gi1/0/6 port has a value of 64, which is lower than the value of it's Gi1/0/5 port, which is using a default value of 128
+
+- SW4's Gi1/0/6 is now preferred and will impact the RP on SW5
+
+#### Additional STP Protection Mechanisms
+
+- Network packets do not decrement the time-to-live portion of the header as a packet forwarded in a Layer 2 topology
+
+- A network forwarding loop occurs when the logical topology allows for multiple active paths between two devices
+
+- Broadcast and multicast traffic wreak havoc as they are forwarded out of every switch port and continue the forwarding loop
+
+- High CPU consumption and low free memory space are common simptoms of a Layer 2 forwarding loop
+
+- In Layer 2 forwarding loops, in addition to constantly consuming switch bandwidth, the CPU spikes
+
+- Because the packet is received on a different interface, the switch must move the media access control (MAC) address from one interface to the next
+
+- The network throughput is impacted drastically; users are likely to notice a slowdown on their network applications, and the switches may crash due to exhausted CPU and memory resources
+
+- Common scenarios for Layer 2 forwarding loops:
+
+	- STP disabled on the switch
+	
+	- A misconfigured load-balancer that transmit traffic out multiple ports with the same MAC address
+	
+	- A misconfigured virtual switch that bridges two physical ports (Virtual switches typically does not participate in STP)
+	
+	- End users using a dumb switch or hub
+	
+- Catalyst switches detect a MAC address that is flapping between interfaces and notify via syslog with the MAC address of the host, VLAN, and ports between which the MAC address is flapping
+
+- These messages must be investigated to ensure that a forwarding loop does not exist
+
+- Syslog message for a flapping MAC address which have been removed from the topology
+
+```
+%SW_MATM-4-MACFLAP_NOTIF: Host 70df.2f22.b8c7 in vlan 1 is flapping between port Gi1/0/3 and port Gi1/0/2
+```
+
+- In this scenario, STP must be checked for all the switches hosting this VLAN mentioned in the syslog message to ensure that spanning-tree is enabled and working properly
+
+#### Root Guard
+
+- Root Guard is a STP feature that is enabled on a port-by-port basis; it prevents a configured port from becoming a root port
+
+- Root Guard prevents a downstream switch(often misconfigured or rogue) from becoming a root bridge on the topology
+
+- Root Guard functions by placing a port in an ErrDisabled state if a superior BPDU is received on a configured port
+
+- This prevents the configured DP with root guard from becoming an RP
+
+- Root guard is enabled per interface
+
+```ios
+conf t
+ interface gi1/0/2
+  spanning-tree guard root
+```
+
+- Root Guard is placed on designated ports toward other switches that should never become root bridges
+
+- In our topology for STP, root guard should be placed on SW2's Gi1/0/4 port toward SW4 and on SW3's Gi1/0/5 port toward SW5
+
+- This prevents SW4 and SW5 from ever becoming root bridges but still allows for SW2 to maintain connectivity to SW1 via SW3 if the link between SW1 to SW2 fails
+
+#### STP Portfast
+
+- The generation of TCN for hosts does not make sense as a host generally has only one connection to the network
+
+- Restricting TCN creation to only ports that connect to other switches and network devices increase L2 network's stability and efficiency
+
+- The STP portfast feature disables TCN generation for access ports
+
+- Another major benefit of the STP portfast feature is that the access ports bypass the earlier 802.1D states (listening and learning) and forward traffic immediately
+
+- This is beneficial in environments where computers use Dynamic Host Configuration Protocol (DHCP) or Preboot Execution Environment (PXE)
+
+- If a BPDU is received on a portfast-enabled port, the portfast functionality is removed from that port
+
+- Enabling portfast on an access port:
+
+```ios
+conf t
+ interface Gi1/0/7
+  spanning-tree portfast
+```
+
+- Enabling portfast globally on all access ports:
+
+```ios
+conf t
+ spanning-tree portfast default
+```
+
+- Disabling portfast configuration on access ports when the global configuration for portfast is enabled
+
+```
+conf t
+ interface Gi1/0/8
+  spanning-tree portfast disable 
+```
+
+- Enabling portfast on trunk links:
+
+```
+conf t
+ interface Gi1/0/10
+  spanning-tree portfast trunk
+```
+
+- This command should be enabled only with ports that are connected to a single host(such as a server with only one NIC that is running a hypervisor with VMs on different VLANs or an Wireless LAN Controller)
+
+- Running this command on interfaces connected to other switches, bridges and so on can result in a bridging loop
+
+- Verifying the portfast configuration can be done by examining STP for VLAN where the port is connected or looking at STP interface
+
+```
+show spanning-tree vlan 10
+show spanning-tre interface Gi1/0/10 detail
+```
+
+- Portfast ports are displayed with P2P Edge
+
+#### BPDU Guard
+
+- BPDU Guard is a safety mechanism that shuts down ports configured with STP portfast upon receipt of a BPDU 
+
+- Assuming all access ports have STP portfast enabled, this ensures that a loop cannot accidentally be created if an unauthorized switch is added to a topology
+
+- Enabling BPDU Guard globally on all portfast-enabled ports
+
+```ios
+conf t
+ spanning-tree portfast bdpuguard default
+```
+
+- BPDU Guard can be enabled or disabled on an interface:
+
+```ios
+conf t
+ interface Gi1/0/10
+  spanning-tree bpduguard [enable | disable]
+```
+
+- Verifying that BPDU Guard is enabled for a specified port:
+
+```ios
+show spanning-tree interface Gi1/0/10 detail
+```
+
+- BPDU Guard is typically configured with all host-facing ports that are enabled with portfast
+
+- A syslog message appears when a BPDU is received on a BPDU guard-enabled port 
+
+- The port is then placed into an ErrDisabled state
+
+```
+%SPANTREE-2-BLOCK_BPDUGUARD: Received BPDU on port GigabitEthernet1/0/10 with BPDU Guard enabled. Disabling port.
+
+%PM-4-ERR_DISABLE: bpduguard error detected on Gi1/0/10, putting Gi1/0/10 in err-disable state
+
+%LINEPROTO-5-UPDOWN: Line protocol on Interface GigabitEthernet1/0/10, changed state to down
+
+%LINK-3-UPDOWN: Interface GigabitEthernet1/0/10, changed state to down
+```
+
+- Verifying the port status(it shows err-disabled for the port listed earlier):
+
+```ios
+show interfaces status
+```
+
+- By default, ports that are put in the ErrDisabled state because of BPDU guard do not automatically restore themselves
+
+- The Error Recovery service can be used to reactivate ports that are shut down for a specific problem, thereby reducing administrative overhead
+
+- Activating Error Recovery to recover ports that were shut down from BPDU Guard:
+
+```ios
+conf t
+ errdisable recovery cause bpduguard
+```
+
+- Modifying the period that Error Recovery checks for ports:
+
+```ios
+conf t
+ errdisable recovery interval <time-seconds>
+```
+
+- Verification of Error Disable recovery for BPDU Guard:
+
+```ios
+show errdisable recovery
+```
+
+- Syslog messages for ErrDisable recovery:
+
+```
+%PM-4-ERR_RECOVER: Attempting to recover from bpduguard err-disable state on Gi1/0/10
+
+%SPANTREE-2-BLOCK_BPDUGUARD: Received BPDU on port Gigabit Ethernet1/0/10 with BPDU Guard enabled. Disabling port.
+
+%PM-4-ERR_DISABLE: bpduguard error detected on Gi1/0/2, putting Gi1/0/10 in err-disable state
+```
+
+- The Error Recovery service operates every 300 seconds (5 minutes)
+
+- This can be changed from 5 to 86400 seconds with the command:
+
+```ios
+conf t
+ errdisable recovery interval <time>
+```
+
+#### BPDU Filter 
+
+- BPDU filter simply blocks BPDUs from being transmitted out a port
+
+- BPDU filter can be enabled globally or on a specific interface
+
+- The behaviour changes depending on the configuration:
+
+	- The global BPDU filter configuration:
+	```ios
+	conf t
+	 spanning-tree portfast bpdufilter default
+	```
+	- The port send a series of 10 to 12 BPDUs
+	
+	- If the switch receives any BPDUs it checks to see which switch is more preferred
+	
+		- The preferred switch does not process any BPDUs that it receives, but it still transmits BPDUs to inferior downstream switches
+	
+		- A switch that is not the preferred switch processes BPDUs that are received but it does not transmit BPDUs to the superior upstream switch
+		
+	- Enabling BPDU filter in interface config mode:
+	
+	```ios
+	conf t
+	 interface gi1/0/10
+	  spanning-tree bpdufilter enable
+	```
+	- The port does not send any BPDUs on an ongoing basis
+	
+	- If the remote port has BPDU guard on it, it generally shuts down the port as a loop prevention mechanism
+	
+- Be careful with the deployment of BPDU filter as it could cause problems
+
+- Most network designs do not require BPDU filter, which adds an unnecessary level of complexity and also introduces risk
+
+- Verifying a BPDU filter
+
+	- With interface-configuration enabled:
+	```ios
+	show spanning-tree interface Gi1/0/10 detail | in BPDU|Bpdu|Ethernet
+	```
+	
+	- With global-configuration enabled:
+	```ios
+	show spanning-tree interface Gi1/0/10 detail | in BPDU|Bpdu|Ethenet 
+	```
+	
+#### Problems with Unidirectional Links
+
+- Fiber-optic cables consist of strands of glass/plastic that transmit light
+
+- A cable typically consists of one strand for sending data and another strand for receiving data on one side; the order is directly opposite at the remote side
+
+- Network devices that use fiber for connectivity can encounter unidirectional traffic flows if one strand is broken
+
+- In such scenarios the interface still shows a line-protocol up state; however, BPDUs are not able to be transmitted, and the downstream switch eventually times out the existing root port and identifies a different port as the root port
+
+- Traffic is then received on the new root port and forwarded out the strand that is still working, thereby creating a forwarding loop
+
+- Solutions that can resolve this scenario:
+
+	- STP loop guard
+	
+	- Unidirectional link detection
+
+#### STP Loop Guard
+
+- STP loop guard prevents any alternative or root ports from becoming designated ports (ports towards downstream switches) due to loss of BPDUs on the root port
+
+- Loop Guard places the port in an ErrDisabled state while BPDUs are not being received
+
+- When BPDU transmission starts again on that interface, the port recovers and begins to transition through the STP stated again
+
+- Enabling loop guard globally:
+
+```ios
+spanning-tree loopguard default
+```
+
+- Enabling loop guard on a per-interface basis:
+
+```ios
+conf t
+ interface gi1/0/10
+  spanning-tree guard loop
+```
+
+- It is important to note that loop guard should not be enabled on portfast-enabled ports(because it directly conflicts with the root/alternate port logic)
+
+- Enabling both loopguard and bpdufilter on the interface triggers loopguard as follows:
+
+```ios
+conf t
+ interface gi1/0/10
+  spanning-tree guard loop
+  
+  spanning-tree bpdufilter enabled
+  
+%SPANTREE-2-LOOPGUARD_BLOCK: Loop guard blocking port GigabitEthernet1/0/10 on VLAN0001
+```
+
+- Viewing the port state:
+
+```ios
+show spanning-tree vlan 1 | b Interface
+```
+
+- At this point the port is considered to be in an inconsistent state and does not forward any traffic
+
+- Viewing inconsistent ports
+
+```ios
+show spanning-tree inconsistentports
+```
+
+- An entry exists for each VLANs carried along the trunk link (Gi1/0/10 port)
+
+#### Unidirectional link detection (UDLD)
+
+- Unidirectional link detection (UDLD) allows for bidirectional monitoring of fiber-optic cables
+
+- UDLD operates by transmitting UDLD packets to the neighbor device that includes the system ID and the port ID of the interface transmitting the UDLD packet
+
+- The receiving device then repeats that information, including it's system ID and port ID, back to the originating device
+
+- The process continues infinitely
+
+- UDLD operating modes
+
+	- **Normal**: In normal mode if a frame is not acknowledged, the link is considered undetermined and the link remains active 
+	
+	- **Aggresive**: In aggresive mode if a frame is not acknowledged, the switch sends another 8 packets in 1-second intervals
+	
+		- If those packets are not acknowledged, the port is placed into an error state
+		
+- Enabling UDLD globally:
+
+```ios
+conf t
+ udld enable [aggresive]
+```
+
+- This enables UDLD on any small form-factor pluggable (SFP)-based port 
+
+- Disabling UDLD on the interface:
+
+```ios
+conf t
+ interface gi1/0/10
+  udld port disable
+```
+
+- Enabling UDLD recovery:
+
+```ios
+conf t
+ udld recovery [interval <sec>]
+```
+
+- The optional `interval` keyword allows for the timer to be modified from the default value of 5 minutes
+
+- Enabling UDLD on a port-by-port basis
+
+```ios
+conf t
+ interface gi1/0/12
+  udld port [aggresive]
+```
+
+- The optional `aggresive` keyword places the ports in UDLD aggresive mode
+
+- UDLD must be enabled on the remote switch as well
+
+- Once it is configured, the status of UDLD neighborship can be verified as follows:
+
+```ios
+show udld neighbors
+```
+- Viewing more detailed information:
+
+```ios
+show udld [<interface id>]
+```
