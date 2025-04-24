@@ -214,4 +214,122 @@ conf t
 
 #### Common MST Misconfigurations
 
+- Two common misconfigurations for MST regions:
+
+	- VLAN assignment to the IST
+	
+	- Trunk link prunning
+	
+- **VLAN assignment to the IST**
+
+- IST operates across all links in the MST region, regardless of the VLAN assigned to the actual port
+
+- The IST topology may not correlate to the access layer and might introduce a blocking port that was not intentional
+
+![MST-topology](./MSTP-IST-assignment.png)
+
+- In the above sample topology, VLAN 10 is assigned to the IST, and VLAN 20 is assigned to MSTI1
+
+- SW1 and SW2 contain 2 network links between them, with VLAN 10 and VLAN 20
+
+- It appears as if traffic between PCA and PCB would flow across the G1/0/2 interface, as it is an access port assigned to VLAN 10
+
+- However, all interfaces belong to the IST instance
+
+- SW1 is the root bridge, and all of it's ports are designated ports (DPs), so SW2 must block either G1/0/1 or G1/0/2
+
+- SW2 blocks it's G1/0/2 port, based on the port identifier from SW1, which is G1/0/2
+
+- So now SW2 is blocking the G1/0/2 interface for the IST instance, which is the instance that VLAN 10 is mapped to
+
+- Solutions to this scenario:
+
+	- Move VLAN 10 to a MSTI instance other than the IST. If you do this, the switches will build a topology based on the links in use by that MSTI
+	
+	- Allow the VLANs associated with the IST on all interswitch (trunk) links
+	
+- **Trunk Link Pruning**
+
+- Pruning of VLANs on a trunk link is a common practice for load balancing
+
+- However it is important that pruning of VLANs does not occur for VLANs in the same MST on different on different network links
+
+![Pruning](./MSTP-pruning.png)
+
+- In the above topology in which VLAN 10 and VLAN 20 are throughout the entire topology
+
+- A junior network engineer was pruned VLANs on the trunk links between SW1 and SW2 and SW1 and SW3 to help load balance traffic
+
+- Shortly after implementing the change, users attached to SW1 and SW3 cannot talk to the servers on SW2
+
+- This is because while the VLANs on the trunk links have changed, the MSTI topology has not
+
+- A simple rule to follow is to only prune all the VLANs in the same MSTI for a trunk link
+
+#### MST region boundary
+
+- The topology for all the MST instances is contained within the IST, which operates internally to the MST region
+
+- An *MST region boundary* is any port that connects to a switch in a different MST region or that connects to 802.1D or 802.1W BPDUs
+
+- MSTI never interacts outside the region
+
+- MST switches can detect PVST+ neighbors at MST region boundaries
+
+- Propagating the CST (derived from the IST) at the MST region boundary involves a feature called *PVST simulation mechanism*
+
+- The PVST simulation mechanism sends out PVST+ (and includes RSTP, too) BPDUs (one for each VLAN), using the information from the IST
+
+- To be very explicit, this requires a mapping of one topology (IST) to multiple VLANs (VLANs towards the PVST link)
+
+- The PVST simulation mechanism is required because PVST+/RSTP topologies do not understand the IST BPDU structure
+
+- When the MST boundary receives PVST+ BPDUs, it does not map the VLANs to the appropriate MSTIs
+
+- Instead, the MST boundary maps the PVST+ BPDU from VLAN 1 to the IST instance
+
+- The MST boundary engages the PVST simulation mechanism only when it receives a PVST BPDU on a port
+
+- PVST vs PVST+ 
+
+	- PVST+ supports 802.1Q trunk links, PVST only supports ISL trunks
+
+- Two design considerations when integrating the MST region with a PVST+/RSTP environment:
+
+	- The MST region is the root bridge
+	
+	- MST region is not the root bridge for any VLAN
+	
+- **MST region as the Root Bridge**
+
+- Making the MST region the root bridge ensures that all region boundary ports flood the same IST instance BPDU to all VLANs in the PVST topology
+
+- Making the IST instance more preferable than any other switch in the PVST+ topology enables this design
+
+- The MST region appears as a single entity, and the PVST+ switches detect the alternate link and and place it into a blocking state
+
+![MST-region-as-root](./MST-region-root-bridge.png)
+
+- The above topology shows the IST instance as the root bridge for all VLANs
+
+- SW1 and SW2 advertise multiple superior BPDUs for each VLAN towards , which is operating as a PVST+ switch
+
+- SW3 is responsible for blocking ports
+
+- SW3 could load balance traffic between the VLANs by setting the STP port cost on a VLAN-by-VLAN basis on each uplink
+
+- **MST Region Not as Root Bridge for Any VLAN**
+
+- In this scenario, the MST region boundary ports can only block or forward for all VLANs 
+
+- Only the VLAN 1 PVST BPDU is used for the IST and that the IST BPDU is a one-to-many translation of IST BPDUs to all PVST BPDUs
+
+- There is not an option to load balance traffic because the IST instance must remain consistent
+
+- If an MST switch detects a better BPDU for a specific VLAN on a boundary port, the switch will use BPDU guard to block that port
+
+- The port will then be placed into a root inconsistent state 
+
+- While this may isolate downstream switches, it is done to ensure a loop free topology; this is called PVST simulation check
+
 
