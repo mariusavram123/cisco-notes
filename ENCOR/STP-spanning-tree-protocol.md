@@ -247,6 +247,19 @@ show spanning-tree root
 	
 - The root bridge can be identified for a specific VLAN using the command `show spanning-tree root` and examining the CDP or LLDP neighbor information to identify the host name of the RP switch
 
+- Port costs are derived from interfaces bandwidth, so manipulating the interface bandwidth can help influencing the root costs:
+
+```
+conf t
+ interface G1/0/10
+  speed <in kbps>
+  bandwidth <in kbps>
+```
+
+- By default the bandwidth is deducted from interface speed
+
+- The bandwidth value does not affect the port's actual operating speed, but influences cost calculations for STP, OSPF, etc.
+
 ### Locating Blocked Designated Switch Ports
 
 - Now that the root bridge and RPs have been identified, all other ports are considered designated ports
