@@ -69,6 +69,12 @@
 		
 - The entire 802.1D STP initialization time takes about 30 seconds for a port to enter the forwarding state using default timers
 
+- Cisco switches send BPDUs to 2 multicast MAC addresses:
+
+	- One to Cisco PVST+ MAC address: 01.00.0c.cc.cc.cd
+	
+	- One to standard STP 802.1D MAC address: 01.80.c2.00.00.00
+
 - 802.1D Port Types:
 
 	- **Root Port**(RP): A port that connects to the root bridge or an upstream switch in the spanning-tree topology
@@ -127,6 +133,8 @@
 		
 		- If a switch loses contact with the BPDU's source, it assumes it assumes the BPDU information is still valid for the duration of Max Age timer
 		
+		- The Max Age timer of the root bridge will be used by all other switches in the topology
+		
 	- **Hello Time**: This is the time that a BPDU is avertised out of a port
 	
 		- The default value is 2 seconds
@@ -136,6 +144,10 @@
 		conf t
 		 spanning-tree vlan <id> hello-time <hello-time>
 		```
+		- This timer matters only when this switch is the root bridge
+		
+		- If the switch is not the root bridge, the hello timer is not in effect
+		
 	- **Forward delay**: This is the ammount of time that a port stays in listening and learning state
 	
 		- The default value is 15 seconds
@@ -145,6 +157,8 @@
 		conf t
 		 spanning-tree vlan <id> forward-time <forward-time>
 		```
+		
+		- The forward delay timer of the Root Bridge is used by all other switches
 
 ### Spanning Tree Path cost
 
