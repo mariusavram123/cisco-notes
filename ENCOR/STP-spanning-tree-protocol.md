@@ -1074,7 +1074,45 @@ conf t
 	```ios
 	show spanning-tree interface Gi1/0/10 detail | in BPDU|Bpdu|Ethenet 
 	```
-	
+
+#### UplinkFast and backbonefast
+
+- **UplinkFast**
+
+- To be used only on direct link failures
+
+- It helps speed up a port transitioning from Blocked port to a Root port bypassing listening and learning states and go directly to forwarding
+
+- To be enabled on switches that have blocked ports only (usually the access switches)
+
+- Enabling it:
+
+```
+conf t
+ spanning-tree uplinkfast
+```
+
+- **BackboneFast**
+
+- To be enabled on all switches
+
+- Used to speed up an indirect link failure by not waiting for Max Age time before transition the port from blocking to a designated state
+
+- To be enabled on all switches
+
+- Enabling it:
+
+```
+conf t
+ spanning-tree backbonefast
+```
+
+- Verifying it:
+
+```
+show spanning-tree backbonefast
+```
+
 #### Problems with Unidirectional Links
 
 - Fiber-optic cables consist of strands of glass/plastic that transmit light
