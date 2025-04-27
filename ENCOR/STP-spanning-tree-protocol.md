@@ -778,6 +778,14 @@ conf t
 
 - SW2's Gi1/0/3 was changed from a designated port to an alternate port
 
+- To modify the port cost it is also possible to limit the bandwidth of the link
+
+```ios
+conf t
+ interface gi1/0/1
+  bandwidth <kbps>
+```
+
 #### Modifying STP Port Priority
 
 - The STP port priority impacts which port is used as alternate port when multiple links are used between switches
