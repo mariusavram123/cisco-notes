@@ -1075,7 +1075,7 @@ conf t
 	show spanning-tree interface Gi1/0/10 detail | in BPDU|Bpdu|Ethenet 
 	```
 
-#### UplinkFast and backbonefast
+#### UplinkFast and BackboneFast
 
 - **UplinkFast**
 
@@ -1092,11 +1092,29 @@ conf t
  spanning-tree uplinkfast
 ```
 
+- Debugging uplinkfast:
+
+```
+debug spanning-tree uplinkfast
+```
+
+- Viewing uplinkfast states:
+
+```
+show spanning-tree uplinkfast
+```
+
+- There is also a 35 seconds Root Delay Timer for UplinkFast on the recovery process. This is because the switch on the other side of the link still needs time to transition the port through listening and learning states
+
+- Also UplinkFast sets the bridge priority to 49152 and increases all port participating in STP's cost by 1000
+
 - **BackboneFast**
 
 - To be enabled on all switches
 
 - Used to speed up an indirect link failure by not waiting for Max Age time before transition the port from blocking to a designated state
+
+- To make sure the current root is still up, backbonefast uses Root Link Query (RLQ) request and response messages to make sure the current root is still up before enabling back the link
 
 - To be enabled on all switches
 
@@ -1111,6 +1129,12 @@ conf t
 
 ```
 show spanning-tree backbonefast
+```
+
+- Debugging it:
+
+```
+debug spanning-tree backbonefast
 ```
 
 #### Problems with Unidirectional Links
