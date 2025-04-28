@@ -1006,6 +1006,7 @@ conf t
 
 ```ios
 show errdisable recovery
+show errdisable detect # by default is enabled for all causes
 ```
 
 - Syslog messages for ErrDisable recovery:
