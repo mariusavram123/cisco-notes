@@ -593,9 +593,9 @@ interface g0/1
 show route-map
 ```
 
-## Set metric for MPLS TE routes to influence the path taken by MPLS TE traffic:
+## Set metric for MPLS TE routes to influence the path taken by MPLS TE traffic
 
-- PE1 (g0/3) + P3 (f0/5) + P4 (g0/7)
+- PE1 (g0/3) + P3 (g0/5) + P4 (g0/7)
 
 ```
 interface g0/3
@@ -607,3 +607,257 @@ interface g0/3
 ```
 show mpls traffic-eng tunnels tunnel 1
 ```
+
+### Set explicit paths in MPLS TE
+
+- Topology:
+
+![Topology](./mpls-te-topology.png)
+
+- Existing configuration for MPLS TE tunnel
+
+```
+interface tunnel1
+ ip unnumbered loopback 0
+ tunnel mode mpls traffic-eng
+ tunnel destination 2.0.0.2
+ tunnel mpls traffic-eng bandwidth 1000
+ tunnel mpls traffic-eng path-option 1 dynamic
+```
+
+- PE1 verify the path the MPLS tunnel takes
+
+```
+show mpls traffic-eng tunnels tunnel 1
+```
+
+- The above command show the RSVP information and the underlying IGP path chosen based on the underlying IGP metric
+
+- Configuring an explicit path to exclud router P1 from the MPLS TE tunnel 
+
+```
+ip explicit-path name P1_EXCLUDE enable
+ exclude-address 1.1.1.1
+ exit
+ 
+interface tunnel 1
+ tunnel mpls traffic-eng path-option 1 explicit name P1_EXCLUDE
+```
+
+- Include g0/7 interface of P4 (10.10.70.1/24) in an MPLS tunnel path
+
+- First remove the above explicit path configured:
+
+
+```
+interface tunnel 1
+ no tunnel mpls traffic-eng path-option 1 explicit name P1_EXCLUDE
+```
+
+- Create a new explicit path
+
+```
+ip explicit-path name P4Gi07_INCLUDE enable
+ next-address ? 
+    loose # somewhere along the path
+    strict # directly connected
+    
+ next-address loose 10.10.70.1
+ exit
+ 
+interface tunnel 1
+ tunnel mpls traffic-eng path-option 1 explicit name P4Gi07_INCLUDE 
+```
+
+### MPLS-TE and Affinity Attributes
+
+- Each link in the network is assigned an affinity
+
+- Applied on the interfaces of the PE and P routers
+
+![Affinity-assignment](./mpls-te-affinity.png)
+
+- Next we can define a series of Affinity Attributes constraints on the tunnel
+
+- Constrained Shortest Path First (CSPF) algorithm will determine the path the tunnel will take
+
+- The algorithm applies an Bitwise AND Operation between the configured values for affinity attributes configured on the link and the affinity constraints defined
+
+- CSPF evaluates each link independently
+
+- Bitwise AND is performed between each link's affinity values and our affinity constraints
+
+- **Affinity Attributes Mask**
+
+    - We may not want to take all 32 flags into account for our particular tunnel
+
+    - We may want for our tunnel to match last 5 right bits only and ignore the others (for example)
+  
+    - 00000000 00000000 00000000 000**10001**
+    
+    - We can use the following mask in order to match only the latest bits
+    
+    - 00000000 00000000 00000000 000**11111**
+    
+- Affinity flags and affinity mask are written in hex like:
+
+    - Affinity flags: 0x11
+    
+    - Affinity mask: 0x1F
+
+- **Defining Affinity Flags**
+
+![Affinity-flags](./defining-affinity-flags.png)
+
+- Assigning affinity flags to a link
+
+![Affinity-flags-definition](./giving-affinity-flags-to-a-link.png)
+
+- Configuring affinity attributes
+
+- P3:
+
+```
+interface G0/5
+ mpls traffic-eng attribute-flags 0x91
+```
+
+- P4:
+
+```
+interface G0/6
+ mpls traffic-eng attribute-flags 0x91
+```
+
+- You should configure attributes in all interfaces in all of your topology
+
+- If there are no affinity flags configured on a link it is taken that you have all affinity flags set to 0
+
+- Defining affinity constraints
+
+![Constraints](./define-affinity-constraints.png)
+
+- Affinity constraints: 0x15c
+
+- Affinity mask: 0x1FF
+
+- Configuring the affinity constraints for the tunnel:
+
+```
+interface tunnel 1
+ tunnel mpls traffic-eng affinity 0x15C mask 0x1FF
+```
+
+### MPLS-TE Class-Based Tunnel selection
+
+- CBTS (Class Based Tunnel Selection) is used when there are more than 1 tunnel from the same head-end router to the same tail-end router
+
+- CBTS examines the EXP field into from the MPLS header of the packet to decide which tunnel should be used to forward the traffic
+
+- EXP field is used for Quality of Service (3 bits- range from 0 to 7)
+
+- All tunnels participating in CBTS are known as a bundle
+
+![CBTS](./CBTS-MPLS-topology.png)
+
+- Paths taken by each tunnel in the bundle can be the same or can be different based on the constraints on each tunnel
+
+- CBTS is more a QoS mechanism than a routing mechanism
+
+- To configure CBTS we configure a Master Tunnel
+
+- We create the Master Tunnel and assign the underlying TE tunnels to it as member tunnels
+
+- The Master Tunnel is configured in the Headend Router (PE1)
+
+- CBTS will distribute routed traffic to the appropriate tunnel based on the EXP value 
+
+- Tunnels configuration
+
+```
+interface tunnel 1
+ ip unnumbered loopback 0
+ tunnel mode mpls traffic-eng
+ tunnel destination 2.0.0.2
+ tunnel mpls traffic-eng bandwidth 1000
+ tunnel mpls traffic-eng path-option 1 dynamic
+ exit
+ 
+interface tunnel 2
+ ip unnumbered loopback 0
+ tunnel mode mpls traffic-eng
+ tunnel destination 2.0.0.2
+ tunnel mpls traffic-eng bandwidth 750
+ tunnel mpls traffic-eng path-option 1 dynamic
+```
+
+- Assign EXP values for each tunnel
+
+```
+interface tunnel 1
+ tunnel mpls traffic-eng exp 1
+ exit
+
+interface tunnel 2
+ tunnel mpls traffic-eng exp 2
+ exit
+```
+
+- Creating the Master Tunnel
+
+```
+interface tunnel 3
+ ip unnumbered loopback 0
+ tunnel mode mpls traffic-eng
+ tunnel destination 2.0.0.2
+ tunnel mpls traffic-eng autoroute announce
+ tunnel mpls traffic-eng exp-bundle master
+ tunnel mpls traffic-eng exp-bundle member tunnel 1
+ tunnel mpls traffic-eng exp-bundle member tunnel 2
+```
+
+- Routing should be configured on the master tunnel, only when the routing is configured on the master tunnel, only then will CBTS work
+
+- Viewing the master tunnel information
+
+```
+show mpls traffic-eng tunnels tunnel 3
+```
+
+- Test with ping setting a ToS value (used for QoS marking)
+
+- ToS value when used in MPLS are mapped inside the EXP values
+
+- From CE1 router
+
+```
+ping 2.0.0.2 tos 32 repeat 50
+```
+
+- ToS 32 is mapped to a EXP value of 1
+
+- Viewing which tunnel was used
+
+```
+show interfaces tunnel 1 | include packets
+
+# should see 50 output packets
+```
+
+- ToS 64 is mapped to a EXP value of 2
+
+```
+ping 2.0.0.2 tos 64 repeat 40
+```
+
+- Viewing the result on tunnel 2
+
+```
+show interface tunnel 2 | include packets
+
+# should see 40 output packets
+```
+
+
+
+
