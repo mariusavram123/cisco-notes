@@ -181,6 +181,12 @@ conf t
  spanning-tree pathcost method long
 ```
 
+- Verifying the pathcost method used
+
+```
+show spanning-tree pathcost method
+```
+
 - The entire Layer 2 topology SHOULD use the same setting for every device in the environment to ensure a consistent topology.
 
 ### Building the STP topology
