@@ -192,6 +192,29 @@ show spanning-tree mst interface <id>
 
 - The output of this command includes additional information about optional STP features such as BPDU filter and BPDU guard
 
+- While in mst configuration mode you can view the pending information to be saved as follows:
+
+```
+conf t
+ spanning-tree mst configuration
+ show pending
+```
+
+- Just use the show command in mst config mode to view the pending settings:
+
+```
+conf t
+ spanning-tree mst configuration
+ show
+```
+
+- While in mst configuration mode you can view the current settings as follows:
+```
+conf t
+ spanning-tree mst configuration
+ show current
+```
+
 #### MST Tuning
 
 - MST supports the tuning of port cost and port priority
