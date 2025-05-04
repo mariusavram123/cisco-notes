@@ -355,4 +355,52 @@ conf t
 
 - While this may isolate downstream switches, it is done to ensure a loop free topology; this is called PVST simulation check
 
+#### MSTP and VTP
 
+- VTP version 3 can be used to sync the MST configurations:
+
+	- Region Name
+	
+	- Revision number
+	
+	- MSTI Instance to VLAN mapping
+	
+- You should still configure the priorities for switches for each MSTI instances
+	
+- With VTPv3 you should manually configure the domain name and VTP version 
+
+- Configure a VTP domain name and VTP version:
+
+```
+conf t
+ vtp domain Region123
+ vtp version 3
+```
+
+- Configure the VTP mode for the switch:
+
+```
+conf t
+ vtp mode client #or
+ vtp mode transparent #or
+ vtp mode off #or
+ do vtp primary 
+```
+
+- Enable MST sync feature for VTP:
+
+```
+conf t
+ vtp mode server mst #or
+ do vtp primary mst #or
+ vtp mode client mst #or
+ vtp mode off mst
+```
+
+- Verify the settings:
+
+```
+show vtp status
+show vlan brief
+show spanning-tree mst configuration
+```
