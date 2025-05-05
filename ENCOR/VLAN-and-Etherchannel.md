@@ -175,7 +175,7 @@ vtp primary
 	3. Define the VTP switch role:
 		```
 		conf t
-		 vtp mode <server|transparent|client|none>
+		 vtp mode <server|transparent|client|off>
 		```
 	4. (Optional) Secure the VTP domain:
 		```
@@ -198,6 +198,39 @@ vtp primary
 	```
 	vtp primary
 	```
+- Enabling VTP per port (per interface) - only VTP version 3
+
+```
+conf t
+ interface g0/1
+ vtp
+```
+
+- Disabling VTP per trunk link (per interface):
+
+```
+conf t
+ interface g0/1
+ no vtp
+```
+
+- Verifying the VTP interface:
+
+```
+show vtp interface g0/1
+```
+
+#### VTP configuration guidelines
+
+- All switches have the same VTP domain name, unless the network design requires different VTP domains
+
+- All switches in the same VTP domain 
+
+- All switches in a VTP domain have the same VTP password, if there are any
+
+- All VTP Server switch(es) must have the same configuration revision number and it must also be the highest in the domain
+
+- When you move a VTP mode of a switch from Transparent to Server, VLANs configured on the VTP Transparent switch must exist on the Server switch
 
 ### VTP Password
 
@@ -255,6 +288,13 @@ show vlan
 
 - It is then necessary to reassign VLANs to every port associated to the VLANs that were removed
 
+- Debug commands for VTP advertisements:
+
+```
+debug sw-vlan vtp events
+debug sw-vlan vtp packets
+```
+
 ### VTP Pruning
 
 - VTP ensures that all swithes in the VTP domain are aware of all VLANs
@@ -296,6 +336,29 @@ show vlan
 - VLAN 1 and VLANs 1001-1005 are always pruning-ineligible; traffic from these VLANs cannot be pruned
 
 - Extended-range VLANs (VLAN IDs greater than 1005) are also pruning-ineligible
+
+- In VTP version 3, the domain administrator must manually enable or disable VTP pruning explicitly on each device
+
+- Configure VTP pruning:
+
+```
+conf t
+ vtp pruning
+```
+
+- Configure VTP pruning per switch port:
+
+```
+conf t
+ interface g0/1
+ switchport trunk pruning vlan <id>
+```
+
+- Displaying VTP statistics:
+
+```
+show vtp counters
+```
 
 ### Using VTP in a network
 
