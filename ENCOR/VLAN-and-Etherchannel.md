@@ -77,7 +77,6 @@ vtp primary
 	- Summary advertisement packet format:
 
 	![Summ-adv](./VTP-summ-adv.png)
-
 	- The `Followers` field indicates that this packet is followed by a Subset Advertisement packet
 
 	- The `Updater Identity` is the IP address of the switch that is the last to have incremented the configuration revision
@@ -99,13 +98,11 @@ vtp primary
 	- Subset advertisement packet format:
 
 	![Subs-adv](./subset-advert-packet-format-vtp.png)
-
 	- Each VLAN information field contains information for a different VLAN
 
 	- It is ordered so that lowered-valued ISL VLANs occur first
 
 	![VLAN-info](./VTP-vlan-info-fields.png)
-
 	- Subset packet fields:
 
 	- `Code` - The format is 0x02 for subset advertisement
@@ -125,7 +122,6 @@ vtp primary
 	- Structure of the advertisement request message:
 
 	![VTP-adv](./VTP-advertisement-req-structure.png)
-
 	- `Code` - The format 0x03 is for an advertisement request
 
 	- `Start-Value` - This is used in cases in which there are several subsequent advertisements
@@ -396,5 +392,123 @@ show vtp counters
 
 ## Dynamic Trunking Protocol
 
+- The most common format for configuring the trunk links between switches and allow multiple VLANs on a single switchport is to configure them manually
+
+- Cisco provides a mechanism for switches to automatically form a trunk port
+
+- Dynamic trunk ports are established by the switch port sending Dynamic Trunking Protocol (DTP) packets to negotiate wether the other end can be a trunk port
+
+- If both ports can successfully negotiate an agreement, the port will become a trunk switch port
+
+- DTP advertises itself every 30 seconds to neighbors so that they are kept aware of it's status
+
+- DTP requires that the VTP domain match between the two switches
+
+- There are three modes to use in setting a switch port to trunk:
+
+	- **Trunk**: This mode statically places the switch port as a trunk and advertises DTP packets to the other end to establish a dynamic trunk
+
+	- Enabling this mode:
+	```
+	conf t
+	 interface g0/1
+	 switchport mode trunk
+	```
+
+	- **Dynamic desirable**: In this mode, the switch port acts as an access port, but it listens for and advertises DTP packets to the other end to establish a dynamic trunk
+
+	- If it is successful in negotiation, the port becomes a trunk port
+
+	- Enabling this mode on a port:
+	```
+	conf t
+	 interface g0/1
+	 switchport mode dynamic desirable
+	```
+
+	- **Dynamic auto**: In this mode, the switch port acts as an access port, but it listens for DTP packets
+
+	- It responds to DTP packets and, upon successful negotiation, the port becomes a trunk port
+
+	- Enabling the port in this mode:
+	```
+	conf t
+	 interface g0/1
+	 switchport mode dynamic auto
+	```
+
+- A trunk port can successfully form in almost any combination of these modes unless both ends are configured as dynamic auto or static access ports
+
+- Verifying the trunk port status
+
+```
+show interface g0/1 trunk
+```
+
+- The mode for a statically configured trunk port is `on`
+
+- A static trunk port attempts to establish and negotiate a trunk port with a neighbor by default
+
+- The trunk negotiation can be turned off using the following command:
+
+```
+conf t
+ interface g0/1
+ switchport nonegotiate
+```
+
+- Verifying the port status:
+
+```
+show interface g0/1 switchport
+```
+
+- Now the Negotiation of trunk displays as off
+
+- As a best practice configure both ends of a link as a fixed port type (using `switchport mode access` or `switchport mode trunk`) to remove any uncertainty about the port's operations
+
+## EtherChannel Bundle
+
+- Ethernet networks are based on powers of 10 (10 Mbps, 100 Mbps, 1 Gbps, 10 Gbps, 100 Gbps)
+
+- When a link between switches becomes saturated, how can more bandwidth be added to prevent packet loss?
+
+- If both switches have available ports with faster throughput than the current link (for example, 10 Gbps versus 1 Gbps)m then changing the link to higher-speed solves the bandwidth contingency problem
+
+- However in most cases this is not feasible
+
+- Ideally, it would be nice to plug a second cable and double the bandwidth between the switches
+
+- However Spanning Tree Protocol (STP) will place one of the ports into a blocking state to prevent forwarding loops
+
+![Etherchannel-intro](./STP-switches-blocked.png)
+
+- Fortunately, the physical links can be aggregated into a logical link called an EtherChannel bundle
+
+- The industry-based therm for EtherChannel Bundle is EtherChannel for short or or PortChannel, which is defined in IEEE 802.3AD link aggregation specification
+
+- The physical interfaces that are used to assemble the logical EtherChannel are called *member interfaces*
+
+- STP operates on a logical link and not on a physical link
+
+- The logical link would then have the bandwidth of any active member interfaces, and it would be load balanced across all the links
+
+- EtherChannels can be used either Layer2 (access or trunk) or Layer3 (routed) forwarding
+
+- The therms EtherChannel, EtherChannel bundle, and port channel are interchanged frequently on the Catalyst platform, but other Cisco platforms use the therm port channel exclusively
+
+![Etherchannel-bundles](./etherchannel-bundles.png)
+
+- The above diagram shows some of the key components of an EtherChannel bundle between SW1 and SW2, with their G1/0/1 and G1/0/2 interfaces
+
+- A primary advantage of using port channels is a reduction in topology changes when a member link line protocol goes up or down
+
+- In a traditional model, a link status change may trigger a Layer 2 STP tree calculation or a Layer 3 route calculation 
+
+- A member link failure in an EtherChannel does not impact those processes, as long as one active member still remains up
+
+- A switch can successfully form an EtherChannel by statically setting them to an `on` state or by using a dynamic link aggregation protocol to detect connectivity between the switches
+
+- Most network engineers prefer to use a dynamic method as it provides a way to ensure end-to-end connectivity between devices across all network links
 
 
