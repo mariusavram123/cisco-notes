@@ -207,7 +207,7 @@ conf t
 ```
 conf t
  interface g0/1
- no vtp
+  no vtp
 ```
 
 - Verifying the VTP interface:
@@ -347,7 +347,7 @@ conf t
 ```
 conf t
  interface g0/1
- switchport trunk pruning vlan <id>
+  switchport trunk pruning vlan <id>
 ```
 
 - Displaying VTP statistics:
@@ -412,7 +412,7 @@ show vtp counters
 	```
 	conf t
 	 interface g0/1
-	 switchport mode trunk
+	  switchport mode trunk
 	```
 
 	- **Dynamic desirable**: In this mode, the switch port acts as an access port, but it listens for and advertises DTP packets to the other end to establish a dynamic trunk
@@ -423,7 +423,7 @@ show vtp counters
 	```
 	conf t
 	 interface g0/1
-	 switchport mode dynamic desirable
+	  switchport mode dynamic desirable
 	```
 
 	- **Dynamic auto**: In this mode, the switch port acts as an access port, but it listens for DTP packets
@@ -434,7 +434,7 @@ show vtp counters
 	```
 	conf t
 	 interface g0/1
-	 switchport mode dynamic auto
+	  switchport mode dynamic auto
 	```
 
 - A trunk port can successfully form in almost any combination of these modes unless both ends are configured as dynamic auto or static access ports
@@ -454,7 +454,7 @@ show interface g0/1 trunk
 ```
 conf t
  interface g0/1
- switchport nonegotiate
+  switchport nonegotiate
 ```
 
 - Verifying the port status:
@@ -511,4 +511,686 @@ show interface g0/1 switchport
 
 - Most network engineers prefer to use a dynamic method as it provides a way to ensure end-to-end connectivity between devices across all network links
 
+- A significant downfall of statically setting an EtherChannel to an `on` state is that there is no health integrity check
 
+- If the physical medium degrades and keep the line protocol to an up state, the port channel will reflect that link is viable for transferring data, which may not be accurate and would result in sporadic packet loss
+
+- A common scenario involves the use of intermediary devices and technologies(for example powered network taps, IPSs, Layer 2 Firewalls, DWDM) between devices
+
+- It is critical for the link state to be propagated to the other side
+
+![EtherChannel-DWDM](./etherchannel-with-dwdm.png)
+
+- In the above diagram SW1 and SW2 have combined their G1/0/1 and G1/0/2 interfaces into a static EtherChannel across optical transport DWDM infrastructure
+
+- A failure on the link between DWDM1 and DWDM2 is not propagated to SW1 or SW2 G1/0/1 interface
+
+- The switches continue to forward traffic out the G1/0/1 interface because these ports still maintain physical state to DWDM1 and DWDM2
+
+- Both SW1 and SW2 load balance traffic across G1/0/1 interface, resulting in packet loss for the traffic that is send out of the G1/0/1 interface
+
+- There is not a health-check mechanism with the port-channel ports being statically set to `on`
+
+- However, if a dynamic link aggregation protocol were used between SW1 and SW2, the link failure would be detected, and G1/0/1 interfaces would be made inactive for the EtherChannel
+
+### Dynamic Link Aggregation Protocols
+
+- Two common link aggregation protocols are Link Aggregation Control Protocol(LACP) and Port Aggregation Protocol(PAgP)
+
+- PAgP is Cisco proprietary and was developed first, and then LACP was created as an open industry standard (802.3AD)
+
+- All the member links must participate in the same protocol on the local and remote switches
+
+#### PAgP Port Modes
+
+- PAgP advertises messages to 01.00.0c.cc.cc.cc and the protocol code 0x104
+
+- PAgP can operate in two modes:
+
+	- **Auto**: In this PAgP mode, the interface does not initiate an EtherChannel to be established and does not transmit PAgP packets out of it
+
+	- If an PAgP packet is received from the remote switch, this interface responds and then can establish a PAgP adjacency
+
+	- If both devices are PAgP auto, a PAgP adjacency does not form
+
+	- **Desirable**: In this PAgP mode, an interface tries to establish an EtherChannel and transmit PAgP packets out of it
+
+	- Active PAgP interfaces can establish a PAgP adjacency only if the remote interface is connected to auto or desirable
+
+### LACP Port Modes
+
+- LACP advertises messages with the multicast MAC address 0180:C200:0002
+
+- LACP can operate in 2 modes:
+
+	- **Passive**: In this LACP mode an interface does not initiate an EtherChannel to be established and does not transmit LACP packets out of it
+	
+	- If an LACP packet is received on the interface from the remote switch, this interface responds and then can establish an LACP adjacency
+
+	- If both devices are LACP passive, an LACP adjacency does not form
+
+	- **Active**: In this LACP mode, an interface tries to establish an EtherChannel and transmit LACP packets out of it
+
+	- Active LACP interfaces can establish an LACP adjacency only if the remote interface is configured to active or passive
+
+### EtherChannel configuration
+
+- It is possible to configure an EtherChannel by going into the interface configuration mode for the member interfaces and assigning them to an EtherChannel ID and configuring the appropriate mode:
+
+	- **Static EtherChannel**: Can be configured as follows:
+
+	```
+	conf t
+	 interface range g1/0/1 - 2
+	  channel-group <etherchannel-id> mode on
+	```
+
+	- **LACP EtherChannel**: Can be configured as follows
+
+	```
+	conf t
+	 interface range g1/0/1 - 2
+	  channel-group <etherchannel_id> mode <active|passive>
+	```
+
+	- **PAgP EtherChannel**: can be configured as follows:
+
+	```
+	conf t
+	 interface range g1/0/1 - 2
+	  channel-group <etherchannel_id> mode <desirable|auto> <non-silent>
+	``` 
+
+- By default PAgP ports operate in silent mode, which allows a port to establish an EtherChannel with a device which is not PAgP capable and rarely sends packets
+
+- Using the optional `non-silent` keyword requires a port to receive PAgP packets before adding it to the EtherChannel
+
+- The `non-silent` keyword is recommended when connecting PAgP-compliant switches together; the `non-silent` option results in a link being established more quickly than if this keyword were not used
+
+- The following additional factors need to be considered with EtherChannel configuration:
+
+	- Configuration settings for the EtherChannel are placed under the port channel interface: `interface po1`
+
+	- Member interfaces need to be in the appropriate Layer 2 or Layer 3 (that is `no switchport`) before being associated with the port channel
+
+	- The member interface type dictates wether the EtherChannel operates at Layer 2 or Layer 3
+
+- Configuring the EtherChannel 1 between SW1 and SW2, using the member interfaces g1/0/1 and g1/0/2 (using LACP)
+
+- SW1:
+
+```
+conf t
+ interface range g1/0/1 - 2
+  channel-group 1 mode active
+```
+
+- SW2:
+
+```
+conf t
+ interface range g1/0/1 - 2
+  channel-group 1 mode passive
+```
+
+- SW1 uses LACP active (which accepts and initiates a request), and SW2 uses LACP passive(which only responds to an LACP initiation)
+
+- The EtherChannel will be used as trunk port, which is configured on each switch after the EtherChannel is created
+
+- SW1:
+
+```
+conf t
+ interface port-channel 1
+  switchport mode trunk
+```
+
+- SW2:
+
+```
+conf t
+ interface port-channel 1
+  switchport mode trunk
+```
+
+### Verifying Port-Channel status
+
+- After a port channel has been configured it is essential to verify that the port channel has been established
+
+```
+show etherchannel summary
+``` 
+
+- The above command provides an overview of all the configured EtherChannels, along with the status and dynamic aggregation protocol used
+
+- A second EtherChannel using PAgP was configured on the topology to differentiate between LACP and PAgP interfaces
+
+- SW1:
+
+```
+conf t
+ interface range g1/0/3 - 4
+  channel-group 2 mode desirable
+```
+
+- SW2:
+
+```
+conf t
+ interface range g1/0/3 - 4
+  channel-group 2 mode auto
+```
+
+- The output of the `show etherchannel summary` command:
+
+	- P: bundled in port-channel
+
+	- U: in use
+
+	- S: Layer 2
+
+	- Po1(SU)	LACP	G1/0/1(P)	G1/0/2(P)
+
+	- Po2(SU)	PAgP	G1/0/3(P)	G1/0/4(P)
+
+- When viewing the output of the `show etherchannel summary` command, the first thing that should be checked is the EtherChannel status, which is listed in the Port-channel column (column 2)
+
+- The status should be **SU**, as in the above output
+
+- The status codes are case-sensitive, so please pay attention to the case of the field
+
+- Logical EtherChannel interface status fields:
+
+	- **U**: The EtherChannel interface is working properly
+
+	- **D**: The EtherChannel interface is down
+
+	- **M**: The EtherChannel interface has successfully established at least one LACP adjacency; however, the interface is configured with a minimum number of active interfaces that exceeds the number of active participating member interfaces
+
+	- Traffic will not be forwarded across this port channel
+
+	- Configuring the minimum number of links in a port-channel interface:
+	```
+	conf t
+	 interface po1
+	  port-channel min-links <min-member-interfaces>
+	```
+
+	- **S**: The port-channel interface is configured for Layer 2 switching
+
+	- **R**: The port-channel interface is configured for Layer 3 routing
+
+- Brief explanation of the fields that are related to member interfaces:
+
+	- **P**: The interface is actively participating and forwarding traffic for this port channel
+	
+	- **H**: The port is configured with the maximum number of active interfaces
+	
+	- This interface is participating in LACP with the remote peer but the interface is acting as a hot-standby and does not forward traffic
+	
+	- Configuring maximum number member interfaces:
+	```
+	conf t
+	 interface po1
+	  lacp max-bundle <number_member_interfaces>
+	```
+	
+	- **I**: The member interface has not detected any LACP activity on this interface and is treated as an individual
+	
+	- **w**: There is time left to receive a packet from this neighbor to ensure that it is still alive
+	
+	- **s**: The member interface is in a suspended state
+	
+	- **r**: The switch module associated with this interface has been removed from the chassis
+	
+- Viewing the logical interface:
+
+```
+show interface port-channel <port-channel-id>
+```
+
+- The output includes traditional interface statistics and lists the member interfaces and indicates that the bandwidth reflects the combined throughput of all active member interfaces
+
+- As the bandwidth changes, systems that reference the bandwidth (such as QoS policies and interface costs for routing protocols) adjust automatically
+
+- Using the command `show interface port-channel <port-channel-id>` command on SW1, we notice that the bandwidth is 2 Gbps and correlates to the two 1 Gpbs interfaces as in the output of `show etherchannel summary` command
+
+- Viewing EtherChannel neighbors
+
+- The LACP and PAgP packets include a lot of useful information that can help identify inconsistencies in configuration
+
+- The command `show etherchannel port` displays detailed instances of the local configuration and information from the packets (my lab uses ethernet interfaces)
+
+```
+SW1#show etherchannel port 
+                Channel-group listing: 
+                ----------------------
+
+Group: 1 
+----------
+                Ports in the group:
+                -------------------
+Port: Et0/0
+------------
+
+Port state    = Up Mstr Assoc In-Bndl 
+Channel group = 1           Mode = Active          Gcchange = -
+Port-channel  = Po1         GC   =   -             Pseudo port-channel = Po1
+Port index    = 0           Load = 0x00            Protocol =   LACP
+
+Flags:  S - Device is sending Slow LACPDUs   F - Device is sending fast LACPDUs.
+        A - Device is in active mode.        P - Device is in passive mode.
+
+Local information:
+                                LACP port    Admin     Oper    Port        Port
+Port          Flags   State     Priority     Key       Key     Number      State
+Et0/0         SA      bndl      32768        0x1       0x1     0x1         0x3D  
+          
+ Partner's information:
+
+                     LACP port                      Admin  Oper   Port    Port
+Port          Flags  Priority  Dev ID          Age  key    Key    Number  State
+Et0/0         SA     32768     aabb.cc80.7300  19s  0x0    0x1    0x1     0x3D  
+
+Age of the port in the current state: 0d:00h:06m:11s
+
+Port: Et0/1
+------------
+
+Port state    = Up Mstr Assoc In-Bndl 
+Channel group = 1           Mode = Active          Gcchange = -
+Port-channel  = Po1         GC   =   -             Pseudo port-channel = Po1
+Port index    = 0           Load = 0x00            Protocol =   LACP
+
+Flags:  S - Device is sending Slow LACPDUs   F - Device is sending fast LACPDUs.
+        A - Device is in active mode.        P - Device is in passive mode.
+
+Local information:
+                                LACP port    Admin     Oper    Port        Port
+Port          Flags   State     Priority     Key       Key     Number      State
+Et0/1         SA      bndl      32768        0x1       0x1     0x2         0x3D  
+
+ Partner's information:
+
+                     LACP port                      Admin  Oper   Port    Port
+Port          Flags  Priority  Dev ID          Age  key    Key    Number  State
+Et0/1         SA     32768     aabb.cc80.7300   9s  0x0    0x1    0x2     0x3D  
+
+Age of the port in the current state: 0d:00h:06m:11s
+
+
+Group: 2 
+----------
+                Ports in the group:
+                -------------------
+Port: Et0/2
+------------
+
+Port state    = Up Mstr In-Bndl 
+Channel group = 2           Mode = Desirable-Sl    Gcchange = 0
+Port-channel  = Po2         GC   = 0x00020001      Pseudo port-channel = Po2
+Port index    = 0           Load = 0x00            Protocol =   PAgP
+          
+
+Age of the port in the current state: 0d:00h:06m:11s
+
+Port: Et0/3
+------------
+
+Port state    = Up Mstr In-Bndl 
+Channel group = 2           Mode = Desirable-Sl    Gcchange = 0
+Port-channel  = Po2         GC   = 0x00020001      Pseudo port-channel = Po2
+Port index    = 0           Load = 0x00            Protocol =   PAgP
+
+
+Age of the port in the current state: 0d:00h:06m:11s
+```
+
+- The output from the `show etherchannel port` command can provide too much information and slow down troubleshooting when a smaller ammount of information is needed
+
+- Getting more succint information:
+
+	- **LACP**: The command `show lacp neighbor [detail]` displays additional information about the LACP neighbor and includes the neighbor's system ID, system priority, and whether it is using fast or slow LACP packet intervals as part of the output
+	```
+	SW1#show lacp neighbor 
+	Flags:  S - Device is requesting Slow LACPDUs 
+    	    F - Device is requesting Fast LACPDUs
+        	A - Device is in Active mode       P - Device is in Passive mode     
+
+	Channel group 1 neighbors
+
+	                     LACP port                      Admin  Oper   Port    Port
+	Port          Flags  Priority  Dev ID          Age  key    Key    Number  State
+	Et0/0         SA     32768     aabb.cc80.7300  19s  0x0    0x1    0x1     0x3D  
+	Et0/1         SA     32768     aabb.cc80.7300   7s  0x0    0x1    0x2     0x3D  
+	```
+
+	- The LACP system identifier is used to verify that the member interfaces are connected to the same device and not split between devices
+
+	- Verifying the local LACP system identifier:
+
+	```
+	SW1#show lacp sys-id 
+	32768, aabb.cc80.7200
+	```
+	
+	- **PAgP**: The command `show pagp neighbor` displays additional information about the PAgP neighbor and includes the neighbor's system ID, remote port number and whether it is using fast or slow PAgP packet intervals as part of the output (my lab does not support this command)
+
+- Viewing EtherChannel packets:
+
+- A vital step in troubleshooting the establishment of port channels is to verify that LACP or PAgP packets are being transmitted between devices
+
+- The first troubleshooting step that can be taken is to verify the EtherChannel counters for the appropriate protocol
+
+- **LACP**
+
+	- The LACP counters can be viewed with the command `show lacp counters`:
+
+	```
+	SW1#show lacp counters 
+                 LACPDUs         Marker          Marker Response  LACPDUs
+	Port             Sent   Recv     Sent   Recv     Sent   Recv      Pkts Err
+	--------------------------------------------------------------------------
+	Channel group: 1
+	Et0/0            230    227      0      0        0      0         0     
+	Et0/1            232    228      0      0        0      0         0     
+	```
+
+	- The output includes a list of EtherChannel interfaces, their associated member interfaces, counters for LACP packets sent/received, and any errors
+
+	- A interface should see the sent and received columns increment over a period of time
+
+	- The failure of the counters to increment indicates a problem
+
+	- The problem could be related to a physical link, or might have to do with an incomplete or incompatible configuration with the remote device
+
+	- Check the LACP counters on the remote device to see if it is transmitting LACP packets
+
+	- Clearing LACP counters
+
+	```
+	clear lacp counters
+	```
+
+- **PAgP**:
+
+	- The PAgP counters can be viewed with the command `show pagp counters`
+
+	- The output of the command above includes a list of EtherChannel interfaces, their associated member interfaces, counters for PAgP packets sent/received, and any errors
+
+	- Clearing PAgP counters:
+
+	```
+	clear pagp counters
+	```
+
+### Advanced LACP configuration options
+
+- LACP provides some additional tunning that is not available with PAgP
+
+- LACP advanced configuration options and the behavioral impact they have on member interface selection for a port channel
+
+- **LACP Fast**:
+
+	- The original LACP standards send out LACP packets every 30 seconds
+
+	- A link is deemed unusable if an LACP packet is not received after three intervals, which results in a potential 90 seconds of packet loss for a link before that member interface is removed from a port channel
+
+	- An amendment to the standards was made so that LACP packets are advertised every one second
+
+	- This is known as *LACP Fast* because a link can be identified and removed in 3 seconds compared to the 90 seconds specified in the initial LACP standard
+
+	- LACP fast is enabled on the member interfaces by using the following command:
+
+	```
+	conf t
+	 int range g1/0/1 - 2
+	  lacp rate fast
+	``` 
+
+	- All the interfaces on both switches need to be configured the same - either using LACP fast or LACP slow - for the EtherChannel to successfully come up
+
+	- Viewing the current state of the LACP channel
+
+	```
+	show lacp internal
+	```
+
+- **Minimum number of Port-Channel Member Interfaces**:
+
+	- An EtherChannel interface becomes active and up when only one member interface successfully form an adjacency with a remote device
+
+	- In some design scenarios using LACP, a minimum number of adjacencies is required before a port-channel interface becomes active
+
+	- This option can be configured as follows:
+
+	```
+	conf t
+	 interface po1
+	  port-channel min-links <min-links>
+	```
+
+- You can set the minimum number of port-channel interfaces to two then shut down one of the member interfaces on SW1
+
+- This prevents the EtherChannel from meeting up the required number of links and shuts it down
+
+- Notice that the port-channel status is not in use in the new state
+
+```
+interface g1/0/1
+ shutdown
+```
+
+```
+ %ETC-5-MINLINKS_NOTMET: Port-channel Po1 is down bundled ports (1) doesn't meet min-links
+ %LINEPROTO-5-UPDOWN: Line protocol on Interface GigabitEthernet1/0/2, changed state to down
+ %LINEPROTO-5-UPDOWN: Line protocol on Interface Port-channel1, changed state to down
+ %LINK-5-CHANGED: Interface GigabitEthernet1/0/1, changed state to administratively down
+ %LINK-3-UPDOWN: Interface Port-channel1, changed state to down
+```
+
+- SW1 `show etherchannel summary`
+
+```
+1	Po1(SM)		LACP	G1/0/1(D)	G1/0/2(P)
+```
+
+- The minimum number of port-channel member interfaces does not need to be configured on both devices to work properly
+
+- However, configuring it on both devices is recommended to accelerate troubleshooting and assist operational staff
+
+- **Maximum number of Port Channel Member interfaces**:
+
+- An EtherChannel can be configured to have a specific maximum number of member interfaces in a port-channel
+
+- This may be done to ensure that the active member interface count proceeds with powers of two (for example 2,4,8) to accomodate load-balancing hashes
+
+- The maximum number of member interfaces in a port channel can be configured as follows:
+
+```
+conf t
+ interface po1
+  lacp max-bundle <max-links>
+```
+
+- After the configuration of the maximum number of active member interfaces for a port channel; now the G1/0/2 port is shown as Hot-standby
+
+```
+1	PO1(SU)		LACP	G1/0/1(P)	G1/0/2(H)
+```
+
+- The maximum number of port-channel member interfaces needs to be configured only on the master switch for that port channel; however, configuring it on both switches is recommended to accelerate troubleshooting and assist operational staff
+
+- The port channel master switch controls which member interfaces (and associated links) are active by examining the LACP port priority
+
+- A lower port priority is preferred. If the port priority is the same, then the lower interface number is preferred
+
+- **LACP System Priority**:
+
+- The LACP system priority identifies which switch is the master switch for a port channel
+
+- The master switch on a port channel is responsible for choosing which member interfaces are active in a port channel when there are more member interfaces than the maximum number of member interfaces associated to a port-channel interface
+
+- The switch with the lower system priority is preferred
+
+- Configuring the LACP system priority
+
+```
+conf t
+ lacp system-priority <priority>
+```
+
+- Example:
+
+```
+conf t
+ lacp system-priority 1
+```
+
+- Verifying the current lacp system priority:
+
+```
+do show lacp sys-id 
+1, aabb.cc80.7200
+```
+
+- **LACP Interface Priority**: LACP interface priority enables the master switch to choose which member interfaces are active in a port channel when there are more member interfaces than the maximum number of member interfaces for a port channel
+
+- A port with a lower priority is preferred
+
+- Setting the interface priority:
+
+```
+conf t
+ interface g1/0/1
+  lacp port-priority <priority>
+```
+
+- Changing the port priority on SW1 for g1/0/2 so that it is the most preferred interface when the LACP maximum link has been set to 1
+
+- SW1:
+
+```
+conf t
+ interface g1/0/2
+  lacp port-priority 1
+```
+
+- SW1 is the master switch for port channel 1, the g1/0/2 interface becomes active, and G1/0/1 becomes Hot-standby
+
+- Viewing the LACP priority
+
+```
+show etherchannel summary | begin Group
+```
+
+```
+1	Po1(SU)		LACP	G1/0/1(H)	G1/0/2(P)
+```
+
+### Troubleshooting EtherChannel Bundles
+
+- It is important to remember that a port channel is a logical interface, so all the member interfaces must have the same characteristics. If they do not, problems will occur
+
+- As a general rule, when configuring port channels on a switch, place each member interface in the appropriate port type (Layer 2 or Layer 3) and then associate the interfaces to a port channel
+
+- All other port channel configuration is done via the port-channel interface
+
+- Settings that should match on the member interfaces:
+
+	- **Port Type**: Every port in the interface must be consistently configured to be a Layer 2 switch port or a Layer 3 routed port
+
+	- **Port Mode**: All Layer 2 port channels must be configured as either access ports or trunk ports. They cannot be mixed
+
+	- **Native VLAN**: The member interfaces on a Layer 2 trunk port channel must be configured with the same native VLAN, using the command `switchport trunk native vlan <id>` 
+
+	- **Allowed VLANs**: The member interfaces on a Layer 2 trunk port channel must be configured to support the same VLANs, using the command `switchport trunk allowed vlan <id>`
+
+	- **Speed**: All member interfaces must be the same speed
+
+	- **Duplex**: The duplex must be the same on the member interfaces
+
+	- **MTU**: All Layer 3 member interfaces must have the same MTU configured
+
+	- The interface cannot be added to the port channel if the MTU does not match the MTU of the other member interfaces
+
+	- **Load interval**: The load interval must be configured the same on all member interfaces. Load interval is used as a interval for monitoring interface settings (such as a SNMP)
+
+	- **Storm control**: The member ports must be configured with the same storm control settings on all member interfaces (used for traffic control on a VPLS bridge)
+
+- In addition to paying attention to the configuration settings listed above, check the following when troubleshooting the establishment of the EtherChannel bundle:
+
+	- Ensure that member link is between only two devices
+
+	- Ensure that the member ports are all active
+
+	- Ensure that both end links are statically set to `on` and that either LACP is enabled with at least one side set to `active` or PAgP is enabled with at least one side set to `desirable`
+
+	- Ensure that all member interface ports are consistently configured (except for LACP port priority)
+
+	- Verify the LACP and PAgP packet transmission and receipt on both devices
+
+### Load Balancing traffic with EtherChannel Bundles
+
+- Traffic that flows across a port-channel interface is not forwarded out member links on a round-robin basis per packet
+
+- Instead, a hash is calculated, and packets are consistently forwarded across a link based on that hash, which runs on various packet header fields
+
+- The load balancing hash is a systemwide configuration
+
+- Configuring the load balancing algorithm
+
+```
+conf t
+ port-channel load-balance <hash>
+```
+
+- Options for load-balance hash:
+
+	- **dst-ip**: Destination IP address
+
+	- **dst-mac**: Destination MAC address
+
+	- **dst-mixed-ip-port**: Destination IP address and destination TCP/UDP port
+
+	- **dst-port**: Destination TCP/UDP port
+
+	- **src-dst-ip**: Source and destination IP address
+
+	- **src-dest-ip-only**: Source and destination IP addresses only
+
+	- **src-dst-mac**: Source and destination MAC addresses
+
+	- **src-dst-mixed-ip-port**: Source and destination IP addresses and source and destination TCP/UDP ports
+
+	- **src-dst-port**: Source and destination TCP/UDP ports only
+
+	- **src-ip**: Source IP address
+
+	- **src-mac**: Source MAC address
+
+	- **src-mixed-ip-port**: Source IP address and source TCP/UDP port 
+
+	- **src-port**: Source TCP/UDP port
+
+- If the links are unevenly distributed, changing the hash value may provide a different distribution ratio across member links
+
+- For example if a port-channel is established with a router, using a MAC address as part of the hash could impact the traffic flow as the router's MAC address for the source or destination will always be the router's MAC address
+
+- A better choice would be to use the source/destination IP address or base the hash on TCP/UDP session ports
+
+- Viewing the current load balance method:
+
+```
+show etherchannel load-balance
+```
+
+- This displays how a switch will load balance network traffic based on it's type: non-IP, IPv4, or IPv6 
+
+- Another critical point is that a hash is a binary function, so links should be in powers of two (for example 2, 4 or 8), to be consistent
+
+- A three-port EtherChannel will not load balance as effectively as two or four-port EtherChannel
+
+- The best way to view the load of each member link is with the command `show etherchannel port`
+
+- The link utilization is displayed in hex under Load and displays the relative link utilization to the other member links of the EtherChannel
