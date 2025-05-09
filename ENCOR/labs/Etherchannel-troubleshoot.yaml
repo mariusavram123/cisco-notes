@@ -1,0 +1,485 @@
+annotations:
+  - border_color: '#00000000'
+    border_style: ''
+    color: '#E2E1E1'
+    rotation: 0
+    text_bold: false
+    text_content: |-
+      Channel group 1
+      LACP
+    text_font: monospace
+    text_italic: false
+    text_size: 12
+    text_unit: pt
+    thickness: 1
+    type: text
+    x1: -200.0
+    y1: -240.0
+    z_index: 0
+  - border_color: '#00000000'
+    border_style: ''
+    color: '#F5F2F2'
+    rotation: 0
+    text_bold: false
+    text_content: |-
+      Channel group 2
+      PAgP
+    text_font: monospace
+    text_italic: false
+    text_size: 12
+    text_unit: pt
+    thickness: 1
+    type: text
+    x1: 120.0
+    y1: -240.0
+    z_index: 1
+smart_annotations: []
+nodes:
+  - boot_disk_size: null
+    configuration:
+      - name: ios_config.txt
+        content: |-
+          Building configuration...
+
+          Current configuration : 1346 bytes
+          !
+          ! Last configuration change at 19:11:24 UTC Fri May 9 2025
+          !
+          version 17.15
+          service timestamps debug datetime msec
+          service timestamps log datetime msec
+          !
+          hostname SW1
+          !
+          boot-start-marker
+          boot-end-marker
+          !
+          !
+          no logging console
+          no aaa new-model
+          !
+          !
+          !
+          !
+          !
+          !
+          !
+          !
+          !
+          !
+          !
+          !
+          !
+          ip audit notify log
+          ip audit po max-events 100
+          ip cef
+          login on-success log
+          no ipv6 cef
+          !
+          !
+          !
+          !
+          !
+          !
+          !
+          !
+          !
+          !
+          !
+          memory free low-watermark processor 79593
+          !
+          !
+          spanning-tree mode rapid-pvst
+          spanning-tree extend system-id
+          lacp system-priority 4096
+          !
+          !
+          vlan internal allocation policy ascending
+          !
+          !
+          !
+          !
+          !
+          interface Port-channel1
+           switchport trunk encapsulation dot1q
+           switchport mode trunk
+           switchport nonegotiate
+          !
+          interface Ethernet0/0
+           switchport trunk encapsulation dot1q
+           switchport mode trunk
+           switchport nonegotiate
+           channel-group 1 mode active
+           lacp rate fast
+          !
+          interface Ethernet0/1
+           switchport trunk encapsulation dot1q
+           switchport mode trunk
+           switchport nonegotiate
+           bandwidth 1000000
+           channel-group 1 mode active
+           lacp port-priority 4096
+          !
+          interface Ethernet0/2
+           shutdown
+          !
+          interface Ethernet0/3
+           shutdown
+          !
+          ip forward-protocol nd
+          !
+          !
+          ip http server
+          ip http secure-server
+          ip ssh bulk-mode 131072
+          !
+          no logging btrace
+          !
+          !
+          !
+          control-plane
+          !
+          !
+          !
+          line con 0
+           exec-timeout 0 0
+           logging synchronous
+          line aux 0
+          line vty 0 4
+           exec-timeout 0 0
+           login
+           transport input ssh
+          !
+          !
+          end
+    cpu_limit: null
+    cpus: null
+    data_volume: null
+    hide_links: false
+    id: n0
+    image_definition: null
+    label: SW1
+    node_definition: ioll2-xe
+    parameters: {}
+    ram: null
+    tags: []
+    x: -280
+    y: -160
+    interfaces:
+      - id: i0
+        label: Loopback0
+        mac_address: null
+        type: loopback
+      - id: i1
+        label: Ethernet0/0
+        mac_address: null
+        slot: 0
+        type: physical
+      - id: i2
+        label: Ethernet0/1
+        mac_address: null
+        slot: 1
+        type: physical
+      - id: i3
+        label: Ethernet0/2
+        mac_address: null
+        slot: 2
+        type: physical
+      - id: i4
+        label: Ethernet0/3
+        mac_address: null
+        slot: 3
+        type: physical
+  - boot_disk_size: null
+    configuration:
+      - name: ios_config.txt
+        content: "Building configuration...\n\nCurrent configuration : 4021 bytes\n\
+          !\n! Last configuration change at 19:11:22 UTC Fri May 9 2025\n!\nversion\
+          \ 17.15\nservice timestamps debug datetime msec\nservice timestamps log\
+          \ datetime msec\n!\nhostname SW2\n!\nboot-start-marker\nboot-end-marker\n\
+          !\n!\nno logging console\nno aaa new-model\n!\n!\n!\n!\n!\n!\n!\n!\n!\n\
+          !\n!\n!\n!\nip audit notify log\nip audit po max-events 100\nip cef\nlogin\
+          \ on-success log\nno ipv6 cef\n!\n!\n!\n!\n!\n!\n!\n!\ncrypto pki trustpoint\
+          \ TP-self-signed-131184757\n enrollment selfsigned\n subject-name cn=IOS-Self-Signed-Certificate-131184757\n\
+          \ revocation-check none\n rsakeypair TP-self-signed-131184757\n hash sha512\n\
+          !\n!\ncrypto pki certificate chain TP-self-signed-131184757\n certificate\
+          \ self-signed 01\n  3082032E 30820216 A0030201 02020101 300D0609 2A864886\
+          \ F70D0101 0D050030\n  30312E30 2C060355 04030C25 494F532D 53656C66 2D536967\
+          \ 6E65642D 43657274\n  69666963 6174652D 31333131 38343735 37301E17 0D323530\
+          \ 35303931 35303034\n  395A170D 33353035 30393135 30303439 5A303031 2E302C06\
+          \ 03550403 0C25494F\n  532D5365 6C662D53 69676E65 642D4365 72746966 69636174\
+          \ 652D3133 31313834\n  37353730 82012230 0D06092A 864886F7 0D010101 05000382\
+          \ 010F0030 82010A02\n  82010100 C81BE2D7 AA2C352F 9335B9B3 FB0E4040 93B4A848\
+          \ C2E048BD 949DEAD7\n  D3A43C2A BC84F41B CA03346F 61E46BFC 438FBC36 7A7D3213\
+          \ 10D3DDDE DA5D4EF3\n  1A2A3752 D1D15FA8 7071B0FC F2FEB244 62D7736A 94B1F432\
+          \ 08BFF5C6 E5CD882E\n  A9B2EC38 4EBC0315 C0F8C4BA 617718D0 757DE1E4 642F34C3\
+          \ 5AF68215 7175279F\n  81F89C99 53D17502 A89931E6 61BC3C7F 63CDC039 855D12AC\
+          \ 8308C4FB 2DD8D628\n  E700E7F7 C487E6B2 A1B87ED9 E23B454B 549835FE 661096D4\
+          \ 17DBF040 F7E6708C\n  AB94F46B 2D5F13EA 20D74C16 C875475E 2C28406B 6F72919C\
+          \ 56A28210 3A2EEFC1\n  BE504732 C2D7CF72 F6BBAD7F 64C0CDF0 8A22C421 EDEB1079\
+          \ 4CAD7F18 D9A23D3C\n  35AEEBE7 02030100 01A35330 51301D06 03551D0E 04160414\
+          \ 18AD1A68 7097FB62\n  541985ED B8B77C63 33D3A9F4 301F0603 551D2304 18301680\
+          \ 1418AD1A 687097FB\n  62541985 EDB8B77C 6333D3A9 F4300F06 03551D13 0101FF04\
+          \ 05300301 01FF300D\n  06092A86 4886F70D 01010D05 00038201 0100430D 384FFAC9\
+          \ EABBC33B 175D3D14\n  D414E1E1 C5495E2B 65BC99F2 110935D5 6F09C289 9385B94A\
+          \ BDE47700 F9267214\n  26FC15BD 42A4AE9E 0F2B62EC 76BFCD19 51F12B56 3C5AC2F9\
+          \ 1D38D921 BE9E437E\n  D3E324B9 7A843FCA 715E7F61 54BC2EDF DDA95EFD 86FFC617\
+          \ 57350384 C8A0419E\n  59331295 F96C3223 8396C4BF 6E54F394 A7DEED00 8280A11F\
+          \ 5B10246C 67402C11\n  3C44A3FF 8AE46A47 6325B7F8 73CADA9A 32DC80ED F4CB573F\
+          \ 090BB7B6 1B20101D\n  3FD174F0 1C90E1E8 2041C570 49E683F7 6337E013 FE3BB7A0\
+          \ CB30D7BE 25CFE2CE\n  39766508 5E265D67 2BDFD46A CF62B3C9 A6FB7373 638B81CE\
+          \ 8F69E76D 29D451F1\n  71708847 002BD243 E6562FD8 17D7BC2D 9B3C\n  \tquit\n\
+          !\n!\nmemory free low-watermark processor 79593\n!\n!\nspanning-tree mode\
+          \ rapid-pvst\nspanning-tree extend system-id\n!\n!\nvlan internal allocation\
+          \ policy ascending\n!\n!\n!\n!\n!\ninterface Port-channel1\n switchport\
+          \ trunk encapsulation dot1q\n switchport trunk native vlan 10\n switchport\
+          \ trunk allowed vlan 20,40\n switchport mode trunk\n switchport nonegotiate\n\
+          !\ninterface Port-channel2\n switchport trunk encapsulation dot1q\n switchport\
+          \ mode trunk\n switchport nonegotiate\n!\ninterface Ethernet0/0\n switchport\
+          \ trunk encapsulation dot1q\n switchport trunk native vlan 10\n switchport\
+          \ trunk allowed vlan 20,40\n switchport mode trunk\n switchport nonegotiate\n\
+          \ channel-group 1 mode passive\n!\ninterface Ethernet0/1\n switchport trunk\
+          \ encapsulation dot1q\n switchport trunk native vlan 10\n switchport trunk\
+          \ allowed vlan 20,40\n switchport mode trunk\n switchport nonegotiate\n\
+          \ channel-group 1 mode passive\n lacp rate fast\n!\ninterface Ethernet0/2\n\
+          \ switchport trunk encapsulation dot1q\n switchport mode trunk\n switchport\
+          \ nonegotiate\n channel-group 2 mode desirable\n!\ninterface Ethernet0/3\n\
+          \ switchport trunk encapsulation dot1q\n switchport mode trunk\n switchport\
+          \ nonegotiate\n channel-group 2 mode desirable\n!\nip forward-protocol nd\n\
+          !\n!\nip http server\nip http secure-server\nip ssh bulk-mode 131072\n!\n\
+          no logging btrace\n!\n!\n!\ncontrol-plane\n!\n!\n!\nline con 0\n exec-timeout\
+          \ 0 0\n logging synchronous\nline aux 0\nline vty 0 4\n exec-timeout 0 0\n\
+          \ login\n transport input ssh\n!\n!\nend"
+    cpu_limit: null
+    cpus: null
+    data_volume: null
+    hide_links: false
+    id: n1
+    image_definition: null
+    label: SW2
+    node_definition: ioll2-xe
+    parameters: {}
+    ram: null
+    tags: []
+    x: 40
+    y: -160
+    interfaces:
+      - id: i0
+        label: Loopback0
+        mac_address: null
+        type: loopback
+      - id: i1
+        label: Ethernet0/0
+        mac_address: null
+        slot: 0
+        type: physical
+      - id: i2
+        label: Ethernet0/1
+        mac_address: null
+        slot: 1
+        type: physical
+      - id: i3
+        label: Ethernet0/2
+        mac_address: null
+        slot: 2
+        type: physical
+      - id: i4
+        label: Ethernet0/3
+        mac_address: null
+        slot: 3
+        type: physical
+  - boot_disk_size: null
+    configuration:
+      - name: ios_config.txt
+        content: |-
+          Building configuration...
+
+          Current configuration : 1256 bytes
+          !
+          ! Last configuration change at 19:11:22 UTC Fri May 9 2025
+          !
+          version 17.15
+          service timestamps debug datetime msec
+          service timestamps log datetime msec
+          !
+          hostname SW3
+          !
+          boot-start-marker
+          boot-end-marker
+          !
+          !
+          no logging console
+          no aaa new-model
+          !
+          !
+          !
+          !
+          !
+          !
+          !
+          !
+          !
+          !
+          !
+          !
+          !
+          ip audit notify log
+          ip audit po max-events 100
+          ip cef
+          login on-success log
+          no ipv6 cef
+          !
+          !
+          !
+          !
+          !
+          !
+          !
+          !
+          !
+          !
+          !
+          memory free low-watermark processor 79593
+          !
+          !
+          spanning-tree mode rapid-pvst
+          spanning-tree extend system-id
+          !
+          !
+          vlan internal allocation policy ascending
+          !
+          !
+          !
+          !
+          !
+          interface Port-channel2
+           switchport trunk encapsulation dot1q
+           switchport mode trunk
+           switchport nonegotiate
+          !
+          interface Ethernet0/0
+           switchport trunk encapsulation dot1q
+           switchport mode trunk
+           switchport nonegotiate
+           channel-group 2 mode auto
+          !
+          interface Ethernet0/1
+           switchport trunk encapsulation dot1q
+           switchport mode trunk
+           switchport nonegotiate
+           channel-group 2 mode auto
+          !
+          interface Ethernet0/2
+           shutdown
+          !
+          interface Ethernet0/3
+           shutdown
+          !
+          ip forward-protocol nd
+          !
+          !
+          ip http server
+          ip http secure-server
+          ip ssh bulk-mode 131072
+          !
+          no logging btrace
+          !
+          !
+          !
+          control-plane
+          !
+          !
+          !
+          line con 0
+           exec-timeout 0 0
+           logging synchronous
+          line aux 0
+          line vty 0 4
+           exec-timeout 0 0
+           login
+           transport input ssh
+          !
+          !
+          end
+    cpu_limit: null
+    cpus: null
+    data_volume: null
+    hide_links: false
+    id: n2
+    image_definition: null
+    label: SW3
+    node_definition: ioll2-xe
+    parameters: {}
+    ram: null
+    tags: []
+    x: 320
+    y: -160
+    interfaces:
+      - id: i0
+        label: Loopback0
+        mac_address: null
+        type: loopback
+      - id: i1
+        label: Ethernet0/0
+        mac_address: null
+        slot: 0
+        type: physical
+      - id: i2
+        label: Ethernet0/1
+        mac_address: null
+        slot: 1
+        type: physical
+      - id: i3
+        label: Ethernet0/2
+        mac_address: null
+        slot: 2
+        type: physical
+      - id: i4
+        label: Ethernet0/3
+        mac_address: null
+        slot: 3
+        type: physical
+links:
+  - id: l0
+    n1: n0
+    n2: n1
+    i1: i1
+    i2: i1
+    conditioning: {}
+    label: SW1-Ethernet0/0<->SW2-Ethernet0/0
+  - id: l1
+    n1: n0
+    n2: n1
+    i1: i2
+    i2: i2
+    conditioning: {}
+    label: SW1-Ethernet0/1<->SW2-Ethernet0/1
+  - id: l2
+    n1: n1
+    n2: n2
+    i1: i3
+    i2: i1
+    conditioning: {}
+    label: SW2-Ethernet0/2<->SW3-Ethernet0/0
+  - id: l3
+    n1: n1
+    n2: n2
+    i1: i4
+    i2: i2
+    conditioning: {}
+    label: SW2-Ethernet0/3<->SW3-Ethernet0/1
+lab:
+  description: ''
+  notes: |-
+    ## Lab guide
+    - Try to set different modes for etherchannel, did they come up?
+
+    - Try to set different bandwidth per interface, is the bundle still up?
+
+    - Try to change the mtu, is this allowed?
+
+    - Try to set different lacp rate on different parts, does this take the lacp down?
+
+    - Trying to set the duplex, setting is not applied in config but only on interface - only CDP reports duplex mismatch but does not shut down the port channel
+  title: Etherchannel-troubleshoot
+  version: 0.3.0

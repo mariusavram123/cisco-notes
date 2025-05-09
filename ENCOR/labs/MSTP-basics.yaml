@@ -1,0 +1,352 @@
+annotations: []
+smart_annotations: []
+nodes:
+  - boot_disk_size: null
+    configuration:
+      - name: ios_config.txt
+        content: "Building configuration...\n\nCurrent configuration : 3818 bytes\n\
+          !\n! Last configuration change at 19:06:33 UTC Fri May 9 2025\n!\nversion\
+          \ 17.15\nservice timestamps debug datetime msec\nservice timestamps log\
+          \ datetime msec\n!\nhostname SW1\n!\nboot-start-marker\nboot-end-marker\n\
+          !\n!\nno logging console\nno aaa new-model\n!\n!\n!\n!\n!\n!\n!\n!\n!\n\
+          !\n!\n!\n!\nip audit notify log\nip audit po max-events 100\nip domain name\
+          \ lan\nip cef\nlogin on-success log\nno ipv6 cef\n!\n!\n!\n!\n!\n!\n!\n\
+          !\ncrypto pki trustpoint TP-self-signed-131184743\n enrollment selfsigned\n\
+          \ subject-name cn=IOS-Self-Signed-Certificate-131184743\n revocation-check\
+          \ none\n rsakeypair TP-self-signed-131184743\n hash sha512\n!\n!\ncrypto\
+          \ pki certificate chain TP-self-signed-131184743\n certificate self-signed\
+          \ 01\n  3082032E 30820216 A0030201 02020101 300D0609 2A864886 F70D0101 0D050030\n\
+          \  30312E30 2C060355 04030C25 494F532D 53656C66 2D536967 6E65642D 43657274\n\
+          \  69666963 6174652D 31333131 38343734 33301E17 0D323530 35303231 30333031\n\
+          \  345A170D 33353035 30323130 33303134 5A303031 2E302C06 03550403 0C25494F\n\
+          \  532D5365 6C662D53 69676E65 642D4365 72746966 69636174 652D3133 31313834\n\
+          \  37343330 82012230 0D06092A 864886F7 0D010101 05000382 010F0030 82010A02\n\
+          \  82010100 CB6AB8D9 0728255E DC1B584A CE996038 EE729DF8 CDE34A1D ED18C227\n\
+          \  C7C207C7 2CE07D7A 635F2020 9DD66050 E42E0AD4 EBCBE8E0 40FC1D30 229D7742\n\
+          \  B6AEF86B 8E6037DD EDF865AD 81C119C2 E663A4B8 E2BFEE97 44C8B778 B69BF458\n\
+          \  C629D604 F0B3C7C3 FBE1C7F7 498F995F 647050F7 C12B6DED 50384941 10BB7840\n\
+          \  4C41A4E2 498ADAC1 C8A728A9 AC740692 71C91170 9356513F 9324573F 493E11A1\n\
+          \  781E43D8 B2AF2BCF 643E7117 8B8952D8 691C10E5 5780E277 ED176B58 8A6B5F43\n\
+          \  7163918C 6AF9D0B4 7824390E B0AE5FBD 0D91D649 20D12338 86A143B3 9DE6FD16\n\
+          \  5EE726FB 92F9680E 694A6FBD 89D46900 4A5E8E65 1F362C88 D45FCB74 30150AC9\n\
+          \  66CA41A9 02030100 01A35330 51301D06 03551D0E 04160414 F606EB4F 340AF252\n\
+          \  532C6D0F DC8AD192 06A013D0 301F0603 551D2304 18301680 14F606EB 4F340AF2\n\
+          \  52532C6D 0FDC8AD1 9206A013 D0300F06 03551D13 0101FF04 05300301 01FF300D\n\
+          \  06092A86 4886F70D 01010D05 00038201 010057E4 5417A1E8 0FF74962 7A462E17\n\
+          \  1C0E9277 EFAD0FCF 6B874960 8C758BC2 67355EDA C3642461 D3E302E1 DF67DB25\n\
+          \  91CF6DEA A9A77775 1FCF621B 89EA40B6 9EFFEB37 35A940C5 13DEF57E 5986903A\n\
+          \  755FAD42 689F2607 FCDD4943 B9EB7F3F 8E824D72 950623CD 0F1AC008 2408DEB4\n\
+          \  0F72F178 853641C7 4D0CCF52 0C7D916F 1015545B 243B08AC 24E06D83 79DACCBD\n\
+          \  DA406E98 3F2AFB5F 69714082 AF153CCB 052834D9 FADAB180 1F797EB7 1800C9B5\n\
+          \  D4D818C3 CD5231F6 96DC6E8A E1AA5170 68C2B579 371681E5 4D7A5906 A1857A25\n\
+          \  3929F8E8 0F48785A 02DB27EC 228AEEED C8A1CFE5 282A9A83 7C4A17CE 42341CFB\n\
+          \  40859F19 4B9EC7AC 17441ADC 842BB94F C954\n  \tquit\n!\n!\nmemory free\
+          \ low-watermark processor 79593\n!\n!\nspanning-tree mode mst\nspanning-tree\
+          \ extend system-id\n!\nspanning-tree mst configuration\n instance 1 vlan\
+          \ 1-50\n instance 2 vlan 51-100\n!\nspanning-tree mst 0-1 priority 4096\n\
+          spanning-tree mst 2 priority 8192\n!\nusername marius secret 9 $9$7JtfUxlTCZUAUU$pdtb.3fQs/wvcbaVL7vAmfayMYvlpVRpBzTamyJGxn2\n\
+          !\nvlan internal allocation policy ascending\n!\n!\n!\n!\n!\ninterface Ethernet0/0\n\
+          \ switchport trunk encapsulation dot1q\n switchport trunk native vlan 999\n\
+          \ switchport trunk allowed vlan 1-100\n switchport mode trunk\n switchport\
+          \ nonegotiate\n bandwidth 1000000\n!\ninterface Ethernet0/1\n switchport\
+          \ trunk encapsulation dot1q\n switchport trunk native vlan 999\n switchport\
+          \ trunk allowed vlan 1-100\n switchport mode trunk\n switchport nonegotiate\n\
+          \ bandwidth 1000000\n!\ninterface Ethernet0/2\n!\ninterface Ethernet0/3\n\
+          !\ninterface Vlan1\n ip address 10.0.0.2 255.255.255.0\n!\nip default-gateway\
+          \ 10.0.0.1\nip forward-protocol nd\n!\n!\nip http server\nip http secure-server\n\
+          ip ssh bulk-mode 131072\n!\nno logging btrace\n!\n!\n!\ncontrol-plane\n\
+          !\n!\n!\nline con 0\n exec-timeout 0 0\n logging synchronous\nline aux 0\n\
+          line vty 0 4\n exec-timeout 0 0\n logging synchronous\n login local\n transport\
+          \ input ssh\n!\n!\nend"
+    cpu_limit: null
+    cpus: null
+    data_volume: null
+    hide_links: false
+    id: n0
+    image_definition: null
+    label: SW1
+    node_definition: ioll2-xe
+    parameters: {}
+    ram: null
+    tags: []
+    x: -160
+    y: -280
+    interfaces:
+      - id: i0
+        label: Loopback0
+        mac_address: null
+        type: loopback
+      - id: i1
+        label: Ethernet0/0
+        mac_address: null
+        slot: 0
+        type: physical
+      - id: i2
+        label: Ethernet0/1
+        mac_address: null
+        slot: 1
+        type: physical
+      - id: i3
+        label: Ethernet0/2
+        mac_address: null
+        slot: 2
+        type: physical
+      - id: i4
+        label: Ethernet0/3
+        mac_address: null
+        slot: 3
+        type: physical
+  - boot_disk_size: null
+    configuration:
+      - name: ios_config.txt
+        content: "Building configuration...\n\nCurrent configuration : 3889 bytes\n\
+          !\n! Last configuration change at 19:06:34 UTC Fri May 9 2025\n!\nversion\
+          \ 17.15\nservice timestamps debug datetime msec\nservice timestamps log\
+          \ datetime msec\n!\nhostname SW3\n!\nboot-start-marker\nboot-end-marker\n\
+          !\n!\nno logging console\nno aaa new-model\n!\n!\n!\n!\n!\n!\n!\n!\n!\n\
+          !\n!\n!\n!\nip audit notify log\nip audit po max-events 100\nip domain name\
+          \ lan\nip cef\nlogin on-success log\nno ipv6 cef\n!\n!\n!\n!\n!\n!\n!\n\
+          !\ncrypto pki trustpoint TP-self-signed-131184744\n enrollment selfsigned\n\
+          \ subject-name cn=IOS-Self-Signed-Certificate-131184744\n revocation-check\
+          \ none\n rsakeypair TP-self-signed-131184744\n hash sha512\n!\n!\ncrypto\
+          \ pki certificate chain TP-self-signed-131184744\n certificate self-signed\
+          \ 01\n  3082032E 30820216 A0030201 02020101 300D0609 2A864886 F70D0101 0D050030\n\
+          \  30312E30 2C060355 04030C25 494F532D 53656C66 2D536967 6E65642D 43657274\n\
+          \  69666963 6174652D 31333131 38343734 34301E17 0D323530 35303231 30333031\n\
+          \  375A170D 33353035 30323130 33303137 5A303031 2E302C06 03550403 0C25494F\n\
+          \  532D5365 6C662D53 69676E65 642D4365 72746966 69636174 652D3133 31313834\n\
+          \  37343430 82012230 0D06092A 864886F7 0D010101 05000382 010F0030 82010A02\n\
+          \  82010100 88DA3343 01C67440 8B662F1D 30CDB676 8A9BC751 649D217B E59DF4E2\n\
+          \  9E590F85 DF28ACF7 B28A400C 70F66831 4EC8C4C2 B7CF0475 403FD085 AD2E5BE1\n\
+          \  8ADE1371 1C6B58F5 CA909675 59E94318 C19FB589 F3781796 AD04A7DC FE8B65FB\n\
+          \  5E25758E D26162F4 87AC83CC EEE5BB6E D0A91D73 A58BD9D0 CDBF231E 685AF4C4\n\
+          \  48F98F4C D7366181 8FD966A2 7E8D93DE 91C7BC5A C27D9787 369DFFD7 CF4B1206\n\
+          \  FB80725D 3C430141 2AE3FAB4 A179BE3C 6AC930B8 2994A4BD 39AF11C8 24F45B97\n\
+          \  FB7D1980 FCC486FD B51E9A3D 9FC3E6EF 75C45B80 FB337C17 C86C3A88 3F0819DC\n\
+          \  51665793 86D656FF 9A1D20EB BBF96C99 2CF4BB86 B86E43B8 4097A784 D70511DC\n\
+          \  E6BBF541 02030100 01A35330 51301D06 03551D0E 04160414 7D53F65B 66D65207\n\
+          \  984EF855 B917D37F D947B468 301F0603 551D2304 18301680 147D53F6 5B66D652\n\
+          \  07984EF8 55B917D3 7FD947B4 68300F06 03551D13 0101FF04 05300301 01FF300D\n\
+          \  06092A86 4886F70D 01010D05 00038201 01000BAA DA1DC62C 9BF7149B C32C5F28\n\
+          \  91CEDB3C 59993EC3 9CF037E1 02CEB141 1E20BE59 39B92C80 DF7CE177 4DFBC47C\n\
+          \  C17C515C 482F02E3 6204941E B74D165F 63D9D1DD 8A98D0B3 0797D395 CCAC0A5F\n\
+          \  8D9C6445 EF91DA0C 6151E5DC 6B0FF6E4 70DC268B 1545A209 8165C1CF 39C36379\n\
+          \  8CFB4A33 1501DEAB 3CBBD2F8 F7DEDA42 08165040 4232DC39 4D407831 FD028E77\n\
+          \  227215CD 1609BC7F E5D9E4D5 758F7C1E AD9C4DF6 0D677216 8950B231 D6386168\n\
+          \  02B813B7 F6F563B6 FF966BAF FDBD5D07 46BEFB39 97C1F6A7 C186CFC2 90CFCCDB\n\
+          \  BED7940C 1AE6236B DC01DA3B F5977A46 B0E78AA4 02BD580B 00D498B8 B218577F\n\
+          \  8397E361 C7BD1038 F6F1D39E AD2F298E B1C8\n  \tquit\n!\n!\nmemory free\
+          \ low-watermark processor 79593\n!\n!\nspanning-tree mode mst\nspanning-tree\
+          \ extend system-id\n!\nspanning-tree mst configuration\n instance 1 vlan\
+          \ 1-50\n instance 2 vlan 51-100\n!\nspanning-tree mst 0-1 priority 8192\n\
+          spanning-tree mst 2 priority 4096\n!\nusername marius secret 9 $9$lrMN6SlCV7382U$q2Nkqku6CjSgIKBJsGI.x6Ayi206uT8VelxDj8zWnBI\n\
+          !\nvlan internal allocation policy ascending\n!\n!\n!\n!\n!\ninterface Ethernet0/0\n\
+          \ switchport trunk encapsulation dot1q\n switchport trunk native vlan 999\n\
+          \ switchport trunk allowed vlan 1-100\n switchport mode trunk\n switchport\
+          \ nonegotiate\n bandwidth 1000000\n!\ninterface Ethernet0/1\n switchport\
+          \ trunk encapsulation dot1q\n switchport trunk native vlan 999\n switchport\
+          \ trunk allowed vlan 1-100\n switchport mode trunk\n switchport nonegotiate\n\
+          \ bandwidth 1000000\n!\ninterface Ethernet0/2\n switchport trunk encapsulation\
+          \ dot1q\n switchport mode trunk\n shutdown\n!\ninterface Ethernet0/3\n!\n\
+          interface Vlan1\n ip address 10.0.0.4 255.255.255.0\n!\nip default-gateway\
+          \ 10.0.0.1\nip forward-protocol nd\n!\n!\nip http server\nip http secure-server\n\
+          ip ssh bulk-mode 131072\n!\nno logging btrace\n!\n!\n!\ncontrol-plane\n\
+          !\n!\n!\nline con 0\n exec-timeout 0 0\n logging synchronous\nline aux 0\n\
+          line vty 0 4\n exec-timeout 0 0\n logging synchronous\n login local\n transport\
+          \ input ssh\n!\n!\nend"
+    cpu_limit: null
+    cpus: null
+    data_volume: null
+    hide_links: false
+    id: n1
+    image_definition: null
+    label: SW2
+    node_definition: ioll2-xe
+    parameters: {}
+    ram: null
+    tags: []
+    x: 120
+    y: -280
+    interfaces:
+      - id: i0
+        label: Loopback0
+        mac_address: null
+        type: loopback
+      - id: i1
+        label: Ethernet0/0
+        mac_address: null
+        slot: 0
+        type: physical
+      - id: i2
+        label: Ethernet0/1
+        mac_address: null
+        slot: 1
+        type: physical
+      - id: i3
+        label: Ethernet0/2
+        mac_address: null
+        slot: 2
+        type: physical
+      - id: i4
+        label: Ethernet0/3
+        mac_address: null
+        slot: 3
+        type: physical
+  - boot_disk_size: null
+    configuration:
+      - name: ios_config.txt
+        content: "Building configuration...\n\nCurrent configuration : 3772 bytes\n\
+          !\n! Last configuration change at 19:06:34 UTC Fri May 9 2025\n!\nversion\
+          \ 17.15\nservice timestamps debug datetime msec\nservice timestamps log\
+          \ datetime msec\n!\nhostname SW3\n!\nboot-start-marker\nboot-end-marker\n\
+          !\n!\nno logging console\nno aaa new-model\n!\n!\n!\n!\n!\n!\n!\n!\n!\n\
+          !\n!\n!\n!\nip audit notify log\nip audit po max-events 100\nip domain name\
+          \ lan\nip cef\nlogin on-success log\nno ipv6 cef\n!\n!\n!\n!\n!\n!\n!\n\
+          !\ncrypto pki trustpoint TP-self-signed-131184742\n enrollment selfsigned\n\
+          \ subject-name cn=IOS-Self-Signed-Certificate-131184742\n revocation-check\
+          \ none\n rsakeypair TP-self-signed-131184742\n hash sha512\n!\n!\ncrypto\
+          \ pki certificate chain TP-self-signed-131184742\n certificate self-signed\
+          \ 01\n  3082032E 30820216 A0030201 02020101 300D0609 2A864886 F70D0101 0D050030\n\
+          \  30312E30 2C060355 04030C25 494F532D 53656C66 2D536967 6E65642D 43657274\n\
+          \  69666963 6174652D 31333131 38343734 32301E17 0D323530 35303231 30333032\n\
+          \  305A170D 33353035 30323130 33303230 5A303031 2E302C06 03550403 0C25494F\n\
+          \  532D5365 6C662D53 69676E65 642D4365 72746966 69636174 652D3133 31313834\n\
+          \  37343230 82012230 0D06092A 864886F7 0D010101 05000382 010F0030 82010A02\n\
+          \  82010100 9EE4FC5B D179BA59 9EF0A1A7 FF07EEAD 6AF9F54A 9A8E6531 B221C280\n\
+          \  48081DE1 0757548E 862B5D69 CBBAE9CF DE287046 0285891B CA3C0206 12B501BD\n\
+          \  FA5FBEF9 9605F6DA 620F0A2E 60248BA6 DD23FEA3 2D59DE69 C8E975B4 274807ED\n\
+          \  E03793B1 B36430DD A3A26933 D4241248 4967D570 C020F0D5 9B5E1CEE 98603367\n\
+          \  2AB4CF23 6822AB29 9E9E8B09 94E593A0 F776DDF5 A3623907 383058BF 45797330\n\
+          \  9574242E ACD1F273 A6934176 EF274CC4 9B8951B0 628E1F81 EA78C02A 0AD280B1\n\
+          \  86EFDBCA 7D5BDAE1 A86B53F5 386D1823 D4932F0A 6135BC63 2AFD7966 B13FC956\n\
+          \  8278BD01 2DE5AE6A E2420E3F F7D17C59 E7A6A460 FB73E312 84AA461E E6F83FDA\n\
+          \  D1FFAD3D 02030100 01A35330 51301D06 03551D0E 04160414 88AA2311 1EF91DDB\n\
+          \  8C1EB0CC A9CEBE96 2C7D87B4 301F0603 551D2304 18301680 1488AA23 111EF91D\n\
+          \  DB8C1EB0 CCA9CEBE 962C7D87 B4300F06 03551D13 0101FF04 05300301 01FF300D\n\
+          \  06092A86 4886F70D 01010D05 00038201 01003261 C4AF4AC5 ED25A010 945FB051\n\
+          \  0AE28712 58E178F8 D1B6ED97 FEB2C810 863F4B20 1D9CF0ED 624DA90F C72DC0CB\n\
+          \  A879E4A4 B6E7BE3E DAB7ED35 C8FF9C40 F5A5A7F3 F121904D 5D82C821 53064BA5\n\
+          \  8807B6C8 ABB70F61 36112E05 DA04CCF9 4FF474D4 F324BEF6 D71D2263 C8E39D78\n\
+          \  BA4FA857 A2FC852D E3265DED 12648768 BFC6886F 02C04CF1 A9EB273D 35379D31\n\
+          \  2A278AFF A3372AC7 78630B4A E7B8CAF4 425FE08A CC1A13EA 941DB653 A4105565\n\
+          \  6D29AB7B 6FC9CF64 32FD1890 6B862D3B E38378C5 4BE9D418 274762D6 1F9A32DC\n\
+          \  CE21171E B65EEA04 2322C590 60BE2691 23C13CE4 861623EF 32475E3C C26232D8\n\
+          \  20D7F8E7 A04981AE 57A96C26 A208BE5C 0506\n  \tquit\n!\n!\nmemory free\
+          \ low-watermark processor 79593\n!\n!\nspanning-tree mode mst\nspanning-tree\
+          \ extend system-id\n!\nspanning-tree mst configuration\n instance 1 vlan\
+          \ 1-50\n instance 2 vlan 51-100\n!\n!\nusername marius secret 9 $9$uoPOe6lvsrhBAU$xqjEKVsCl5qNyy5noYY.X26yVhKDIleNcy0jGh7/mxw\n\
+          !\nvlan internal allocation policy ascending\n!\n!\n!\n!\n!\ninterface Ethernet0/0\n\
+          \ switchport trunk encapsulation dot1q\n switchport trunk native vlan 999\n\
+          \ switchport trunk allowed vlan 1-100\n switchport mode trunk\n switchport\
+          \ nonegotiate\n bandwidth 1000000\n!\ninterface Ethernet0/1\n switchport\
+          \ trunk encapsulation dot1q\n switchport trunk native vlan 999\n switchport\
+          \ trunk allowed vlan 1-100\n switchport mode trunk\n switchport nonegotiate\n\
+          \ bandwidth 1000000\n!\ninterface Ethernet0/2\n switchport mode access\n\
+          !\ninterface Ethernet0/3\n!\ninterface Vlan1\n ip address 10.0.0.3 255.255.255.0\n\
+          !\nip default-gateway 10.0.0.1\nip forward-protocol nd\n!\n!\nip http server\n\
+          ip http secure-server\nip ssh bulk-mode 131072\n!\nno logging btrace\n!\n\
+          !\n!\ncontrol-plane\n!\n!\n!\nline con 0\n exec-timeout 0 0\n logging synchronous\n\
+          line aux 0\nline vty 0 4\n exec-timeout 0 0\n logging synchronous\n login\
+          \ local\n transport input ssh\n!\n!\nend"
+    cpu_limit: null
+    cpus: null
+    data_volume: null
+    hide_links: false
+    id: n2
+    image_definition: null
+    label: SW3
+    node_definition: ioll2-xe
+    parameters: {}
+    ram: null
+    tags: []
+    x: -160
+    y: -80
+    interfaces:
+      - id: i0
+        label: Loopback0
+        mac_address: null
+        type: loopback
+      - id: i1
+        label: Ethernet0/0
+        mac_address: null
+        slot: 0
+        type: physical
+      - id: i2
+        label: Ethernet0/1
+        mac_address: null
+        slot: 1
+        type: physical
+      - id: i3
+        label: Ethernet0/2
+        mac_address: null
+        slot: 2
+        type: physical
+      - id: i4
+        label: Ethernet0/3
+        mac_address: null
+        slot: 3
+        type: physical
+links:
+  - id: l0
+    n1: n0
+    n2: n1
+    i1: i1
+    i2: i1
+    conditioning: {}
+    label: SW1-Ethernet0/0<->SW2-Ethernet0/0
+  - id: l1
+    n1: n0
+    n2: n2
+    i1: i2
+    i2: i1
+    conditioning: {}
+    label: SW1-Ethernet0/1<->SW3-Ethernet0/0
+  - id: l2
+    n1: n2
+    n2: n1
+    i1: i2
+    i2: i2
+    conditioning: {}
+    label: SW3-Ethernet0/1<->SW2-Ethernet0/1
+lab:
+  description: ''
+  notes: |-
+    ## Lab Instructions
+    ---
+    -
+    - **Step 1** - Create VLANs 1-100 on SW1, SW2, and SW3.
+    - Configure the links between the switches as static trunks that allow only VLANs 1-100.
+    - Explicitly disable DTP.
+    - Configure VLAN 999 as the native VLAN.
+    - How many BPDUs are sent every second? Use a packet capture to confirm.
+    -
+    ---
+    -
+    - **Step 2** - Enable MSTP on the switches.
+    - What is the STP cost of each port before and after?
+    - Explicitly configure STP short costs. Does it affect the port costs?
+    - How many BPDUs are sent every second? Use a packet capture to confirm.
+    -
+    ---
+    -
+    - **Step 3** - Configure each switch's priority for the IST.
+    - Make SW1's priority one increment higher than the lowest possible priority.
+    - Make SW2's priority two increments higher than the lowest possible priority.
+    - Leave SW3's priority as the default.
+    -
+    ---
+    -
+    - **Step 4** - Configure MSTI 1 (VLANs 1-50) and MSTI 2 (VLANs 51-100).
+    - Make SW1 the root bridge for MSTI 1 and the secondary root for MSTI 2.
+    - Make SW2 the root bridge for MSTI 2 and the secondary root for MSTI 1.
+    -
+    ---
+    -
+    - **Step 5** - Confirm the status of the LAN after these configurations.
+    - Verify that the instances were properly configured.
+    - Verify the root bridge of each instance.
+    - How many BPDUs are sent every second? Use a packet capture on each link to confirm.
+    -
+    ---
+  title: MSTP-basics
+  version: 0.3.0

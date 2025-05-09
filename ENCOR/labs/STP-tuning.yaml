@@ -1,0 +1,686 @@
+annotations:
+  - border_color: '#808080FF'
+    border_radius: 0
+    border_style: ''
+    color: '#DDEB11F6'
+    rotation: 0
+    thickness: 1
+    type: rectangle
+    x1: -280.0
+    y1: -360.0
+    x2: 160.0
+    y2: 160.0
+    z_index: 0
+  - border_color: '#808080FF'
+    border_radius: 0
+    border_style: ''
+    color: '#F3F334FF'
+    rotation: 0
+    thickness: 1
+    type: rectangle
+    x1: 80.0
+    y1: -360.0
+    x2: 160.0
+    y2: 160.0
+    z_index: 1
+  - border_color: '#00000000'
+    border_style: ''
+    color: '#808080FF'
+    rotation: 0
+    text_bold: false
+    text_content: ''
+    text_font: monospace
+    text_italic: false
+    text_size: 12
+    text_unit: pt
+    thickness: 1
+    type: text
+    x1: -240.0
+    y1: -360.0
+    z_index: 2
+  - border_color: '#00000000'
+    border_style: ''
+    color: '#1A4AF8'
+    rotation: 0
+    text_bold: false
+    text_content: |-
+      VLAN 10: - root
+      VLAN 20: - secondary root
+    text_font: monospace
+    text_italic: false
+    text_size: 12
+    text_unit: pt
+    thickness: 1
+    type: text
+    x1: -360.0
+    y1: -360.0
+    z_index: 3
+  - border_color: '#00000000'
+    border_style: ''
+    color: '#312BF0'
+    rotation: 0
+    text_bold: false
+    text_content: |-
+      VLAN 10: secondary root
+      VLAN 20: root
+    text_font: monospace
+    text_italic: false
+    text_size: 12
+    text_unit: pt
+    thickness: 1
+    type: text
+    x1: 80.0
+    y1: -360.0
+    z_index: 4
+  - border_color: '#808080FF'
+    border_style: ''
+    color: '#FFFFFFFF'
+    line_end: null
+    line_start: null
+    thickness: 1
+    type: line
+    x1: -440.0
+    y1: -280.0
+    x2: -440.0
+    y2: -280.0
+    z_index: 5
+smart_annotations: []
+nodes:
+  - boot_disk_size: null
+    configuration:
+      - name: ios_config.txt
+        content: "Building configuration...\n\nCurrent configuration : 3788 bytes\n\
+          !\n! Last configuration change at 18:50:59 UTC Fri May 9 2025\n!\nversion\
+          \ 17.15\nservice timestamps debug datetime msec\nservice timestamps log\
+          \ datetime msec\n!\nhostname SW1\n!\nboot-start-marker\nboot-end-marker\n\
+          !\n!\nno logging console\nno aaa new-model\n!\n!\n!\n!\n!\n!\n!\n!\n!\n\
+          !\n!\n!\n!\nip audit notify log\nip audit po max-events 100\nip cef\nlogin\
+          \ on-success log\nno ipv6 cef\n!\n!\n!\n!\n!\n!\n!\n!\ncrypto pki trustpoint\
+          \ TP-self-signed-131184712\n enrollment selfsigned\n subject-name cn=IOS-Self-Signed-Certificate-131184712\n\
+          \ revocation-check none\n rsakeypair TP-self-signed-131184712\n hash sha512\n\
+          !\n!\ncrypto pki certificate chain TP-self-signed-131184712\n certificate\
+          \ self-signed 01\n  3082032E 30820216 A0030201 02020101 300D0609 2A864886\
+          \ F70D0101 0D050030\n  30312E30 2C060355 04030C25 494F532D 53656C66 2D536967\
+          \ 6E65642D 43657274\n  69666963 6174652D 31333131 38343731 32301E17 0D323530\
+          \ 35303931 38353034\n  375A170D 33353035 30393138 35303437 5A303031 2E302C06\
+          \ 03550403 0C25494F\n  532D5365 6C662D53 69676E65 642D4365 72746966 69636174\
+          \ 652D3133 31313834\n  37313230 82012230 0D06092A 864886F7 0D010101 05000382\
+          \ 010F0030 82010A02\n  82010100 9CF54ECE A7FD80B3 1A88AF13 506B1484 BEE8ED56\
+          \ 55F379ED 0345C0DF\n  B6A63897 739B4C20 5CAC3361 AF9FB33F F01673E9 17440DFB\
+          \ 96DA4CEB 0BBB50D5\n  A0E857C9 01E3B89A 1F4072B5 82C280D5 5ED05548 9DC6A755\
+          \ BE8CAA21 37B8D215\n  10B0E9FA 0169D0C0 6C61AD73 86AA0CB7 61B5702E D1EC1B6E\
+          \ 4201F045 8C4B93E9\n  E9F03BD9 0FD32460 256775B6 5A1C4772 E5E01C19 71E6CEBF\
+          \ 7BE8A1B2 BA9B79AD\n  8F67BB89 434BA488 FD1BE6CD C5E819BA A51499B8 CDB738E9\
+          \ 9043FA87 2D9D87E6\n  5CFD3FD0 186A5D15 FCADCB5A 612EB09C 9044BC4E 2D788E92\
+          \ 570F0941 6B460021\n  E6DF8EEA 4AFC5FF7 1AA491A0 3D06D2A9 B2E8BB39 5D0AAE2A\
+          \ F3204B1D 9AB6036C\n  42B05E39 02030100 01A35330 51301D06 03551D0E 04160414\
+          \ B310CEFB 04DFD45D\n  AB9909B9 AAFD5A42 5A2CEEA5 301F0603 551D2304 18301680\
+          \ 14B310CE FB04DFD4\n  5DAB9909 B9AAFD5A 425A2CEE A5300F06 03551D13 0101FF04\
+          \ 05300301 01FF300D\n  06092A86 4886F70D 01010D05 00038201 01007F24 D3F38397\
+          \ FA97C1CF 4CC6C92A\n  55D0EAC5 C4561DE4 2D5BD3EC FDDBC115 5C77E8A0 AB6357EE\
+          \ 362C9739 DFCC5413\n  DF835F14 2FBEA619 52020B81 0BD8AD4D D0BB89AE C6FA7ADB\
+          \ 8DB52478 2FB76FB9\n  5240DC41 C3B731A9 30B65E4D 55249D86 114D3734 4C688AD9\
+          \ 4E50BB65 4091AE87\n  6C7EF0E4 5B562DCD C02ACCA5 CC70E535 5D03C068 D0D9C558\
+          \ 43ED200D 0335FAC4\n  0D2E41C4 6973EE0A 4A01DA71 8710CC09 3300D702 CA48FCA6\
+          \ 84F0A0AB CB67534A\n  A0AD2BA3 C9E044ED 3827EFF9 F2471BBA 2F86ED7D 546312DE\
+          \ C4217941 152960EF\n  667CE50C B160D8CD 83B0C087 14AB7683 79D83BCA E3360918\
+          \ 45AEDCC5 CA852527\n  38727830 506ADFA5 A8758A76 23EAFC49 1C90\n  \tquit\n\
+          !\n!\nmemory free low-watermark processor 79593\n!\n!\nspanning-tree mode\
+          \ pvst\nspanning-tree extend system-id\nspanning-tree vlan 10 priority 0\n\
+          spanning-tree vlan 20 priority 4096\n!\n!\nvlan internal allocation policy\
+          \ ascending\n!\n!\n!\n!\n!\ninterface Ethernet0/0\n switchport trunk encapsulation\
+          \ dot1q\n switchport trunk allowed vlan 10,20\n switchport mode trunk\n\
+          \ switchport nonegotiate\n spanning-tree cost 4\n!\ninterface Ethernet0/1\n\
+          \ switchport trunk encapsulation dot1q\n switchport trunk allowed vlan 10,20\n\
+          \ switchport mode trunk\n switchport nonegotiate\n spanning-tree vlan 10\
+          \ port-priority 16\n spanning-tree cost 4\n!\ninterface Ethernet0/2\n switchport\
+          \ trunk encapsulation dot1q\n switchport trunk allowed vlan 10,20\n switchport\
+          \ mode trunk\n switchport nonegotiate\n spanning-tree cost 4\n!\ninterface\
+          \ Ethernet0/3\n switchport trunk encapsulation dot1q\n switchport trunk\
+          \ allowed vlan 10,20\n switchport mode trunk\n switchport nonegotiate\n\
+          \ spanning-tree cost 4\n!\nip forward-protocol nd\n!\n!\nip http server\n\
+          ip http secure-server\nip ssh bulk-mode 131072\n!\nno logging btrace\n!\n\
+          !\n!\ncontrol-plane\n!\n!\n!\nline con 0\n exec-timeout 0 0\n logging synchronous\n\
+          line aux 0\nline vty 0 4\n exec-timeout 0 0\n login\n transport input ssh\n\
+          !\n!\nend"
+    cpu_limit: null
+    cpus: null
+    data_volume: null
+    hide_links: false
+    id: n0
+    image_definition: null
+    label: SW1
+    node_definition: ioll2-xe
+    parameters: {}
+    ram: null
+    tags: []
+    x: -200
+    y: -280
+    interfaces:
+      - id: i0
+        label: Loopback0
+        mac_address: null
+        type: loopback
+      - id: i1
+        label: Ethernet0/0
+        mac_address: null
+        slot: 0
+        type: physical
+      - id: i2
+        label: Ethernet0/1
+        mac_address: null
+        slot: 1
+        type: physical
+      - id: i3
+        label: Ethernet0/2
+        mac_address: null
+        slot: 2
+        type: physical
+      - id: i4
+        label: Ethernet0/3
+        mac_address: null
+        slot: 3
+        type: physical
+  - boot_disk_size: null
+    configuration:
+      - name: ios_config.txt
+        content: |-
+          Building configuration...
+
+          Current configuration : 1484 bytes
+          !
+          ! Last configuration change at 18:50:50 UTC Fri May 9 2025
+          !
+          version 17.15
+          service timestamps debug datetime msec
+          service timestamps log datetime msec
+          !
+          hostname SW2
+          !
+          boot-start-marker
+          boot-end-marker
+          !
+          !
+          no logging console
+          no aaa new-model
+          !
+          !
+          !
+          !
+          !
+          !
+          !
+          !
+          !
+          !
+          !
+          !
+          !
+          ip audit notify log
+          ip audit po max-events 100
+          ip cef
+          login on-success log
+          no ipv6 cef
+          !
+          !
+          !
+          !
+          !
+          !
+          !
+          !
+          !
+          !
+          !
+          memory free low-watermark processor 79593
+          !
+          !
+          spanning-tree mode pvst
+          spanning-tree extend system-id
+          spanning-tree vlan 10 priority 4096
+          spanning-tree vlan 20 priority 0
+          !
+          !
+          vlan internal allocation policy ascending
+          !
+          !
+          !
+          !
+          !
+          interface Ethernet0/0
+           switchport trunk encapsulation dot1q
+           switchport trunk allowed vlan 10,20
+           switchport mode trunk
+           spanning-tree cost 4
+          !
+          interface Ethernet0/1
+           switchport trunk encapsulation dot1q
+           switchport trunk allowed vlan 10,20
+           switchport mode trunk
+           spanning-tree vlan 20 port-priority 16
+           spanning-tree cost 4
+          !
+          interface Ethernet0/2
+           switchport trunk encapsulation dot1q
+           switchport trunk allowed vlan 10,20
+           switchport mode trunk
+           spanning-tree cost 4
+          !
+          interface Ethernet0/3
+           switchport trunk encapsulation dot1q
+           switchport trunk allowed vlan 10,20
+           switchport mode trunk
+           spanning-tree cost 4
+          !
+          ip forward-protocol nd
+          !
+          !
+          ip http server
+          ip http secure-server
+          ip ssh bulk-mode 131072
+          !
+          no logging btrace
+          !
+          !
+          !
+          control-plane
+          !
+          !
+          !
+          line con 0
+           exec-timeout 0 0
+           logging synchronous
+          line aux 0
+          line vty 0 4
+           exec-timeout 0 0
+           login
+           transport input ssh
+          !
+          !
+          end
+    cpu_limit: null
+    cpus: null
+    data_volume: null
+    hide_links: false
+    id: n1
+    image_definition: null
+    label: SW2
+    node_definition: ioll2-xe
+    parameters: {}
+    ram: null
+    tags: []
+    x: 160
+    y: -280
+    interfaces:
+      - id: i0
+        label: Loopback0
+        mac_address: null
+        type: loopback
+      - id: i1
+        label: Ethernet0/0
+        mac_address: null
+        slot: 0
+        type: physical
+      - id: i2
+        label: Ethernet0/1
+        mac_address: null
+        slot: 1
+        type: physical
+      - id: i3
+        label: Ethernet0/2
+        mac_address: null
+        slot: 2
+        type: physical
+      - id: i4
+        label: Ethernet0/3
+        mac_address: null
+        slot: 3
+        type: physical
+  - boot_disk_size: null
+    configuration:
+      - name: ios_config.txt
+        content: |-
+          Building configuration...
+
+          Current configuration : 1166 bytes
+          !
+          ! Last configuration change at 18:50:51 UTC Fri May 9 2025
+          !
+          version 17.15
+          service timestamps debug datetime msec
+          service timestamps log datetime msec
+          !
+          hostname SW3
+          !
+          boot-start-marker
+          boot-end-marker
+          !
+          !
+          no logging console
+          no aaa new-model
+          !
+          !
+          !
+          !
+          !
+          !
+          !
+          !
+          !
+          !
+          !
+          !
+          !
+          ip audit notify log
+          ip audit po max-events 100
+          ip cef
+          login on-success log
+          no ipv6 cef
+          !
+          !
+          !
+          !
+          !
+          !
+          !
+          !
+          !
+          !
+          !
+          memory free low-watermark processor 79593
+          !
+          !
+          spanning-tree mode pvst
+          spanning-tree extend system-id
+          !
+          !
+          vlan internal allocation policy ascending
+          !
+          !
+          !
+          !
+          !
+          interface Ethernet0/0
+           switchport trunk encapsulation dot1q
+           switchport trunk allowed vlan 10,20
+           switchport mode trunk
+           spanning-tree cost 4
+          !
+          interface Ethernet0/1
+           switchport trunk encapsulation dot1q
+           switchport trunk allowed vlan 10,20
+           switchport mode trunk
+           spanning-tree vlan 20 cost 19
+           spanning-tree cost 4
+          !
+          interface Ethernet0/2
+          !
+          interface Ethernet0/3
+          !
+          ip forward-protocol nd
+          !
+          !
+          ip http server
+          ip http secure-server
+          ip ssh bulk-mode 131072
+          !
+          no logging btrace
+          !
+          !
+          !
+          control-plane
+          !
+          !
+          !
+          line con 0
+           exec-timeout 0 0
+           logging synchronous
+          line aux 0
+          line vty 0 4
+           exec-timeout 0 0
+           login
+           transport input ssh
+          !
+          !
+          end
+    cpu_limit: null
+    cpus: null
+    data_volume: null
+    hide_links: false
+    id: n2
+    image_definition: null
+    label: SW3
+    node_definition: ioll2-xe
+    parameters: {}
+    ram: null
+    tags: []
+    x: -200
+    y: -80
+    interfaces:
+      - id: i0
+        label: Loopback0
+        mac_address: null
+        type: loopback
+      - id: i1
+        label: Ethernet0/0
+        mac_address: null
+        slot: 0
+        type: physical
+      - id: i2
+        label: Ethernet0/1
+        mac_address: null
+        slot: 1
+        type: physical
+      - id: i3
+        label: Ethernet0/2
+        mac_address: null
+        slot: 2
+        type: physical
+      - id: i4
+        label: Ethernet0/3
+        mac_address: null
+        slot: 3
+        type: physical
+  - boot_disk_size: null
+    configuration:
+      - name: ios_config.txt
+        content: |-
+          Building configuration...
+
+          Current configuration : 1196 bytes
+          !
+          ! Last configuration change at 18:50:49 UTC Fri May 9 2025
+          !
+          version 17.15
+          service timestamps debug datetime msec
+          service timestamps log datetime msec
+          !
+          hostname SW4
+          !
+          boot-start-marker
+          boot-end-marker
+          !
+          !
+          no logging console
+          no aaa new-model
+          !
+          !
+          !
+          !
+          !
+          !
+          !
+          !
+          !
+          !
+          !
+          !
+          !
+          ip audit notify log
+          ip audit po max-events 100
+          ip cef
+          login on-success log
+          no ipv6 cef
+          !
+          !
+          !
+          !
+          !
+          !
+          !
+          !
+          !
+          !
+          !
+          memory free low-watermark processor 79593
+          !
+          !
+          spanning-tree mode pvst
+          spanning-tree extend system-id
+          !
+          !
+          vlan internal allocation policy ascending
+          !
+          !
+          !
+          !
+          !
+          interface Ethernet0/0
+           switchport trunk encapsulation dot1q
+           switchport trunk allowed vlan 10,20
+           switchport mode trunk
+           spanning-tree vlan 10 cost 4
+           spanning-tree cost 4
+          !
+          interface Ethernet0/1
+           switchport trunk encapsulation dot1q
+           switchport trunk allowed vlan 10,20
+           switchport mode trunk
+           spanning-tree vlan 10 cost 19
+           spanning-tree cost 4
+          !
+          interface Ethernet0/2
+          !
+          interface Ethernet0/3
+          !
+          ip forward-protocol nd
+          !
+          !
+          ip http server
+          ip http secure-server
+          ip ssh bulk-mode 131072
+          !
+          no logging btrace
+          !
+          !
+          !
+          control-plane
+          !
+          !
+          !
+          line con 0
+           exec-timeout 0 0
+           logging synchronous
+          line aux 0
+          line vty 0 4
+           exec-timeout 0 0
+           login
+           transport input ssh
+          !
+          !
+          end
+    cpu_limit: null
+    cpus: null
+    data_volume: null
+    hide_links: false
+    id: n3
+    image_definition: null
+    label: SW4
+    node_definition: ioll2-xe
+    parameters: {}
+    ram: null
+    tags: []
+    x: 160
+    y: -80
+    interfaces:
+      - id: i0
+        label: Loopback0
+        mac_address: null
+        type: loopback
+      - id: i1
+        label: Ethernet0/0
+        mac_address: null
+        slot: 0
+        type: physical
+      - id: i2
+        label: Ethernet0/1
+        mac_address: null
+        slot: 1
+        type: physical
+      - id: i3
+        label: Ethernet0/2
+        mac_address: null
+        slot: 2
+        type: physical
+      - id: i4
+        label: Ethernet0/3
+        mac_address: null
+        slot: 3
+        type: physical
+links:
+  - id: l0
+    n1: n0
+    n2: n1
+    i1: i1
+    i2: i1
+    conditioning: {}
+    label: SW1-Ethernet0/0<->SW2-Ethernet0/0
+  - id: l1
+    n1: n0
+    n2: n1
+    i1: i2
+    i2: i2
+    conditioning: {}
+    label: SW1-Ethernet0/1<->SW2-Ethernet0/1
+  - id: l2
+    n1: n0
+    n2: n2
+    i1: i3
+    i2: i1
+    conditioning: {}
+    label: SW1-Ethernet0/2<->SW3-Ethernet0/0
+  - id: l3
+    n1: n1
+    n2: n3
+    i1: i3
+    i2: i1
+    conditioning: {}
+    label: SW2-Ethernet0/2<->SW4-Ethernet0/0
+  - id: l4
+    n1: n0
+    n2: n3
+    i1: i4
+    i2: i2
+    conditioning: {}
+    label: SW1-Ethernet0/3<->SW4-Ethernet0/1
+  - id: l5
+    n1: n1
+    n2: n2
+    i1: i4
+    i2: i2
+    conditioning: {}
+    label: SW2-Ethernet0/3<->SW3-Ethernet0/1
+lab:
+  description: ''
+  notes: |2-
+       ## Lab Instructions
+        1) Modify Bridge Priority to achieve the following:
+        - SW1 should be Root for VLAN 10 and Secondary for VLAN 20
+        - SW2 should be Root for VLAN 20 and Secondary for VLAN 10
+        2) Modify Port Cost to achieve the following:
+        - In VLAN 10, all traffic from users connected to SW4 should pass through SW2 before reaching the Root Bridge.
+        - In VLAN 20, all traffic from users connected to SW3 should pass through SW1 before reaching the Root Bridge.
+        3) Modify Port Priority to achieve the following:
+        - Frames forwarded between SW1 and SW2 should use the E0/1-E0/1 link in VLANs 10 and 20.
+  title: STP-tuning
+  version: 0.3.0
