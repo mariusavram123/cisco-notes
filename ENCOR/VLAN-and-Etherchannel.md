@@ -533,6 +533,13 @@ show interface g0/1 switchport
 
 - However, if a dynamic link aggregation protocol were used between SW1 and SW2, the link failure would be detected, and G1/0/1 interfaces would be made inactive for the EtherChannel
 
+- Cisco switches have an optional spanning-tree features that try to prevent etherchannel misconfigurations (for static ones at least). It is enabled by default, and can be enabled/disabled as follows:
+
+```
+conf t
+ [no] spanning-tree etherchannel guard misconfig # it is not recommended to disable it
+```
+
 ### Dynamic Link Aggregation Protocols
 
 - Two common link aggregation protocols are Link Aggregation Control Protocol(LACP) and Port Aggregation Protocol(PAgP)
@@ -584,7 +591,6 @@ show interface g0/1 switchport
 	 interface range g1/0/1 - 2
 	  channel-group <etherchannel-id> mode on
 	```
-
 	- **LACP EtherChannel**: Can be configured as follows
 
 	```
@@ -592,7 +598,6 @@ show interface g0/1 switchport
 	 interface range g1/0/1 - 2
 	  channel-group <etherchannel_id> mode <active|passive>
 	```
-
 	- **PAgP EtherChannel**: can be configured as follows:
 
 	```
@@ -601,6 +606,17 @@ show interface g0/1 switchport
 	  channel-group <etherchannel_id> mode <desirable|auto> <non-silent>
 	``` 
 
+- Another method to configure etherchannel is to first create the port channel interface and then configure the member ports as part of that etherchannel
+
+```
+conf t
+ interface port-channel 1
+ exit
+
+ interface range g1/0/1 - 2
+  channel-group 1 mode active
+   exit
+```
 - By default PAgP ports operate in silent mode, which allows a port to establish an EtherChannel with a device which is not PAgP capable and rarely sends packets
 
 - Using the optional `non-silent` keyword requires a port to receive PAgP packets before adding it to the EtherChannel
@@ -1194,3 +1210,104 @@ show etherchannel load-balance
 - The best way to view the load of each member link is with the command `show etherchannel port`
 
 - The link utilization is displayed in hex under Load and displays the relative link utilization to the other member links of the EtherChannel
+
+### Auto-LAG 
+
+- Auto-LAG allows a switch to automatically create EtherChannels with it's neighbors using LACP
+
+- All ports using Auto-LAG will send out LACP messages periodically
+
+- Auto-LAG can be enabled on all interfaces by default
+
+- Enabling or disabling them per interface:
+
+- SW1:
+
+```
+conf t
+ interface g0/1
+  [no] channel-group auto
+```
+
+- Auto-LAG is globally disabled by default
+
+- It won't be active on a port unless it's enabled on the port and globally
+
+- Enabling Auto-LAG globally:
+
+```
+conf t
+ port-channel auto
+```
+
+- Auto-LAG can create an EtherChannel with a neighbor using Auto-LAG, or in LACP Active or LACP passive mode
+
+- Configuring the other side of the link:
+
+- SW2
+
+```
+conf t
+ port-channel auto
+```
+
+or
+
+```
+conf t
+ interface range g0/0 - 1
+  channel-group 1 mode active
+```
+
+or
+
+```
+conf t
+ interface range g0/0 - 1
+  channel-group 1 mode passive
+```
+
+- AutoLAG only works on Layer-2 EtherChannels (not Layer-3)
+
+- Port-channels created via Auto-LAG are not saved to the config 
+
+- Saving Auto-LAG config to be persistent (privileged exec mode command):
+
+```
+port-channel <number> persistent
+```
+
+- This converts an auto created EtherChannel to a manual EtherChannel 
+
+- This allows you to add configurations to the port-channel interface
+
+### Testing etherchannel load-balancing for different sources
+
+- Apart from configuring what is taked into account for the hashing algorithm in order to load-balance traffic on an etherchannel ports, you can test which port the traffic can take in order to view it:
+
+```
+test etherchannel load-balance interface port-channel 1 <mac|ip> <source_ip_address|source_mac_address> <destination_ip_address> <destination_mac_address>
+```
+
+### Spanning-tree etherchannel misconfiguration guard
+
+- When one side is configured as a static etherchannel (mode on), and the other side of the link is not configured for an etherchannel, loops can occur
+
+- Cisco switches uses a method to detect misconfigurations on etherchannel so that it can prevent layer 2 loops
+
+- This is the spanning-tree misconfiguration guard and it is enabled by default
+
+- Enabling/disabling it:
+
+```
+conf t
+ [no] spanning-tree etherchannel guard misconfig
+```
+
+- Not recommended to disable it
+
+- Verifying it
+
+```
+show spanning-tree summary
+```
