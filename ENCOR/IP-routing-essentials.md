@@ -196,4 +196,497 @@
 
 ### Path Selection
 
+- A router identifies the path a packet should take by evaluating the prefix length that is programmed in the *Forwarding Information Base (FIB)*
 
+- The FIB is programmed through the routing table, also known as the *routing information base (RIB)*
+
+- The RIB is composed of routes presented from the routing protocol processes
+
+- Path selection has three main components:
+
+    - **Prefix length**: The prefix length represents the number of leading binary bits in the subnet mask that are in the on position
+    
+    - **Administrative distance**: Administrative distance (AD) is a rating of the trustworthiness of a routing information source
+    
+    - If a router learns about a route to a destination from more than one routing protocol, and all the routes have the same prefix length, then the AD is compared
+    
+    - **Metrics**: A metric is a unit of measure used by a routing protocol in the best-path calculation. The metrics vary from one routing protocol to another
+    
+#### Prefix Length
+
+- Let's look at a scenario in which a router selects a route when the packet destination is within the network range for multiple routes
+
+- Assume that a router has the following routes with various prefix lengths in the routing table:
+
+    - 10.0.3.0/28
+    
+    - 10.0.3.0/26
+    
+    - 10.0.3.0/24
+    
+- Each of these routes, also known as *prefix routes* or simply prefixes, has a different prefix length (subnet mask)
+
+- The routes are considered to be different destinations, and they will be installed into the RIB, also known as the routing table
+
+- The routing table also includes the outgoing interface and the next-hop IP address (unless a prefix is a connected network)
+
+- Routing table of R1:
+
+```
+Prefix          IP address range        Next hop        Outgoing Interface
+10.0.3.0/28     10.0.3.0-10.0.3.15      10.1.1.1        Gi 1/1
+10.0.3.0/26     10.0.3.0-10.0.3.63      10.2.2.2        Gi 2/2
+10.0.3.0/24     10.0.3.0-10.0.3.255     10.3.3.3        Gi 3/3
+```
+
+- If a packet needs to be forwarded, the route chosen depends on the prefix length, where the longest prefix length is always preferred
+
+- For example, /28 is preferred over /26 and /26 is preferred over /24
+
+- Example:
+
+    - If a packet needs to be forwarded to 10.0.3.14, the router matches all three routes as it fits into all three IP address ranges. But the packet is forwarded to next hop 10.1.1.1 with the outgoing interface Gigabit Ethernet 1/1 because 10.0.3.0/28 has the longest prefix match
+    
+    - If a packet needs to be forwarded to 10.0.3.42, the router matches 10.0.3.0/24 and 10.0.3.0/26 prefixes. But the packet is forwarded to 10.2.2.2 with the outgoing interface Gigabit Ethernet 2/2 because 10.0.3.0/26 has the lowest prefix match
+    
+    - If a packet needs to be forwarded to 10.0.3.100, the router matches only 10.0.3.0/24. The packet is forwarded to 10.3.3.3 with the outgoing interface Gigabit Ethernet 3/3
+    
+- The forwarding decision is a function of the FIB and results from the calculations performed in the RIB. The RIB is calculated through the combination of routing protocol metrics and administrative distance
+
+#### Administrative Distance
+
+- As each routing protocol receive routing updates and other routing information it chooses the best path to any given destination and attempts to install this path into the routing table
+
+- Default ADs for routing protocols:
+
+```
+Connected                   0
+Static                      1
+EIGRP summary route         5
+External BGP (eBGP)         20
+EIGRP (internal)            90
+OSPF                        110
+IS-IS                       115
+RIP                         120
+EIGRP (external)            170
+Internal BGP (iBGP)         200
+```
+
+- The RIB is programmed from the various routing protocol processes
+
+- Every routing protocol presents the same information to the RIB for insertion: the destination network, the next hop IP address, the AD and metric values
+
+- The RIB accepts or rejects a route based on the following logic:
+
+    - If the route does not exist in the RIB, the route is accepted
+    
+    - If the route exist in the RIB, the AD must be compared. If the AD of the route already in the RIB is lower than the process of submitting the second route, the route is rejected. Then the routing process is notified
+    
+    - If the route exists in the RIB, the AD must be compared. If the AD of the route already in the RIB is higher than the routing process submitting the alternate entry, the route is accepted, and the current source protocol is notified of the removal of the entry in the RIB
+    
+- Another example can be a router that has OSPF, IS-IS and EIGRP running, and all three protocols have learned of the destination 10.3.3.0/24 network with a different best path and metric
+
+- Each of these three protocols attempt to install the route to 10.3.3.0/24 into the routing table 
+
+- Because the prefix length is the same, the next decision point is the AD, where the routing protocol with the lowest AD installs the route into the routing table
+
+- Because the EIGRP internal route has the best AD, it is the one installed into the routing table
+
+```
+Routing Protocol        AD          Network         Installs in the RIB
+EIGRP                   90          10.3.3.0/24         yes
+OSPF                    110         10.3.3.0/24         no
+IS-IS                   115         10.3.3.0/24         no
+```
+
+- The routing protocol or protocols that failed to install their route into the table (in this example, OSPF and IS-IS) hang on the route and tell the routing table process to report to them if the best path fails so that they can try to reinstall this route
+
+- For example, if the EIGRP route 10.3.3.0/24 installed in the routing table fails for some reason, the routing table process calls OSPF and IS-IS and requests that they reinstall the route in the routing table
+
+- Out of these two protocols, the preferred route is chosen based on AD, which would be OSPF, because of it's lower AD
+
+- Understanding the order of processing from a router is critical because in some scenarios the path with the lowest AD may not always be installed in the RIB
+
+- For example, BGP's path selection process could choose an iBGP path over an eBGP path
+
+- So BGP would present the path with an AD of 200, not 20 to the RIB, which might not preempt a route learned via OSPF that has an AD of 110
+
+- These situations are almost never seen; but remember that it is the best route from the routing protocol presented to the RIB when AD is then compared
+
+- The default AD might not always be suitable for a network; for instance, there might be a requirement to adjust it so that OSPF routes are preferred over EIGRP routes
+
+- However, changing the AD on routing protocols can have severe consequences, such as routing loops and other odd behaviour in a network
+
+- It is recommended that the AD be changed only with extreme caution and only after what needs to be accomplished has been thoroughly thought out
+
+### Metrics
+
+- The logic for selecting the best path for a routing protocol can vary
+
+- Most IGPs prefer internally learned routes over external routes and further prioritize the path with the lowest metric 
+
+
+#### Equal-Cost Multipathing
+
+- If a routing protocol identifies multiple paths as a best path and supports multiple path entries, the router installs the maximum number of paths allowed per destination
+
+- This is known as *equal-cost multipathing* (ECMP) and provides load sharing across all links
+
+- RIP, EIGRP, OSPF and IS-IS all support ECMP. 
+
+- ECMP provides a mechanism to increase bandwidth across multiple paths by splitting traffic equally across the links
+
+![topology](./OSPF-ECMP.png)
+
+- In the above topology the four routers are running OSPF
+
+- All four routers belong to the same area and use the same interface metric cost
+
+- R1 has two paths with equal cost to reach R3's 10.3.3.0/24 network
+
+- R1 installs both routes into the routing table and forwards traffic across the R1-R2-R3 and R1-R4-R3 path to reach 10.3.3.0/24 network
+
+- The following output confirms that both paths have been installed into the RIB and, because the metrics are identical that the router is using ECMP
+
+```
+R1# show ip route
+
+O   10.3.3.0/24     [110/30]    via 10.12.1.2, 00:49:12 GigabitEthernet 0/2
+                    [110/30]    via 10.14.1.4, 00:49:51 GigabitEthernet 0/4
+```
+
+#### Unequal-Cost Multipathing 
+
+- By default, routing protocols install only routes with the lowest path metric
+
+- However, EIGRP can be configured (not enabled by default) to install multiple routes with different path metrics
+
+- This allows for unequal-cost load balancing across multiple paths
+
+- Traffic is transmitted out of router's interfaces based on that path's metrics in ratio to other the interface's metrics
+
+![EIGRP-unequal-cost](./EIGRP-ucmp-topo.png)
+
+- The above is a topology with four routers running EIGRP
+
+- The delay has been incremented on R1's G0/2 interface from 1u to 10u
+
+- R1 sees two paths with different metrics
+
+- The path from R1 to R3 via R1-R4-R3 has been assigned a path metric of 3328, and the path via R1-R2-R3 has been assigned a path metric of 5632
+
+- Below is the routing table of R1. Notice that metrics are different for each path to the 10.3.3.0/24 network
+
+```
+R1# show ip route eigrp
+
+D   10.3.3.0/24     [90/3328] via 10.14.1.4, 00:00:02   GigabitEthernet 0/4
+                    [90/5632] via 10.12.1.2, 00:00:02   GigabitEthernet 0/2
+```
+
+- The explicit path must be viewed to see the traffic ratios with unequal-cost load balancing
+
+- R1 forwards 71 packets toward R2 for every 120 packets that are forwarded toward R4
+
+```
+show ip route 10.3.3.0
+```
+
+### Static Routing
+
+- Static routes provide precise control over routing but may create an administrative burden as the number of routers and network segments grow
+
+- Using static routing requires zero network bandwidth because implementing manual route entries does not require communication with other routers
+
+- Unfortunately, because the routers are not communicating, there is no network intelligence
+
+- If a link goes down, other routers will not be aware that the network path is no longer valid
+
+- Situations when static routes are useful:
+
+    - Dynamic routing protocols cannot be used on the router because the limited router CPU or memory
+    
+    - Routes learned from dynamic routing protocols need to be superseded
+    
+#### Static Route Types
+
+- Static routes can be classified as one of the following:
+
+    - Directly attached static routes
+    
+    - Recursive static route
+    
+    - Fully specified static route
+    
+#### Directly Attached Static Routes
+
+- Point-to-point (P2P) serial interfaces do not have to worry about maintaining an adjacency table and do not use Address Resolution Protocol (ARP), so static routes can directly reference the outbound interface of a router
+
+- A static route that use only the outbound next-hop interface is known as a *directly attached static route*, and it requires that the outbound interface be in an up state for the route to be installed into the RIB
+
+- Configuring directly attached static routes:
+
+```
+conf t
+ ip route <network> <subnet-mask> <next-hop-interface-id>
+```
+
+![Static-route-serial](./dirrectly-attached-static-route.png)
+
+- In the above scheme R1 is connected to R2 using a serial connection
+
+- R1 uses a dirrectly attached static route to the 10.22.22.0/24 network, and R2 uses a directly attached static route to the 10.11.11.0/24 network to allow connectivity between the two remote networks
+
+- Static routes are configured on both routers so that return traffic will have a path back
+
+- Configuration of static routes with serial 1/0 as the exit interface:
+
+- R1:
+
+```
+conf t
+ ip route 10.22.22.0 255.255.255.0 serial 1/0
+```
+
+- R2
+
+```
+conf t
+ ip route 10.11.11.0 255.255.255.0 serial 1/0
+```
+
+- R1 indicates that the 10.22.22.0/24 network is reachable via S1/0 interface, and R2 indicates that the 10.11.11.0/24 network is reachable via the S1/0 interface
+
+- A directly attached static route does not display AD/metric information when looking at the routing table
+
+- Note that the static route displays directly connected with the outbound interface
+
+- R1:
+
+```
+show ip route
+
+C   10.11.11.0/24 is directly connected, GigabitEthernet0/1
+C   10.12.2.0/24 is directly connected, Serial1/0
+S   10.22.22.0/24 is directly connected, Serial1/0
+```
+
+- R2:
+
+```
+show ip route
+
+S   10.11.11.0/24 is directly connected, Serial1/0
+C   10.12.2.0/24 is directly connected, Serial1/0
+C   10.22.22.0/24 is directly connected, GigabitEthernet0/1
+```
+
+- Configuring a directly attached static route to an interface that uses ARP (that is, Ethernet) causes problems and is not recommended 
+
+- The router must repeat the ARP process for every destination that matches the static route, which consumes CPU and memory 
+
+- Depending on the size of the prefix of the static route and the number of lookups, the configuration can cause system instability
+
+#### Recursive Static Routes
+
+- The forwarding engine on Cisco devices needs to know which interface an outbound packet should use
+
+- A *recursive static route* specifies the IP address of the next-hop address 
+
+- The recursive lookup occurs when the router queries the RIB to locate the route toward the next-hop IP address (connected, static or dynamic) and then cross-references the adjacency table
+
+- Configuring the recursive static routes:
+
+```
+conf t
+ ip route <network> <subnet-mask> <next-hop-ip>
+```
+
+- Recursive static routes require the route's next-hop address to exist in the routing table to install the static route into the RIB
+
+- A recursive static route may not resolve the next-hop forwarding address using the default route (0.0.0.0/0) route. The static route will fail next-hop reachability requirements and will not be inserted into the RIB
+
+![recursive-static](./recursive-static-routring.png)
+
+- In the above topology R1 and R2 are connected using the G0/0 port
+
+- R1 uses a recursive static route to the 10.22.22.0/24 network, and R2 uses a recursive static route to the 10.11.11.0/24 network to allow connectivity between these networks
+
+- R1 and R2 configuration:
+
+- R1:
+
+```
+conf t
+ ip route 10.22.22.0 255.255.255.0 10.12.1.2
+```
+
+- R2:
+
+```
+conf t
+ ip route 10.11.11.0 255.255.255.0 10.12.1.1
+```
+
+- Verifying the static route configuration on R1:
+
+```
+show ip route
+
+C   10.11.11.0/24 is directly connected, GigabitEthernet0/1
+C   10.12.1.0/24 is directly connected, GigabitEthernet0/0
+S   10.22.22.0/24   [1/0] via 10.12.1.2
+```
+
+- The static route has been configured on R1 for the 10.22.22.0/24 network with the next-hop IP address 10.12.1.2
+
+- Notice that the [AD/Metric] information is present in the output and that the next-hop IP address is displayed
+
+- Cisco supports the configuration of multiple recursive static routes
+
+![multiple-recursive](./recursive-static-3routes.png)
+
+- In the above scheme R1 needs connectivity to the 10.23.1.0/24 network and to the 10.33.33.0/24 network
+
+- R1 could configure the static route to the 10.33.33.0/24 network with a next-hop IP address as either 10.12.1.2 or 10.23.1.3 
+
+- If R1 configured the static route with the 10.23.1.3 next-hop IP address, the router performs a second lookup when building the CEF entry for the 10.33.33.0/24 network
+
+#### Fully Specified Static Routes
+
+- Static route recursion can simplify topologies if a link fails because it may allow the static route to stay installed while it changes to a different outbound interface in the same direction as the destination
+
+- However, problems arise if the recursive lookup resolves to a different interface pointed in the opposite direction
+
+- To correct this issue, the static route configuration should use the outbound interface and the next-hop IP address
+
+- A static route with both an interface and a next-hop IP address is known as a *fully specified static route*
+
+- If the interface is not in an up state, the router removes the static route from the RIB
+
+- Specifying the next-hop address along with the physical interface removes the recursive lookup and does not involve the ARP processing problems that occur when using only the outbound interface
+
+- Configuring fully specified static routes:
+
+```
+conf t
+ ip route <network> <subnet-mask> <interface-id> <next-hop-ip>
+```
+
+- R1:
+
+```
+conf t
+ ip route 10.22.22.0 255.255.255.0 gigabitethernet0/0 10.12.1.2
+```
+
+- R2:
+
+```
+conf t
+ ip route 10.11.11.0 255.255.255.0 gigabitethernet0/0 10.12.1.1
+```
+
+- R1 and R2 use fully specified static routes to connect to the 10.11.11.0/24 and 10.22.22.0/24 networks using the Gi0/0 interface
+
+- Verifying that R1 can only reach the 10.22.22.0/24 network via 10.12.1.2 from the Gi0/0 interface
+
+```
+show ip route
+
+C   10.11.11.0/24 is directly connected, GigabitEthernet0/1
+C   10.12.1.0/24 is directly connected, GigabitEthernet0/0
+S   10.22.22.0/24   [1/0] via 10.12.1.2, GigabitEthernet0/0 
+```
+
+#### Floating Static Routing
+
+- The default AD on a static route is 1, but a static route can be configured with an AD value of 1 to 255 for a specific route
+
+- The AD is set on a static route by appending the AD as part of the command structure
+
+- Using a floating static route is a common technique for providing backup connectivity for prefixes learned via dynamic routing protocols
+
+- A floating static route is configured with an AD higher than that of the primary route
+
+- Because the AD is higher than that of the primary route, it is installed in the RIB only when the primary route is withdrawn 
+
+![floating-static](./floating-static-routes.png)
+
+- R1 and R2 are configured with two links. The 10.12.1.0/24 transit network is preferred to the 10.12.2.0/24 network
+
+- Configuring R1 and R2 with floating static routes:
+
+- R1
+
+```
+conf t
+ ip route 10.22.22.0 255.255.255.0 10.12.1.2 10
+ ip route 10.22.22.0 255.255.255.0 serial1/0 210
+```
+
+- R2
+
+```
+conf t
+ ip route 10.11.11.0 255.255.255.0 10.12.1.1 10
+ ip route 10.11.11.0 255.255.255.0 serial1/0 210
+```
+
+- The static route using the Ethernet link (10.12.1.0/24) has an AD of 10 and the serial link (10.12.2.0/24) has an AD set to 210
+
+- Verifying the routing table of R1:
+
+```
+show ip route
+
+C   10.11.11.0/24 is directly connected, GigabitEthernet0/1
+C   10.12.1.0/24 is directly connected, GigabitEthernet0/0
+C   10.12.2.0/24 is directly connected, Serial 1/0
+S   10.22.22.0/24 [10/0] via 10.12.1.2
+```
+
+- Notice that the static route across the serial link is not installed into the RIB
+
+- Only the static route for the Ethernet link (10.12.1.0/24) with an AD of 10 is installed into the RIB
+
+- Routing table of R1 after shutting down the G0/0 Ethernet link to simulate a link failure
+
+```
+conf t
+ interface g0/0
+  shutdown
+  exit
+
+show ip route
+
+C   10.11.11.0/24 is directly connected, GigabitEthernet0/1
+C   10.12.2.0/24 is directly connected, Serial1/0
+S   10.22.22.0/24 is directly connected, Serial1/0
+```
+
+- The 10.12.1.0/24 network (R1's G0/0) is removed from the RIB
+
+- The floating static route through the 10.12.2.0/24 network (R1's S1/0) is now the best path and is installed into the RIB
+
+- Notice that the AD is not shown for that static route
+
+- Even though the static route's AD is not shown, it is still programmed in the RIB
+
+- Verifying the static route further:
+
+```
+show ip route 10.22.22.0
+
+Routing entry for 10.22.22.0/24
+    Known via "static", distance 210, metric 0, connected
+    Routing Descriptor Blocks:
+    *   directly connected, via Serial1/0
+        Route metric is 0, traffic share count is 1
+```
+
+- The output confirms that the floating static route with AD 210 is currently active in the routing table
+
+#### Static Null Routes
+
+- The null interface is a virtual interface that is always in an up state
