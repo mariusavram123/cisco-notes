@@ -690,3 +690,140 @@ Routing entry for 10.22.22.0/24
 #### Static Null Routes
 
 - The null interface is a virtual interface that is always in an up state
+
+- Null interfaces do not forward or receive network traffic and drop all traffic destined toward them without adding overhead to the router's CPU
+
+- Configuring a static route to a null interface provides a method of dropping network traffic without requiring the configuration of an access list
+
+- Creating a static route to a Null0 interface is a common technique to prevent routing loops
+
+- The static route to the Null0 interface used a summarized network range, and routes that are more specific point toward the actual destination
+
+![topology](./null-static-routing.png)
+
+- In the above topology, company ABC has aquired the 172.16.0.0/20 network range from it's service provider
+
+- ABC uses only a portion of the given addresses but keeps the large network block in anticipation of future growth
+
+- The service provider places a static route for the 172.16.0.0/20 network to R1's interface (192.168.1.1)
+
+- R1 uses a static default route pointed toward the service provider (192.168.1.2) and a static route to the 172.16.3.0/24 network via R2 (172.16.1.2)
+
+- Because R2 accesses all other networks through R1, a static default route points toward R1's interface (172.16.1.1)
+
+- If packets are sent to any addresses in the 172.16.0.0/20 range that is not used by company ABC, the packet gets stuck in a loop between R1 and the ISP, consuming additional bandwidth until the packet TTL expires
+
+- For example, a computer on the Internet sends a packet to 172.16.5.5, and the 172.16.5.0/24 network is not allocated on R1 or R2
+
+- The ISP sends the packet to R1 because the 172.16.0.0/20 static route; R1 looks into the RIB, and the longest match for the prefix is the default route back to the ISP, so R1 sends the packet back to the ISP, creating a routing loop
+
+- Routing loop when the packets originate from R2:
+
+```
+traceroute 172.16.5.5 source GigabitEthernet 0/2
+
+1 172.16.1.1 0 msec 0 msec 0 msec
+2 192.168.1.1 0 msec 0 msec 0 msec
+3 192.168.1.2 0 msec 4 msec 0 msec
+4 192.168.1.1 0 msec 0 msec 0 msec
+5 192.168.1.2 0 msec 0 msec 0 msec
+(...)
+```
+
+- To prevent the routing loop, a static route is added for the 172.16.0.0/20, pointed to the Null0 interface on R1
+
+- Any packets matching the 172.16.0.0/20 network range that do not have a longer match in R1's RIB are dropped
+
+- Static route configuration for R1 with the newly added null static route:
+
+```
+conf t
+ ip route 0.0.0.0 0.0.0.0 Gi0/0 192.168.1.2
+ ip route 172.16.3.0 255.255.255.0 Gi0/2 172.16.1.2
+ ip route 172.16.0.0 255.255.240.0 Null0
+```
+
+- Verifying that the null static route has removed the routing loop as intended:
+
+- R2
+
+```
+traceroute 172.16.5.5 source GigabitEthernet 0/2
+
+1 172.16.1.1 * * *
+2 172.16.1.1 * * *
+(...)
+```
+
+#### IPv6 Static Routes
+
+- The static routing principles for IPV4 routes are the same for IPv6
+
+- Ensuring that IPv6 routing is enabled on the router:
+
+```
+conf t
+ ipv6 unicast-routing
+```
+
+- Configuring IPv6 static routes:
+
+```
+conf t
+ ipv6 route <network>/<prefix_length> <next_hop_interfacd_id> | [next_hop_interface_id] <next_ip_address>
+```
+
+![ipv6-topology](./ipv6-static-routes.png)
+
+- R1 needs a static route to R2's 2001:db8:22::/64 network, and R2 needs a static route to R1's 2001:db8:11::/64 network
+
+- IPv6 static routing configuration for R1 and R2:
+
+- R1:
+
+```
+conf t
+ ipv6 unicast-routing
+ ipv6 route 2001:db8:22::/64 2001:db8:12::2
+```
+
+- R2:
+
+```
+conf t
+ ipv6 unicast-routing
+ ipv6 route 2001:db8:11::/64 2001:db8:12::1
+```
+
+- If the next-hop address is an IPv6 link-local address, the static route must be a fully specified static route
+
+- Displaying the IPv6 routing table on R1:
+
+```
+show ipv6 route
+(...)
+C   2001:db8:11::/64    [0/0]
+    via GigabitEthernet0/2, directly connected
+C   2001:db8:12::/64    [0/0]
+    via GigabitEthernet0/1, directly connected
+S   2001:db8:22::/64    [1/0]
+    via 2001:db8:12::2
+```
+
+- Connectivity can be verified with the `ping` or `traceroute` command:
+
+- R1 pings R2's 2001:db8:22::2 interface IP address
+
+```
+ping 2001:db8:22::2
+```
+
+### Virtual Routing and Forwarding (VRF)
+
+- Virtual routing and forwarding (VRF) is a technology that creates separate virtual routers on a physical router
+
+- Router interfaces, routing tables, and forwarding tables are completely isolated between VRFs, preventing traffic from one VRF from forwarding into another VRF
+
+- All router interfaces belong to the global VRF until they are specifically assigned to a user-defined VRF
+
+- The global VRF is identical to the regular routing table of non-VRF routers
