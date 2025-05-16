@@ -827,3 +827,155 @@ ping 2001:db8:22::2
 - All router interfaces belong to the global VRF until they are specifically assigned to a user-defined VRF
 
 - The global VRF is identical to the regular routing table of non-VRF routers
+
+- Every router's VRF maintains a separate routing table; it is possible to allow for overlapping IP address ranges
+
+- VRF creates segmentation between network interfaces, network subinterfaces, IP addresses and routing tables
+
+- Router without VRF:
+
+![no-vrf](./router-novrf.png)
+
+- Router with MGMT VRF:
+
+![with-vrf](./router-vrf.png)
+
+- The above schemes show two routers to help visualize the VRF routing table concept
+
+- One of the routers has no VRFs configured, and the other one has a management VRF instance named MGMT
+
+- Creating multiprotocol VRF instances:
+
+```
+conf t
+ vrf definition <vrf-name>
+```
+
+- Under the VRF definition submode, we can enable address families for IPv4 or IPv6
+
+```
+conf t
+ vrf definition MGMT
+ address-family <ipv4|ipv6>
+```
+
+- The VRF instance is then associated to the interface with the following command, under the interface configuration submode:
+
+```
+conf t
+ interface g0/3
+ vrf forwarding <vrf-name> # vrf forwarding MGMT
+```
+
+- Steps required to create a VRF and assign it to an interface:
+
+    - **Step 1**: Create a multiprotocol VRF routing table by using the command `vrf definition <vrf-name>`
+
+    - **Step 2**: Initialize the appropriate address family by using the command `address-family <ipv4|ipv6>`
+
+    - The address family can be IPv4, IPv6 or both
+
+    - **Step 3**: Enter the interface configuration submode and specify the interface to be associated with the VRF instance by using the command `interface <interface_id>`
+
+    - **Step 4**: Associate the VRF instance to the interface or subinterface by entering the command `vrf forwarding <vrf-name>` under interface configuration submode
+
+    - **Step 5**: Configure an IP address (IPv4, IPv6 or both) on the interface or subinterface by entering either or both of the following commands:
+
+    ```
+    ip address <ip_address> <subnet_mask> [secondary]
+    ```
+
+    ```
+    ipv6 address <ipv6_address>/<prefix_length> 
+    ```
+
+- The following table provides a set of interfaces and IP addresses that overlap between the global routing table and the VRF instance
+
+```
+Interface               IP Address      VRF         Global
+GigabitEthernet 0/1     10.0.3.1/24     -           yes
+GigabitEthernet 0/2     10.0.4.1/24     -           yes
+GigabitEthernet 0/3     10.0.3.1/24     MGMT        -     
+GigabitEthernet 0/4     10.0.4.1/24     MGMT        -
+```
+
+- The configuration for above interfaces and the MGMT VRF is the following:
+
+```
+conf t
+ interface gi0/1
+  ip address 10.0.3.1 255.255.255.0
+  no shutdown
+
+ interface gi0/2
+  ip address 10.0.4.1 255.255.255.0
+  no shutdown
+
+ vrf definition MGMT
+  address family ipv4
+ 
+ interface gi0/3
+  vrf forwarding MGMT
+  ip address 10.0.3.1 255.255.255.0
+ 
+ interface gi0/4
+  vrf forwarding MGMT
+  ip address 10.0.4.1 255.255.255.0
+```
+
+- Viewing the global routing table:
+
+```
+show ip route
+
+C   10.0.3.0/24 is directly connected, GigabitEthernet 0/1
+L   10.0.3.1/32 is directly connected, GigabitEthernet 0/1
+C   10.0.4.0/24 is directly connected, GigabitEthernet 0/2
+L   10.0.4.1/32 is directly connected, GigabitEthernet 0/2
+```
+
+- Note that the interfaces with the MGMT routing table do not appear with this command
+
+- Verifying the routing table of the MGMT VRF:
+
+```
+show ip route vrf MGMT
+
+C   10.0.3.0/24 is directly connected, GigabitEthernet 0/3
+L   10.0.3.1/32 is directly connected, GigabitEthernet 0/3
+C   10.0.4.0/24 is directly connected, GigabitEthernet 0/4
+L   10.0.4.1/32 is directly connected, GigabitEthernet 0/4
+```
+
+- The IP addresses in the VRF MGMT instance overlap with the ones configured in the global routing table, but there is no conflict because they are in a different routing table
+
+- VRF instances on a router can be compared to that of virtual local area networks (VLANs) on a switch
+
+- However, instead of relying on Layer 2 technologies such as spanning tree, VRF instances allow for interaction and segmentation with Layer 3 dynamic routing protocols
+
+- Using routing protocols over Layer 2 technologies has some advantages, such as improved network convergence times, dynamic traffic load-sharing, and troubleshooting tools such as ping and traceroute
+
+- `ip vrf` versus `vrf definition`
+
+- The first command only enables VRF for ipv4. It does not have IPv6 support
+
+- The second one enables a multiprotocol VRF. IPv4 and IPv6 support can be enabled with the specific address families
+
+- Converting an `ip vrf` to a `vrf definition` automatically:
+
+```
+conf t
+ vrf upgrade-cli multi-af-mode common-policies
+```
+
+- Note that the above command takes off the IPv6 addresses configured on the interfaces while migrating them as per warning:
+
+```
+R1(config)#vrf upgrade-cli multi-af-mode common-policies 
+You are about to upgrade to the multi-AF VRF syntax commands.
+You will lose any IPv6 addresses configured on interfaces
+belonging to upgraded VRFs.
+
+Are you sure ? [yes]: yes
+Number of VRFs upgraded: 0
+```
