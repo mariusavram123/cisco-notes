@@ -150,3 +150,292 @@ P 10.4.4.0/24, 1 successors, FD is 3328 ---> Feasible distance
 
 - Type: 5, Packet name: **Reply** - Send in response to a Query packet
 
+### Path Metric Calculation
+
+- Metric calculation is a critical component for any routing protocol
+
+- EIGRP uses multiple factors to calculate the metric for a path
+
+- Metric calculation uses *bandwidth* and *delay* by default, but it can include interface load and reliability, too
+
+- EIGRP metric formula:
+
+![metric-formula](./eigrp-metric.jpg)
+
+- EIGRP uses K values to define which factors the formula uses and the associate impact of a factor when calculating the metric
+
+- A common misconception is that K values directly apply to bandwidth, load, delay or reliability; this is not accurate
+
+- For example, K1 and K2 both reference bandwidth (BW)
+
+- BW represents the slowest link in the path scaled to a 10 Gbps link (10^7)
+
+- Link speed is collecte from the configured interface bandwidth on an interface
+
+- Delay is the total measure of delay in the path, measured in tens of microseconds (us)
+
+- The EIGRP formula is based on IGRP metric formula, except the output is multiplied by 256 to change the metric from 24 bits to 32 bits
+
+- Taking these definitions into consideration, the formula for EIGRP is:
+
+![eigrp-metric](./eigrp-metric-explained.jpg)
+
+- By default K1 and K3 have the value 1, and K2, K4 and K5 are set to 0
+
+- Placing the default K values in the formula it becomes:
+
+![default-metric](./eigrp-with-default-metrics.jpg)
+
+- The EIGRP update packet includes path attributes associated with each prefix
+
+- The EIGRP path attributes can include hop count, cumulative delay, minimum bandwidth link speed, and RD
+
+- The attributes are updated each hop along the way, allowing each router to independently identify the shortest path
+
+![path-calculation](./eigrp-path-calculation.png)
+
+- The above picture displays the information in the EIGRP update packets for the 10.1.1.0/24 propagating through the autonomous system
+
+- Notice that the hop count increments, minimum bandwidth decreases, total delay increases, and RD changes with each router in the AS
+
+- Common network types, link speeds, delay, and EIGRP metrics, using the streamlined formula from above:
+
+```
+Interface Type      Link Speed (kbps)       Delay           Metric
+Serial              64                      20000 us        40.512.000
+T1                  1544                    20000 us        2.170.031
+Ethernet            10.000                  1000 us         281.600
+FastEthernet        100.000                 100 us          28.160
+GigabitEthernet     1.000.000               10 us           2.816
+10 GigabitEthernet  10.000.000              10 us           512
+```
+
+- On this topology:
+
+[topology](./EIGRP-network-topology.png)
+
+the metric from R1 and R2 metric for the 10.4.4.0/24 network can be calculated using the following formula:
+
+![calculated-metric](./eigrp-calculated-metric.png)
+
+- The link speed for both routers is 1 Gbps, and the total delay is 30 us (10 us for the 10.4.4.0/24 link, 10 us for the 10.34.1.0/24 link, and 10 us for the 10.13.1.0/24 link)
+
+#### Wide Metrics
+
+- The original EIGRP specification measured delay in 10 us units and bandwidth in kilobytes per second, which did not scale well with higher speed interfaces
+
+- Notice that the delay is the same for the GigabitEthernet and 10 GigabitEthernet interfaces 
+
+- The above examples provide some metric calculation for common LAN interface speeds
+
+- Notice that there is not a differenciation between an 11 Gbps interface and 20 Gbps interface
+
+- The composite metric stays at 256 despite having different bandwidth rates
+
+- Metrics calculated for common LAN interface speeds:
+
+```
+GigabitEthernet:
+Scaled Bandwidth: 10.000.000 / 1.000.000
+Scaled Delay: 10 / 10
+Composite Metric: 10 + 1 * 256 = 2816
+
+10 GigabitEthernet:
+Scaled Bandwidth: 10.000.000 / 10.000.000
+Scaled Delay: 10 / 10
+Composite Metric: 1 + 1 * 256 = 512
+
+11 GigabitEthernet:
+Scaled Bandwidth: 10.000.000 / 11.000.000
+Scaled Delay: 10 / 10
+Composite Metric: 0 + 1 * 256 = 256
+
+20 GigabitEthernet:
+Scaled Bandwidth: 10.000.000 / 20.000.000
+Scaled Delay: 10 / 10
+Composite Metric: 0 + 1 * 256 = 256
+```
+
+- EIGRP includes support for a second set of metrics, known as *wide metrics*, that addresses the issue of scalability with higher-capacity interfaces
+
+- The original formula from above refers to EIGRP *classic metrics*
+
+![wide-metrics](./eigrp-wide-metrics.png)
+
+- The above shows the EIGRP wide metrics formula. Notice that an additional K value (K6) is included that adds an extended attribute to measure jitter, energy or other future attributes
+
+- Just as EIGRP scaled by 256 to accomodate IGRP, EIGRP wide metrics scale by 65535 to accomodate higher-speed links
+
+- This provides support for interface speeds up to 655 Tbps (65535 * 10^7) without any scalability issues
+
+- Latency is the total interface delay measured in picoseconds (10^-12) instead of measuring in microseconds (10^-6)
+
+- Below is the updated formula that takes into account the conversions in latency and scalability
+
+![explained-wide-metrics](./eigrp-extended-wide-metrics.png)
+
+#### Metric Backward Compatibility
+
+- EIGRP wide metrics were designed with backward compatibility in mind
+
+- With EIGRP wide metrics, K1 and K3 are set to a value of 1, and K2, K4, K5, and K6 are set to 0
+
+- As long as K1 to K5 are the same and K6 is not set, the two metrics styles allow adjacency between routers
+
+- EIGRP is able to detect when peering with a router is using clasic metrics, and it unscales a metric from the formula:
+
+![unscalling-metric](./eigrp-unscalling-metrics.png)
+
+#### Load Balancing
+
+- EIGRP allows multiple successor routes (using the same metric) to be installed into the RIB
+
+- Installing multiple paths into the RIB for the same prefix is called *equal-cost multipathing (ECMP)* 
+
+- EIGRP supports unequal-cost load balancing, which allows installation of both successor routes and feasible successors into the EIGRP RIB
+
+- EIGRP supports unequal-cost load balancing by changing EIGRP's *variance multiplier* 
+
+- The EIGRP *variance value* is the feasible distance (FD) for a route multiplied by the EIGRP variance multiplier
+
+- Any feasible successor's FD with a metric below the EIGRP variance value is installed into the RIB
+
+- EIGRP installs multiple routes where the FD for the routes is less than the EIGRP multiplier value up to the maximum number of ECMP routes
+
+- Dividing the feasible successor metric by the successor route metric provides the variance multiplier
+
+- The variance multiplier is a whole number, so any remainders should always round up
+
+- Into our example topology (the one showing the route calculation for the 10.4.4.0/24 subnet) and the output of the EIGRP topology table, the minimum EIGRP variance multiplier can be calculated so that the direct path from R1 to R4 can be installed into the RIB
+
+- The FD for the successor route is 3328, and the FD for the feasible successor is 5376
+
+- The formula provides a value of about 1.6 and is always rounded up to the nearest whole number to provide an EIGRP variance multiplier of 2
+
+![variance](./variance-calculation.png)
+
+- Verifying that both paths have been installed into the RIB
+
+```
+show ip route eigrp | begin Gateway
+D   10.4.4.0/24 [90/5376] via 10.14.1.4, 00:00:03, GigabitEthernet0/2
+                [90/3328] via 10.13.1.3, 00:00:03, GigabitEthernet0/1
+
+
+show ip route 10.4.4.0
+Routing entry for 10.4.4.0/24
+    Known via "eigrp 100", distance 90, metric 3328, type internal
+    Redistributing via EIGRP 100
+    Last update from 10.13.1.3 on GigabitEthernet0/1, 00:00:35 ago
+    Routing Descriptor Blocks:
+    * 10.14.1.4, from 10.14.1.4, 00:00:35 ago, via GigabitEthernet0/2
+        Route metric is 5376, traffic share count is 149
+        Total delay is 110 microseconds, minimum bandwidth is 1000000 Kbit
+        Reliability 255/255, minimum MTU 1500 bytes
+        Loading 1/255, Hops 1
+    
+     10.13.1.3, from 10.13.1.3, 00:00:39 ago, via GigabitEthernet0/1
+        Route metric is 3328, traffic share count is 240
+        Total delay is 30 microseconds, minimum bandwidth is 1000000 Kbit
+        Reliability 254/255, minimum MTU 1500 bytes
+        Loading 1/255, Hops 2
+```
+
+- Notice that the metrics for the paths are different. One path metric is 3328, and the other path metric is 5376. The *traffic share count* setting correlates to the ratio of traffic sent across each path
+
+#### Failure detection and timers
+
+- A secondary function for the EIGRP hello packets is to ensure that EIGRP neighbors are still healthy and available
+
+- EIGRP hello packets are sent out in intervals determined by the hello timer
+
+- The default EIGRP hello timer is 5 seconds, but it is 60 seconds on slow-speed interfaces (T1 or lower)
+
+- EIGRP uses a second timer for the *hold time* which is the ammount of time EIGRP deems the router reachable and functioning
+
+- The hold time defaults to 3 times hello interval
+
+- The default value is 15 seconds, and it is 180 seconds on slow speed interfaces
+
+- The hold time decrements, and upon receipt of a hello packet, the hold time resets and restarts the countdown
+
+- If the hold time reaches 0, EIGRP declares the neighbor unreachable and notifies DUAL of a topology change
+
+#### Convergence
+
+- When a link fails, and an interface protocol moves to a down state, any neighbor attached to that interface moves to a down state too
+
+- When an EIGRP neighbor moves to a down state, path recomputation must occur for any prefixes where that EIGRP neighbor was a successor (upstream router)
+
+- When EIGRP detects that it has lost it's successor for a path, the feasible successor instantly becomes the successor route, providing a backup route
+
+- The router sends out an update packet for that path because of the new EIGRP path metrics
+
+- Downstream routers run their own DUAL for any impacted prefixes to account the new EIGRP metrics
+
+- It is possible that a change of the successor route or feasible successor may occur upon receipt of new EIGRP metrics from a successor router for a prefix
+
+![link-failure](./eigrp-failure-update.png)
+
+- In above figure it is demonstrated when the link between R1 and R3 fails
+
+- R3 installs the feasible successor path advertised from R2 as the successor route
+
+- R3 sends an update with a new RD 19 for the 10.1.1.0/24 prefix
+
+- R5 receives the update packet from R3 and calculates an FD of 29 for the R1-R2-R3 path to 10.1.1.0/24 
+
+- R5 compares that path to the one received from R4, which has a path metric of 25
+
+- R5 chooses the path via R4 as the successor route
+
+- If a feasible successor is not available for a prefix, DUAL must perform a new route calculation 
+
+- The route changes from passive (P) to active (A) in the EIGRP topology table
+
+- The router detecting the topology change sends out query packets to EIGRP neighbors for the route
+
+- The query packet includes the network prefix with the delay set to infinity so that other routers are aware that it has gone active
+
+- When the router sends the EIGRP query packets, it sets the reply status flag set for each neighbor on a prefix basis
+
+- Upon receipt of a query packet, an EIGRP router does one of the following:
+
+    - It may reply to a query that the router does not have a route to the prefix
+
+    - If the query did not come from the successor for that route, it detects the delay set for infinity but ignores it because it did not come from the successor. The receiving router replies with the EIGRP attributes for that route
+
+    - If the query came from the successor for the route, the receiving router detects the delay set for infinity, sets the prefix as active in the EIGRP topology, and sends out a query packet to all downstream EIGRP neighbors for that route
+
+- The query process continues from router to router until a router establishes the query boundary
+
+- A query boundary is established when a router does not mark the prefix as active, meaning that it responds to a query as follows:
+
+    - It says it does not have a route to the prefix
+
+    - It replies with EIGRP attributes because the query did not come from the successor
+
+- When e router receives a reply for every downstream that was sent out, it completes the DUAL, changes the route to passive, and sends a reply packet to any upstream routers that send a query packet to it
+
+- Upon receiving the reply packet for a prefix, the reply packet is notated for that neighbor and prefix
+
+- The reply process continues upstream for the queries until the first router's queries are received
+
+![link-failure](./eigrp-link-failure.png)
+
+- In the above topology the link between R1 and R2 has failed
+
+- The following steps are processed in order from the perspective of R2 calculating a new route to the 10.1.1.0/24 network
+
+    - **Step 1**: R2 detects the link failure. R2 does not have a feasible successor for the route, sets the 10.1.1.0/24 network as active, and sends queries to R3 and R4
+
+    - **Step 2**: R3 receives the query from R2 and processes the Delay field which is set to infinity. R3 does not have any other EIGRP neighbors and sends a reply to R2 saying that a route does not exist
+
+    - R4 receives the query from R2 and processes the Delay field which is set to infinity. Because the query was received by the successor, and a feasible successor for the prefix does not exist, R4 marks the route as active and sends a query to R5
+
+    - **Step 3**: R5 receives the query from R4 and detects the Delay field set to infinity. Because the query was received by a nonsuccessor and a successor exists on a different interface, a reply for the 10.1.1.0/24 network is sent back to R2 with the appropriate EIGRP attributes
+
+    - **Step 4**: R4 receives R5's reply, acknowledges the packet, and computes a new path. Because this is the last outstanding query packet on R4, R4 sets the prefix as passive. With all query satisfied, R4 responds to R2's query with the new EIGRP metrics
+
+    - **Step 5**: R2 receives R4's reply, acknowledges the packet, and computes a new path. Because this is the last outstanding query packet on R4, R2 sets the prefix as passive
+
