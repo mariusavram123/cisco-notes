@@ -687,8 +687,6 @@ debug eigrp packets
 debug eigrp notifications
 ```
 
-- More on EIGRP notifications:
+- More on EIGRP authentication:
 
 [Documentation-cisco](https://www.cisco.com/c/en/us/support/docs/ip/enhanced-interior-gateway-routing-protocol-eigrp/82110-eigrp-authentication.html)
-
-
