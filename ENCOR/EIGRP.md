@@ -353,6 +353,8 @@ Routing entry for 10.4.4.0/24
 
 - EIGRP uses a second timer for the *hold time* which is the ammount of time EIGRP deems the router reachable and functioning
 
+(How much my neighbor tells me to wait for him before considering it down)
+
 - The hold time defaults to 3 times hello interval
 
 - The default value is 15 seconds, and it is 180 seconds on slow speed interfaces
@@ -360,6 +362,8 @@ Routing entry for 10.4.4.0/24
 - The hold time decrements, and upon receipt of a hello packet, the hold time resets and restarts the countdown
 
 - If the hold time reaches 0, EIGRP declares the neighbor unreachable and notifies DUAL of a topology change
+
+- Timers between neighbors does not have to match at all. It is recommended to match but they can be different
 
 #### Convergence
 
@@ -438,4 +442,253 @@ Routing entry for 10.4.4.0/24
     - **Step 4**: R4 receives R5's reply, acknowledges the packet, and computes a new path. Because this is the last outstanding query packet on R4, R4 sets the prefix as passive. With all query satisfied, R4 responds to R2's query with the new EIGRP metrics
 
     - **Step 5**: R2 receives R4's reply, acknowledges the packet, and computes a new path. Because this is the last outstanding query packet on R4, R2 sets the prefix as passive
+
+### Route Summarization
+
+- EIGRP works well with minimal optimizations. Scalability of an EIGRP autonomous system depends on summarization
+
+- As the size of an EIGRP autonomous system increases, convergence may take longer. Scaling an EIGRP topology requires summarizing routes in a hierarchical fashion
+
+- EIGRP summarizes network prefixes on an interface basis. A summary aggregate is configured for the EIGRP interface
+
+- Prefixes within the summary aggregate are suppressed, and the summary aggregate prefix is advertised in lieu of the original prefixes
+
+- The summary aggregate prefix is not advertised until a prefix matches it. Interface-specific summarization can be performed in any portion of the network topology
+
+- In addition to shrinking the routing table of all the routers, summarization creates a query boundary and shrinks the query domain when a route goes active during convergence
+
+![summarization](./eigrp-summary-route.png)
+
+- The above topology illustrates the concept of EIGRP summarization
+
+- Without summarization, R2 advertises the 172.16.1.0/24, 172.16.3.0/24, 172.16.12.0/24, and 172.16.23.0/24 towards R4
+
+- R2 can summarize these network prefixes to the summary aggregate 172.16.0.0/16 prefix so that only one advertisement is sent to R4
+
+### EIGRP configurations
+
+#### EIGRP for IPv4 traditional configuration
+
+- Topology:
+
+![conf-topology](./eigrp-lab.png)
+
+- R1
+
+```
+conf t
+ router eigrp 1
+  network 192.168.1.0 0.0.0.255
+  network 192.0.2.0 0.0.0.3
+  no auto-summary 
+```
+
+- R2 (with classic mode)
+
+```
+conf t
+ router eigrp 1
+  network 192.0.2.0 0.0.0.3
+  network 203.0.113.0 0.0.0.3
+  no auto-summary
+```
+
+- R3
+
+```
+conf t
+ router eigrp 1
+  network 203.0.113.0 0.0.0.3
+  network 172.16.1.0 0.0.0.255
+  no auto-summary
+```
+
+- Verification commands:
+
+- R1:
+
+```
+show ip eigrp neighbors
+show ip eigrp interfaces
+show ip eigrp topology
+```
+
+#### EIGRP stub
+
+- A stub router is not queried in case of a link failure. It is recommended to configure stub router on routers that are not connected to other routers (like at the edge of the network)
+
+- Configure stub routing on R1 and R3 in our topology:
+
+- R1
+
+```
+conf t
+ router eigrp 1
+  eigrp stub connected
+```
+
+- You can use only `eigrp stub` command but it will not advertise any networks to neighbors. To advertise the connected networks use `eigrp stub connected`
+
+#### Configuring timers on interfaces
+
+- R1
+
+```
+conf t
+ interface range e0/0 - 1
+  ip hello-interval eigrp 1 10
+  ip hold-time eigrp 1 30
+```
+
+#### Passive interface
+
+- Passive interfaces do not sent EIGRP hellos
+
+- R1:
+
+```
+conf t
+ router eigrp 1
+  passive-interface e0/0
+```
+
+#### Route summarization
+
+- Summary topology
+
+![summ-topology](./eigrp-summary-topology.png)
+
+- On R5, interface g0/5 we can do summarization for 172.16.0.0/22
+
+```
+conf t
+ interface g0/5
+  ip summary address eigrp 1 172.16.0.0 255.255.252.0
+```
+
+- Verifying on R6 there is only one network now in the routing table for the range 172.16.0.0/22
+
+```
+show ip route
+```
+
+- Automatically summarize routes:
+
+- By default summarization to the classful boundary is enabled by default for IPv4
+
+```
+conf t
+ router eigrp 1
+  auto-summary
+```
+
+#### EIGRP for IPv6 traditional configuration
+
+- On R1:
+
+```
+conf t
+ ipv6 unicast-routing
+ ipv6 router eigrp 65000
+ interface range e0/0 - 1
+  ipv6 eigrp 65000
+```
+
+- R2:
+
+```
+conf t
+ ipv6 unicast-routing
+ ipv6 router eigrp 65000
+ interface range e0/0 - 1
+  ipv6 eigrp 65000
+```
+
+- R3:
+
+```
+conf t
+ ipv6 unicast-routing
+ ipv6 router eigrp 65000
+ interface range e0/0 - 1
+  ipv6 eigrp 65000
+```
+
+#### EIGRP Named mode configuration
+
+- We will enable this only on R2. It should be able to establish the neighborship with the other routers anyway
+
+- First get rid of the normal configuration
+
+```
+conf t
+ no router eigrp 1
+ no ipv6 router eigrp 65000
+```
+
+- Configuring Named mode
+
+```
+router eigrp TEST
+ !
+ address-family ipv4 unicast autonomous-system 1
+  !
+  topology base
+   variance 2
+  exit-af-topology
+  network 192.0.2.0 0.0.0.3
+  network 203.0.113.0 0.0.0.3
+ exit-address-family
+ !
+ address-family ipv6 unicast autonomous-system 65000
+  !
+  topology base
+   variance 2
+  exit-af-topology
+ exit-address-family
+```
+
+- With named mode, for IPv6 EIGRP, once you enable address family, the interfaces get already enabled
+
+- EIGRP uses link local IPv6 addresses as next hops for routes
+
+- For named EIGRP there is a K6 value used for wide metrics
+
+#### EIGRP authentication
+
+- EIGRP authentication using a keychain
+
+1. The creation of the keychain and key
+
+2. The configuration of EIGRP authentication to use that keychain and key
+
+- Creating a key chain:
+
+```
+conf t
+ key-chain R1KEYCHAIN
+  key 1
+   key-string securetraffic
+
+ int e0/0
+  ip authentication mode eigrp 1 md5
+  ip authentication key-chain eigrp 1 R1KEYCHAIN
+
+ int e0/1
+  ip authentication mode eigrp 1 md5
+  ip authentication key-chain eigrp 1 R1KEYCHAIN 
+```
+
+- Verifying that the authentication take place by debugging EIGRP packets:
+
+```
+debug eigrp packets
+
+debug eigrp notifications
+```
+
+- More on EIGRP notifications:
+
+[Documentation-cisco](https://www.cisco.com/c/en/us/support/docs/ip/enhanced-interior-gateway-routing-protocol-eigrp/82110-eigrp-authentication.html)
+
 
