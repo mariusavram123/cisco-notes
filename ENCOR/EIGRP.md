@@ -687,6 +687,41 @@ debug eigrp packets
 debug eigrp notifications
 ```
 
-- More on EIGRP authentication:
+- More on EIGRP authentication: [Documentation-cisco](https://www.cisco.com/c/en/us/support/docs/ip/enhanced-interior-gateway-routing-protocol-eigrp/82110-eigrp-authentication.html)
 
-[Documentation-cisco](https://www.cisco.com/c/en/us/support/docs/ip/enhanced-interior-gateway-routing-protocol-eigrp/82110-eigrp-authentication.html)
+
+#### Set K values for metric calculation
+
+- On R1:
+
+```
+router eigrp 1
+ metric weights 0 1 0 1 0 0 
+```
+
+- First "0" is the TOS value and is always 0
+
+
+- On R2, with named mode EIGRP:
+
+```
+conf t
+ router eigrp TEST
+  address-family ipv4 unicast autonomous-system 1
+   metric weights 0 1 0 1 0 0
+```
+
+#### Set metric version (32bit or 64bit metrics)
+
+- On my IOL router is only possible to set it for named mode eigrp
+
+- R2:
+
+```
+conf t
+ router eigrp TEST
+  address-family ipv4 unicast autonomous-system 1
+   metric version ?
+                  32bit # normal metrics
+                  64bit # wide metrics
+```
