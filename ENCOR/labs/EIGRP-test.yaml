@@ -140,7 +140,7 @@ nodes:
     configuration:
       - name: ios_config.txt
         content: "Building configuration...\n\nCurrent configuration : 3525 bytes\n\
-          !\n! Last configuration change at 19:51:15 UTC Tue May 20 2025\n!\nversion\
+          !\n! Last configuration change at 14:54:13 UTC Wed May 21 2025\n!\nversion\
           \ 17.15\nservice timestamps debug datetime msec\nservice timestamps log\
           \ datetime msec\n!\nhostname R1\n!\nboot-start-marker\nboot-end-marker\n\
           !\n!\nno logging console\nno aaa new-model\n!\n!\n!\n!\n!\n!\n!\n!\n!\n\
@@ -231,10 +231,11 @@ nodes:
   - boot_disk_size: null
     configuration:
       - name: ios_config.txt
-        content: "Building configuration...\n\nCurrent configuration : 3602 bytes\n\
-          !\n! Last configuration change at 19:51:14 UTC Tue May 20 2025\n!\nversion\
-          \ 17.15\nservice timestamps debug datetime msec\nservice timestamps log\
-          \ datetime msec\n!\nhostname R2\n!\nboot-start-marker\nboot-end-marker\n\
+        content: "*May 21 14:54:11.256: %SYS-5-CONFIG_I: Configured from console by\
+          \ console\nR2#\nBuilding configuration...\n\nCurrent configuration : 3602\
+          \ bytes\n!\n! Last configuration change at 14:54:12 UTC Wed May 21 2025\n\
+          !\nversion 17.15\nservice timestamps debug datetime msec\nservice timestamps\
+          \ log datetime msec\n!\nhostname R2\n!\nboot-start-marker\nboot-end-marker\n\
           !\n!\nno logging console\nno aaa new-model\n!\n!\n!\n!\n!\n!\n!\n!\n!\n\
           !\n!\n!\n!\nip cef\nlogin on-success log\nipv6 unicast-routing\nipv6 cef\n\
           !\n!\n!\n!\n!\n!\n!\n!\n!\n!\ncrypto pki trustpoint TP-self-signed-131184659\n\
@@ -325,7 +326,7 @@ nodes:
     configuration:
       - name: ios_config.txt
         content: "Building configuration...\n\nCurrent configuration : 3427 bytes\n\
-          !\n! Last configuration change at 19:51:15 UTC Tue May 20 2025\n!\nversion\
+          !\n! Last configuration change at 14:54:12 UTC Wed May 21 2025\n!\nversion\
           \ 17.15\nservice timestamps debug datetime msec\nservice timestamps log\
           \ datetime msec\n!\nhostname R3\n!\nboot-start-marker\nboot-end-marker\n\
           !\n!\nno logging console\nno aaa new-model\n!\n!\n!\n!\n!\n!\n!\n!\n!\n\
