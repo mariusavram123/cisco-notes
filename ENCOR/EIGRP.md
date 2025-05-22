@@ -725,3 +725,28 @@ conf t
                   32bit # normal metrics
                   64bit # wide metrics
 ```
+
+
+#### Set the maximum percent of packets that can be used on an interface
+
+- Maximum is 50 percent
+
+- R1:
+
+```
+conf t
+ interface e0/1
+  ip bandwidth-percent eigrp 2 50
+                            # range <1 - 999999> 
+```
+
+- R2 - EIGRP named mode:
+
+```
+conf t
+ router eigrp TEST
+  address-family ipv4 unicast autonomous-system 1
+   af-interface e0/1
+    bandwidth-percent 50
+```
+
