@@ -176,3 +176,377 @@
 
 - Multi-access networks such as Ethernet (LANs) and Frame Relay allow more than 2 routers to exist on a network segment
 
+- Such a setup could cause scalability problems with OSPF as the number of routers on a segment increases
+
+- Additional routers flood more LSAs on the segment, and OSPF traffic becomes excessive as OSPF neighbor adjacencies increase
+
+- If four routers share the same multi-access network, six OSPF adjacencies form, along with six occurences of database flooding on a network
+
+![multi-access-network](./ospf-neighbors-multiaccess-network.png)
+
+- The above scheme shows a simple four-router physical topology and the adjacencies established
+
+- The number of edges formula, *n(n-1) /2*, where n is the number of routers, is used to identify the number of sessions in a full-mesh topology
+
+- If 5 routers were present on a segment, 5x(5-1) / 2 = 10, then 10 OSPF adjacencies would exist for that segment
+
+- Continuing the logic, adding one additional router would make 15 OSPF adjacencies on a network segment
+
+- Having so many adjacencies per segment consume more bandwidth, more CPU processing, and more memory to maintain each of the neighbor states
+
+- The LSAs increase exponentially with the number of routers on a network segment
+
+- OSPF overcomes this inefficiency by creating a pseudonode (virtual router) to manage the adjacency state with all other routers on that broadcast network segment
+
+- A router on the broadcast segment, known as the *designated router (DR)* assumes the role of the pseudonode
+
+- The DR reduces the number of OSPF adjacencies on a multi-access network segment because routers only form a full OSPF adjacency with the DR and not each other
+
+- The DR is responsive for flooding updates to all OSPF routers on that segment as the updates occur
+
+![multiaccess-with-dr](./ospf-multiaccess.png)
+
+- The above scheme demonstrates how using a DR simplifies a four-router topology with only three neighbor adjacencies
+
+- If the DR were to fail, OSPF would need to form new adjacencies, invoking all new LSAs and could potentially cause a temporary loss of routes
+
+- In the event of DR failure a *backup designated router (BDR)* becomes the new DR; then an election occurs to replace the BDR
+
+- To minimize transition time, the BDR also forms full OSPF adjacencies with all OSPF routers on that segment
+
+- The DR/BDR process distributes LSAs in the following manner:
+
+    1. All OSPF routers (DR, BDR and DROTHER) on a segment form full OSPF adjacencies with the DR and BDR
+
+    2. As an OSPF router learns a new route, it sends the updated LSA to the AllDRouters (224.0.0.6) address, which only the DR and BDR receive and process
+
+    3. The DR sends a unicast acknowledgement to the router that sent the initial LSA update
+
+    4. The DR floods the LSA to all routers on the segment via AllSPFRouters (224.0.0.5) address
+
+![network-advertisement](./ospf-network-advertisement-dr-bdr.png)
+
+### OSPF Configuration
+
+- The configuration process for OSPF resides mostly under the OSPF process, but some OSPF options go directly under the interface configuration submode
+
+- Defining and initializing the OSPF process:
+
+```
+conf t
+ router ospf <process-id>
+```
+
+Example:
+
+```
+conf t
+ router ospf 50
+```
+
+- The OSPF process ID is locally signinficant but is generally kept the same for operational consistency
+
+- OSPF is enabled on an interface using two methods:
+
+    1. An OSPF network statement
+
+    2. Interface-specific configuration
+
+#### OSPF Network Statement
+
+- The OSPF network statement identifies the interface that the OSPF process will use and the area that those interfaces participate in
+
+- The network statements match against the primary IPv4 address and netmask associated with an interface
+
+- A common misconception is that the network statement advertises the networks into OSPF; in reality, though, the network statement is selecting and enabling OSPF on the interface
+
+- The interface is then advertised into OSPF through the LSA
+
+- The network statement uses a wildcard mask, which allows the configuration to be as specific or vague as necessary
+
+- The selection of interfaces within the OSPF process is accomplished by using the following command:
+
+```
+network <ip address> <wildcard-mask> area <area-id>
+```
+
+Example:
+
+```
+conf t
+ router ospf 1
+  network 3.3.3.3 0.0.0.0 area 0
+```
+
+- The concept is similar to the configuration of Enhanced Interior Gateway Routing Protocol (EIGRP), except that the OSPF area is specified
+
+- If an IP address for an interface matches two network statements, with different areas, the most explicit network statement (that is the longest match) preempts the other network statements for area allocation
+
+- The corresponding network for the OSPF-enabled interface is added to the OSPF LSDB under the corresponding OSPF area in which the interface participates
+
+- Secondary connected networks are added to the LSDB only if the secondary IP address matches a network statement associated with the same area
+
+- The following scenarios explain potential use cases of the network statement for a router with four interfaces
+
+IP addresses and interfaces:
+
+```
+Interface                   IP Address
+GigabitEthernet0/0          10.0.0.10/24
+GigabitEthernet0/1          10.0.10.10/24
+GigabitEthernet0/2          192.0.0.10/24
+GigabitEthernet0/3          192.10.0.10/24
+```
+
+- Enabling OSPF on Area 0 for the interfaces that explicitly match the IP addresses:
+
+```
+conf t
+ router ospf 1
+  network 10.0.0.10 0.0.0.0 area 0
+  network 10.0.10.10 0.0.0.0 area 0
+  network 192.0.0.10 0.0.0.0 area 0
+  network 192.10.0.10 0.0.0.0 area 0
+```
+
+- OSPF configuration for Area 0, using network statements that match the subnets configured on the interfaces
+
+- If you set the last octet of the IP address to 0 and change the wildcard mask to 255, the network statements match all IP addresses within the /24 network
+
+```
+conf t
+ router ospf 1
+  network 10.0.0.0 0.0.0.255 area 0
+  network 10.0.10.0 0.0.0.255 area 0
+  network 192.0.0.0 0.0.0.255 area 0
+  network 192.10.0.0 0.0.0.255 area 0
+```
+
+- OSPF configuration for Area 0, using network statements for interfaces that are within the 10.0.0.0/8 and 192.0.0.0/8 network ranges and will result in OSPF being enabled on all four interfaces
+
+```
+conf t
+ router ospf 1
+  network 10.0.0.0 0.255.255.255 area 0
+  network 192.0.0.0 0.255.255.255 area 0
+```
+
+- OSPF configuration for Area 0 to enable OSPF on all interfaces
+
+```
+conf t
+ router ospf 1
+  network 0.0.0.0 255.255.255.255 area 0
+```
+
+#### Interface-Specific Configuration
+
+- The second method for enabling OSPF on an interface, is to configure it specifically on an interface as follows:
+
+```
+conf t
+ interface gi0/1
+  ip ospf <process-id> area <area-id> [secondaries none]
+```
+
+Example:
+
+```
+conf t
+ interface gi0/1
+  ip ospf 1 area 0
+```
+
+- This method also adds secondary connected networks to the LSDB unless the `secondaries none` option is used
+
+- This method provides explicit control for enabling OSPF; however, the configuration is not centralized and increases in complexity as the number of interfaces on the routers increases
+
+- If a hybrid configuration exists on a router, interface-specific settings take precedence over the network statement with the assignment of the areas
+
+```
+conf t
+ interface Gi0/0
+  ip address 10.0.0.1 255.255.255.0
+  ip ospf 1 area 0
+```
+
+#### Statically Setting the Router ID
+
+- By default, the RID is dynamically allocated using the highest IP address of any `up` loopback interfaces
+
+- If there are no `up` loopback interfaces, the highest IP address of any active `up` physical interfaces becomes the RID when the OSPF process initializes
+
+- The OSPF process selects the RID when the OSPF process initializes, and it does not change until the process restarts
+
+- Interface changes (such as addition/removal of IP addresses) on a router are detected when the OSPF process restarts, and the RID changes accordingly
+
+- The OSPF tolology is built on the RID. Setting a static RID helps with troubleshooting and reduces LSAs when a RID changes in an OSPF environment
+
+- The RID is four octets in length but generally represents an IPv4 address that resides on the router for operational simplicity; however this is not a requirement
+
+- Assigning the router ID manually:
+
+```
+conf t
+ router ospf 1
+  router-id <router-id>
+```
+
+- Clearing the OSPF process on a router so that OSPF can use the new router ID
+
+```
+clear ip ospf process
+```
+
+#### Passive Interfaces
+
+- Enabling an interface with OSPF is the quickest way to advertise a network segment to other OSPF routers
+
+- However, it may be easy for someone to plug in an unauthorized OSPF router on an OSPF-enabled network segment and introduce false routes, thus causing havoc on the network
+
+- Making the network interface passive still adds the network segment into the LSDB but prohibits the interface for forming OSPF adjacencies
+
+- A *passive interface* does not send out OSPF hellos and does not process any received OSPF packets
+
+- Making the interface passive:
+
+```
+conf t
+ router ospf 1
+  passive-interface <interface-id>
+```
+
+- Making all interfaces passive by default:
+
+```
+conf t
+ router ospf 1
+  passive-interface default
+```
+
+- Allow an interface to process OSPF packets after all interfaces have been configured as passive:
+
+```
+conf t
+ router ospf 1
+  no passive-interface g0/0
+```
+
+#### Requirements for Neighbor Adjacency
+
+- The following list of requirements must be met for an OSPF neighborship to be formed:
+
+    - RID must be unique between the two devices. They should be unique for the entire OSPF routing domain to prevent errors
+
+    - The interfaces must share a common subnet. OSPF uses the interface's primary IP address when sending out OSPF hellos. The network mask (netmask) in the hello packet is used to extract the network ID of the hello packet
+
+    - The MTUs (maximum transmission unit) on the interfaces must match. The OSPF protocol does not support fragmentation, so the MTUs on the interfaces should match
+
+    - The area ID must match for the segment
+
+    - The DR enablement must match for the segment
+
+    - OSPF hello and dead timers must match for the segment
+
+    - Authentification type and credentials (if any) must match for the segment
+
+    - Area type flags must match for the segment (for example, Stub, NSSA)
+
+#### Sample Topology and Configuration
+
+![ospf-config](./ospf-configuration-topology.png)
+
+- Above is a topology example for a basic OSPF configuration
+
+- All four routers have loopback IP addresses that match their RIDs (R1 equals 192.168.1.1, R2 equals 192.168.2.2, and so on)
+
+- On R1 and R2, OSPF is enabled on all interfaces with one command, R3 uses specific network-based statements, and R4 uses interface specific commands
+
+- R1 and R2 set the Gi0/2 interface as passive, and R3 and R4 make all interfaces passive by default but make Gi0/1 active
+
+- Configuration for all four routers:
+
+- R1:
+
+```
+conf t
+ interface loopback 0
+  ip address 192.168.1.1 255.255.255.255
+ interface gi0/1
+  ip address 10.123.4.1 255.255.255.0
+ interface gi0/2
+  ip address 10.1.1.1 255.255.255.0
+
+ router ospf 1
+  router-id 192.168.1.1
+  passive-interface gi0/2
+  network 0.0.0.0 255.255.255.255 area 0
+```
+
+- R2:
+
+```
+conf t
+ interface loopback 0
+  ip address 192.168.2.2 255.255.255.255
+ interface gi0/1
+  ip address 10.123.4.2 255.255.255.0
+ interface gi0/2
+  ip address 10.2.2.2 255.255.255.0
+
+ router ospf 1
+  router-id 192.168.2.2
+  passive-interface gi0/2
+  network 0.0.0.0 255.255.255.255 area 0
+```
+
+R3:
+
+```
+conf t
+ interface loopback 0
+  ip address 192.168.3.3 255.255.255.255
+ interface gi0/1
+  ip address 10.123.4.3 255.255.255.0
+ interface gi0/2
+  ip address 10.3.3.3 255.255.255.0
+
+ router ospf 1
+  router-id 192.168.3.3
+  passive-interface default
+  no passive-interface gi0/1
+  network 10.3.3.3 0.0.0.0 area 0
+  network 10.123.4.3 0.0.0.0 area 0
+  network 192.168.3.3 0.0.0.0 area 0
+```
+
+- R4:
+
+```
+conf t
+ interface loopback 0
+  ip address 192.168.4.4 255.255.255.255
+  ip ospf 1 area 0
+ interface gi0/1
+  ip address 10.123.4.4 255.255.255.0
+  ip ospf 1 area 0
+ interface gi0/2
+  ip address 10.4.4.4 255.255.255.0
+  ip ospf 1 area 0
+
+ router ospf 1
+  router-id 192.168.4.4
+  passive-interface default
+  no passive-interface gi0/1
+```
+
+#### Confirmation of Interfaces
+
+- It is a good practice to verify that the correct interfaces are running OSPF after making changes to the OSPF configuration
+
+- Display the OSPF-enabled interfaces:
+
+```
+show ip ospf interface [brief | interface-id]
+```
+
