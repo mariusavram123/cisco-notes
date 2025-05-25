@@ -550,3 +550,403 @@ conf t
 show ip ospf interface [brief | interface-id]
 ```
 
+- R1:
+
+```
+R1#show ip ospf interface 
+Loopback0 is up, line protocol is up 
+  Internet Address 192.168.1.1/32, Interface ID 7, Area 0
+  Attached via Network Statement
+  Process ID 1, Router ID 192.168.1.1, Network Type LOOPBACK, Cost: 1
+  Topology-MTID    Cost    Disabled    Shutdown      Topology Name
+        0           1         no          no            Base
+  Loopback interface is treated as a stub Host
+GigabitEthernet0/2 is up, line protocol is up 
+  Internet Address 10.1.1.1/24, Interface ID 4, Area 0
+  Attached via Network Statement
+  Process ID 1, Router ID 192.168.1.1, Network Type BROADCAST, Cost: 10
+  Topology-MTID    Cost    Disabled    Shutdown      Topology Name
+        0           1        no          no            Base
+  Transmit Delay is 1 sec, State DR, Priority 1
+  Designated Router (ID) 192.168.1.1, Interface address 10.1.1.1
+  No backup designated router on this network
+  Timer intervals configured, Hello 10, Dead 40, Wait 40, Retransmit 5
+    oob-resync timeout 40
+    No Hellos (Passive interface) 
+  Supports Link-local Signaling (LLS)
+  Cisco NSF helper support enabled
+  IETF NSF helper support enabled
+  Can be protected by per-prefix Loop-Free FastReroute
+  Can be used for per-prefix Loop-Free FastReroute repair paths
+  Not Protected by per-prefix TI-LFA
+  Index 1/2/2, flood queue length 0
+  Next 0x0(0)/0x0(0)/0x0(0)
+  Last flood scan length is 0, maximum is 0
+  Last flood scan time is 0 msec, maximum is 0 msec
+  Neighbor Count is 0, Adjacent neighbor count is 0 
+  Suppress hello for 0 neighbor(s)
+GigabitEthernet0/1 is up, line protocol is up 
+  Internet Address 10.123.4.1/24, Interface ID 3, Area 0
+  Attached via Network Statement
+  Process ID 1, Router ID 192.168.1.1, Network Type BROADCAST, Cost: 10
+  Topology-MTID    Cost    Disabled    Shutdown      Topology Name
+        0           1        no          no            Base
+  Transmit Delay is 1 sec, State DROTHER, Priority 1
+  Designated Router (ID) 192.168.4.4, Interface address 10.123.4.4
+  Backup Designated router (ID) 192.168.3.3, Interface address 10.123.4.3
+  Old designated Router (ID) 192.168.3.3, Interface address 10.123.4.3
+  Flush timer for old DR LSA due in 00:01:41
+  Timer intervals configured, Hello 10, Dead 40, Wait 40, Retransmit 5
+    oob-resync timeout 40
+    Hello due in 00:00:07
+  Supports Link-local Signaling (LLS)
+  Cisco NSF helper support enabled
+  IETF NSF helper support enabled
+  Can be protected by per-prefix Loop-Free FastReroute
+  Can be used for per-prefix Loop-Free FastReroute repair paths
+  Not Protected by per-prefix TI-LFA
+  Index 1/1/1, flood queue length 0
+  Next 0x0(0)/0x0(0)/0x0(0)
+  Last flood scan length is 0, maximum is 1
+  Last flood scan time is 0 msec, maximum is 0 msec
+  Neighbor Count is 3, Adjacent neighbor count is 2 
+    Adjacent with neighbor 192.168.3.3  (Backup Designated Router)
+    Adjacent with neighbor 192.168.4.4  (Designated Router)
+  Suppress hello for 0 neighbor(s)
+```
+
+- Output of `show ip ospf interface brief`:
+
+- R1:
+
+```
+R1#show ip ospf interface brief 
+Interface    PID   Area            IP Address/Mask    Cost  State Nbrs F/C
+Lo0          1     0               192.168.1.1/32     1     LOOP  0/0
+Gi0/2        1     0               10.1.1.1/24        1     DR    0/0
+Gi0/1        1     0               10.123.4.1/24      1     DROTH 2/3
+```
+
+- R2:
+
+```
+R2#show ip ospf interface brief 
+Interface    PID   Area            IP Address/Mask    Cost  State Nbrs F/C
+Lo0          1     0               192.168.2.2/32     1     LOOP  0/0
+Gi0/2        1     0               10.2.2.2/24        1     DR    0/0
+Gi0/1        1     0               10.123.4.2/24      1     DROTH 2/3
+```
+
+- R3:
+
+```
+R3#show ip ospf interface brief 
+Interface    PID   Area            IP Address/Mask    Cost  State Nbrs F/C
+Lo0          1     0               192.168.3.3/32     1     LOOP  0/0
+Gi0/1        1     0               10.123.4.3/24      1     BDR   3/3
+Gi0/2        1     0               10.3.3.3/24        1     DR    0/0
+```
+
+- R4:
+
+```
+R4#show ip ospf interface brief 
+Interface    PID   Area            IP Address/Mask    Cost  State Nbrs F/C
+Lo0          1     0               192.168.4.4/32     1     LOOP  0/0
+Gi0/2        1     0               10.4.4.4/24        1     DR    0/0
+Gi0/1        1     0               10.123.4.4/24      1     DR    3/3
+```
+
+- OSPF Interface Columns:
+
+	- Interface: Interfaces with OSPF enabled
+
+	- PID: OSPF process ID associated with this interface
+
+	- Area: The area that this interface is associated with
+
+	- IP Address/Mask: The IP address and subnet mask for the interface
+
+	- Cost: The cost metric assigned to an interface that is used to calculate a path metric
+
+	- State: The current interface state, which could be DR, BDR, DROTHER, LOOP, or Down
+
+	- Nbrs F: The number of neighbor OSPF routers for a segment that are fully adjacent
+
+	- Nbrs C: The number of neighbor OSPF routers that have been detected and are in a 2-Way state
+
+- The DROTHER is a router on the DR-enabled segment that is not the DR or the BDR; it is simply the other router
+
+- DROTHERS does not establish full adjacency with other DROTHERs
+
+#### Verification of OSPF Neighbor Adjacencies
+
+- Viewing the OSPF neighbor table
+
+```
+show ip ospf neighbor [detail]
+```
+
+- Example output:
+
+- R1:
+
+```
+R1#show ip ospf neighbor 
+
+Neighbor ID     Pri   State           Dead Time   Address         Interface
+192.168.2.2       1   2WAY/DROTHER    00:00:37    10.123.4.2      GigabitEthernet0/1
+192.168.3.3       1   FULL/BDR        00:00:31    10.123.4.3      GigabitEthernet0/1
+192.168.4.4       1   FULL/DR         00:00:35    10.123.4.4      GigabitEthernet0/1
+```
+
+- R2:
+
+```
+R2#show ip ospf neighbor 
+
+Neighbor ID     Pri   State           Dead Time   Address         Interface
+192.168.1.1       1   2WAY/DROTHER    00:00:36    10.123.4.1      GigabitEthernet0/1
+192.168.3.3       1   FULL/BDR        00:00:32    10.123.4.3      GigabitEthernet0/1
+192.168.4.4       1   FULL/DR         00:00:33    10.123.4.4      GigabitEthernet0/1
+```
+
+- R3:
+
+```
+R3#show ip ospf neighbor 
+
+Neighbor ID     Pri   State           Dead Time   Address         Interface
+192.168.1.1       1   FULL/DROTHER    00:00:34    10.123.4.1      GigabitEthernet0/1
+192.168.2.2       1   FULL/DROTHER    00:00:37    10.123.4.2      GigabitEthernet0/1
+192.168.4.4       1   FULL/DR         00:00:33    10.123.4.4      GigabitEthernet0/1
+```
+
+- R4:
+
+```
+R4#show ip ospf neighbor 
+
+Neighbor ID     Pri   State           Dead Time   Address         Interface
+192.168.1.1       1   FULL/DROTHER    00:00:37    10.123.4.1      Ethernet0/1
+192.168.2.2       1   FULL/DROTHER    00:00:31    10.123.4.2      Ethernet0/1
+192.168.3.3       1   FULL/BDR        00:00:37    10.123.4.3      Ethernet0/1
+```
+
+- The neighbor states on R1 identify R3 as the BDR and R4 as the DR. R3 and R4 idenfify R1 and R2 as DROTHER in the output
+
+- Overview of the fields in the neighbors table:
+
+	- Neighbor ID: The router ID (RID) of the neighboring router
+
+	- Pri: The priority of the neighbor's interface, which is used for DR/BRD elections
+
+	- State: The first field is the neighbor state. The second field is the DR/BDR or DROTHER role if the interface requires a DR. For non-DR network links, the second field shows just a hyphen (-)
+
+	- Dead Time: The time left until the router is declared unreachable
+
+	- Address: The primary IP address for the OSPF neighbor
+
+	- Interface: The local interface to which the OSPF neighbor is attached
+
+#### Verification of OSPF Routes
+
+- The next step is to verify the OSPF routes installed into the IP routing table
+
+- Show the OSPF routes installed into the Routing Information Base (RIB):
+
+```
+show ip route ospf
+```
+
+- Verifying the OSPF routes on R1:
+
+```
+R1#show ip route ospf
+Codes: L - local, C - connected, S - static, R - RIP, M - mobile, B - BGP
+       D - EIGRP, EX - EIGRP external, O - OSPF, IA - OSPF inter area 
+       N1 - OSPF NSSA external type 1, N2 - OSPF NSSA external type 2
+       E1 - OSPF external type 1, E2 - OSPF external type 2, m - OMP
+       n - NAT, Ni - NAT inside, No - NAT outside, Nd - NAT DIA
+       i - IS-IS, su - IS-IS summary, L1 - IS-IS level-1, L2 - IS-IS level-2
+       ia - IS-IS inter area, * - candidate default, U - per-user static route
+       H - NHRP, G - NHRP registered, g - NHRP registration summary
+       o - ODR, P - periodic downloaded static route, l - LISP
+       a - application route
+       + - replicated route, % - next hop override, p - overrides from PfR
+       & - replicated local route overrides by connected
+
+Gateway of last resort is not set
+
+      10.0.0.0/8 is variably subnetted, 7 subnets, 2 masks
+O        10.2.2.0/24 [110/2] via 10.123.4.2, 00:37:39, GigabitEthernet0/1
+O        10.3.3.0/24 [110/2] via 10.123.4.3, 00:37:39, GigabitEthernet0/1
+O        10.4.4.0/24 [110/2] via 10.123.4.4, 00:37:43, GigabitEthernet0/1
+      192.168.2.0/32 is subnetted, 1 subnets
+O        192.168.2.2 [110/2] via 10.123.4.2, 00:37:39, GigabitEthernet0/1
+      192.168.3.0/32 is subnetted, 1 subnets
+O        192.168.3.3 [110/2] via 10.123.4.3, 00:37:39, GigabitEthernet0/1
+      192.168.4.0/32 is subnetted, 1 subnets
+O        192.168.4.4 [110/2] via 10.123.4.4, 00:37:43, GigabitEthernet0/1
+```
+
+- In the output, where two sets of numbers are in the brackets (for example [110/2]), the first number is the administrative distance (AD), which is 110 by default for OSPF, and the second number is the metric of the path used for that network
+
+- The output for R2, R3 and R4 would be similar with the output for R1
+
+- The terms `path cost` and `path metric` are synonymous from OSPFs perspective
+
+### Default Route Advertisement
+
+- OSPF supports advertising the default route into the OSPF domain
+
+- Advertising the default route underneath the OSPF process:
+
+```
+conf t
+ router ospf 1
+  default-information originate <always> <metric metric-value> <metric-type metric-type> 
+```
+
+- If a default route does not exist in a routing table, the `always` optional keyword advertises a default route even if a default route does not exist in the RIB
+
+- In addition, the route metric can be changed with the `metric <metric-value>` option, and the metric type can be changed with the `metric-type <type-value>` option
+
+- In the below example R1 has a static route to a firewall that is connected to the Internet. To provide connectivity to other parts of the network (for example R2 and R3), R1 advertises a default route into OSPF
+
+![topology](./ospf-default-route-adv.png)
+
+- Configuration on R1:
+
+```
+conf t
+ ip route 0.0.0.0 0.0.0.0 100.64.1.2
+ router ospf 1
+  network 10.0.0.0 0.255.255.255 area 0
+  default-information originate
+```
+
+- Notice that R1 has a static default route to the firewall (100.64.1.2) to satisfy the requirement of having a default route in the RIB
+
+- Routing tables of R2 and R3. Notice that R1 advertises the OSPF route as an external OSPF route
+
+- R2:
+
+```
+show ip route | begin Gateway
+
+(...)
+O*E2	0.0.0.0/0 [110/1] via 10.12.1.1, 00:02:56, GigabitEthernet0/1
+(...)
+```
+
+- R3:
+
+```
+show ip route | begin Gateway
+
+(...)
+O*E2	0.0.0.0/0 [110/1] via 10.23.1.2, 00:02:56, GigabitEthernet0/1
+(...)
+```
+
+### Common OSPF Optimizations
+
+- Almost every network requires tunning based on the equipment, technical requirements, or a variety of other factors
+
+- The following sections explain the common concepts for tuning an OSPF network
+
+#### Link Costs
+
+- Interface cost is an essential component of Dijikstra's SPF calculation because the shortest path metric is based on the cummulative interface cost (that is, metric) from the router to the destination
+
+- OSPF assigns the OSPF link cost (that is, metric) for an interface by using the formula: 
+
+Cost = Reference Bandwidth/Interface Bandwidth
+
+- The default reference bandwidth is 100 Mbps
+
+- OSPF cost for common network interface types using the default reference bandwidth:
+
+```
+Interface Type				OSPF Cost
+T1							64
+Ethernet					10
+FastEthernet				1
+GigabitEthernet				1
+10 GigabitEthernet			1
+```
+
+- Notice that there is no differenciation in the link cost associated with a FastEthernet interface and a 10 GigabitEthernet interface
+
+- Changing the reference bandwidth to a higher value allows for differentiation of cost between higher-speed interfaces
+
+- Making the value too high could cause issues because low-bandwidth interfaces would not be destinguishable
+
+- The OSPF LSA metric field is 16 bits, and the interface cost cannot exceed 65535
+
+- Changing the reference bandwidth for all OSPF interfaces associated with that process:
+
+```
+conf t
+ router ospf 1
+  auto-cost reference-bandwidth <bandwidth-in-mbps>
+```
+
+- If the reference bandwidth is changed on one router, the reference bandwidth should be changed on all OSPF routers to ensure that SPF uses the same logic to prevent routing loops
+
+- It is a best practice to set the same reference bandwidth for all OSPF routers
+
+- Setting the OSPF cost manually per interface:
+
+```
+conf t
+ interface g0/1
+  ip ospf cost <1-65535>
+```
+
+- While the interface cost is limited to 65535 because of LSA field limitations, the path metric can exceed a 16-bit value (65535) because all the link metrics are calculated locally
+
+#### Failure Detection
+
+- A secondary function of OSPF hello packets is to ensure that adjacent OSPF neighbors are still healthy and available
+
+- OSPF sends hello packets at set intervals, based on the hello timer
+
+- OSPF uses a second timer called the *OSPF dead interval timer*, which defaults to four times the hello timer
+
+- Upon receipt of a hello packet from a neighboring router, the OSPF dead timer resets to the initial value and then starts to decrement again
+
+- If a router does not receive a hello before the OSPF dead interval timer reaches 0, the neighbor state is changed to down
+
+- The OSPF router immediately sends out the appropriate LSA, reflecting the topology change, and the SPF algorithm processes on all routers within the area
+
+##### Hello Timer
+
+- The default OSPF hello timer interval varies based on the OSPF network type
+
+- OSPF allows modification to the hello timer interval with values between 1 and 65535 seconds
+
+- Changing the hello timer interval modifies the default dead interval, too
+
+- Modifying the OSPF hello timer interval on an OSPF-enabled interface:
+
+```
+conf t
+ interface gi0/1
+  ip ospf hello-interval <1 - 65535>
+```
+
+##### Dead Interval Timer
+
+- The dead interval timer can be changed to a value between 1 and 65535 seconds
+
+- Modifying the OSPF dead interval timer on an OSPF-enabled interface:
+
+```
+conf t
+ interface gi0/1
+  ip ospf dead-interval <1 - 65535>
+```
+
+- Always make sure that the dead interval timer setting is greater than the hello timer setting to ensure that the dead interval timer does not reach 0 between hello packets
