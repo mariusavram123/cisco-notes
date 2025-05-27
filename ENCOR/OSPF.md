@@ -950,3 +950,414 @@ conf t
 ```
 
 - Always make sure that the dead interval timer setting is greater than the hello timer setting to ensure that the dead interval timer does not reach 0 between hello packets
+
+#### Verifying OSPF Timers
+
+- Viewing the timers for an OSPF interface:
+
+```
+show ip ospf interface
+```
+
+```
+show ip ospf interface | i Timer|line
+
+GigabitEthernet0/2 is up, line protocol is up
+	Timer intervals configured, Hello 10, Dead 40, Wait 40, Retransmit 5
+GigabitEthernet0/1 is up, line protocol is up
+	Timer intervals configured, Hello 10, Dead 40, Wait 40, Retransmit 5
+```
+
+#### DR Placement
+
+- The DR and BDR roles for a broadcast network consume CPU and memory on the host routers in order to maintain states with all other routers for that segment
+
+- Placing the DR and BDR roles on routers with adequate resources is recommended
+
+- In the following section the DR election process and how the DR role can be assigned to specific hardware
+
+#### Designated Router Elections
+
+- The DR/BDR election occurs during OSPF neighborship - specifically during the last phase of 2-Way neighbor state and just before the ExStart state
+
+- When the router enters the 2-Way state, it has already received a hello from it's neighbor
+
+- If the hello packets includes a RID other than 0.0.0.0 for the DR and BDR, the new router assumes that the current routers are the actual DR and BDR
+
+- Any router with OSPF priority of 1 to 255 on it's OSPF interface attempts to become the DR
+
+- By default, all OSPF interfaces use a priority of 1
+
+- The routers place their RID and OSPF priorities in their OSPF hellos for that segment
+
+- Routers then receive and examine OSPF hellos from neighboring routers
+
+- If a router identifies itself as being more favorable router than the OSPF hellos it receives, it continues to send out hellos with it's RID and priority listed
+
+- If the hello received is more favorable, the router updates it's OSPF hello packet to use the more preferable RID in the DR field
+
+- OSPF deems a router more preferable if the priority for the interface is the highest for that segment
+
+- If the OSPF priority is the same, the higher RID is more favorable
+
+- Once all the routers have agreed on the same DR, all routers for that segment become adjacent with the DR
+
+- Then the election for the BDR takes place
+
+- The election follows the same logic for the DR election, except that the DR does not add it's RID to the BDR field of the hello packet
+
+- The OSPF DR and BDR roles cannot be preempted after the DR/BDR election 
+
+- Upon only the failure (or process restart of the DR and BDR) does the election start to replace the role that is missing
+
+- To ensure that all routers on a segment have fully initialized, OSPF initiates a wait timer when OSPF hello packets do not contain a DR/BDR router for a segment
+
+- The default value for wait timer is the dead interval timer
+
+- Once the wait timer has expired, a router participates in the DR election 
+
+- The wait timer starts when OSPF first starts on an interface; so that a router can still elect itself as the DR for a segment without other OSPF routers, it waits until the wait timer expires
+
+- The easiest way to view the OSPF's role for an interface:
+
+```
+show ip ospf interface brief
+```
+
+- Executing the above command on R1 and R3 of our sample topology:
+
+- R1:
+
+```
+R1#show ip ospf int brief
+Interface    PID   Area            IP Address/Mask    Cost  State Nbrs F/C
+Lo0          1     0               192.168.1.1/32     1     LOOP  0/0
+Gi0/2        1     0               10.1.1.1/24        1     DR    0/0
+Gi0/1        1     0               10.123.4.1/24      1     DROTH 2/3
+```
+
+- R3:
+
+```
+R3#show ip ospf interface brief 
+Interface    PID   Area            IP Address/Mask    Cost  State Nbrs F/C
+Lo0          1     0               192.168.3.3/32     1     LOOP  0/0
+Gi0/1        1     0               10.123.4.3/24      1     BDR   3/3
+Gi0/2        1     0               10.3.3.3/24        1     DR    0/0
+```
+
+- Notice that R1's Gi0/2 interface is the DR for the 10.1.1.0/24 network (as no other router is present), and R1's Gi0/1 interface is DROTHER for the 10.123.4.0/24 network
+
+- R3's G0/1 interface is the BDR for 10.123.4.0/24 network segment
+
+- The neighbor's full adjacency field reflects the number of routers that have become adjacent on that network segment; the neighbors count field is the number of other OSPF routers on that segment
+
+- You might assume that all routers will become adjacent with each other, but that would defeat the purpose of using a DR
+
+- Only the DR and BDR become adjacent with routers on a network segment
+
+#### DR and BDR placement
+
+- In our example, R4 won the DR election, and R3 won the BDR election because all OSPF routers had the same OSPF priority, so the next decision point was the higher RID
+
+- The RIDs matched the Loopback 0 interface IP addresses, and R4's loopback address is the highest on that segment; R3's is the second highest
+
+- Modifying a router's RID for DR placement is a bad design strategy
+
+- A better technique involves modifying the interface priority to a higher value than the existing DR has
+
+- In our current topology, the DR role for the segment (10.123.4.0/24) requires that the priority change to a higher value than 1 (the existing DR's priority) on the desired node
+
+- Remember that OSPF does not preempt the DR or BDR roles, and the OSPF process might need to be restarted on the current DR/BDR for the changes to take effect
+
+- Configuring the OSPF interface priority manually:
+
+```
+conf t
+ interface gi0/1
+  ip ospf priority <1-255>
+```
+
+- Setting an interface priority to 0 removes that interface from the DR/BDR election immediately
+
+- Raising the priority above the default value (1) makes the interface more favorable compared to interfaces with the default value
+
+![topology](./ospf-dr-bdr-placement.png)
+
+- The above topology example illustrate modification of DR/BDR placement in a network segment
+
+- R4 should never become the DR/BDR for the 10.123.4.0/24 segment, and R1 should always become the DR for the 10.123.4.0/24 segment
+
+- To prevent R4 from entering into the DR/BDR election, the OSPF priority changes to 0
+
+- R1's interface priority will change to a value higher than 1 to ensure that it always win the DR election
+
+- No configuration changes have occured on R2 and R3
+
+- R1 and R4 configuration:
+
+- R1:
+
+```
+conf t
+ interface gi0/1
+  ip ospf priority 100
+```
+
+- R4:
+
+```
+conf t
+ interface gi0/2
+  ip ospf priority 0
+```
+
+- Notice that upon configuring the interface priority to 0, the neighbor state with R1 changed
+
+- When the interface DR priority changed to 0, R4 removed itself as DR, R3 has promoted from the BDR to the DR, and then R1 was elected to the BDR
+
+- Because R1 is now a BDR, any half-open neighborship were allowed to progress with establishing a complete neighborship with other routers
+
+- Checking the status of the topology on R2, R1 shows a priority of 100, and R4 shows a priority of 0
+
+```
+R2#show ip ospf neighbor 
+
+Neighbor ID     Pri   State           Dead Time   Address         Interface
+192.168.1.1     100   FULL/BDR        00:00:37    10.123.4.1      GigabitEthernet0/1
+192.168.3.3       1   FULL/DR         00:00:37    10.123.4.3      GigabitEthernet0/1
+192.168.4.4       0   2WAY/DROTHER    00:00:35    10.123.4.4      GigabitEthernet0/1
+```
+
+- However, R1 is in the BDR position and not the DR role, as intended
+
+- The example shows normal operation because the DR/BDR role does not support preemption
+
+- If all routers started on the same time, R1 would be the DR because of the wait timer in the initial OSPF DR election process
+
+- To complete the migration of the DR to R1, the OSPF process must be restarted on R3
+
+- After the process is restarted, the OSPF neighborship is checked again and now R1 is the DR for the 10.123.4.0/24 network segment
+
+```
+R3#clear ip ospf process
+Reset ALL OSPF processes? [no]: yes
+R3#
+*May 26 18:29:34.295: %OSPF-5-ADJCHG: Process 1, Nbr 192.168.1.1 on GigabitEthernet0/1 from FULL to DOWN, Neighbor Down: Interface down or detached
+*May 26 18:29:34.295: %OSPF-5-ADJCHG: Process 1, Nbr 192.168.2.2 on GigabitEthernet0/1 from FULL to DOWN, Neighbor Down: Interface down or detached
+*May 26 18:29:34.295: %OSPF-5-ADJCHG: Process 1, Nbr 192.168.4.4 on GigabitEthernet0/1 from FULL to DOWN, Neighbor Down: Interface down or detached
+*May 26 18:29:34.298: %OSPF-5-ADJCHG: Process 1, Nbr 192.168.1.1 on GigabitEthernet0/1 from LOADING to FULL, Loading Done
+*May 26 18:29:34.298: %OSPF-5-ADJCHG: Process 1, Nbr 192.168.2.2 on GigabitEthernet0/1 from LOADING to FULL, Loading Done
+```
+
+```
+R3#show ip ospf neighbor 
+
+Neighbor ID     Pri   State           Dead Time   Address         Interface
+192.168.1.1     100   FULL/DR         00:00:38    10.123.4.1      GigabitEthernet0/1
+192.168.2.2       1   FULL/DROTHER    00:00:38    10.123.4.2      GigabitEthernet0/1
+192.168.4.4       0   FULL/DROTHER    00:00:39    10.123.4.4      GigabitEthernet0/1
+```
+
+### OSPF Network Types
+
+- Different media provide different characteristics or might limit the number of nodes allowed on a segment
+
+- Frame-Relay and Ethernet are a common multi-access media, and because they support more than two nodes on a network segment, the need for a DR exists
+
+- Other network circuits, such as serial links (with HDLC or PPP encapsulation), do not require a DR, and having one would just waste router CPU cycles
+
+- The default OSPF network type is set based on the media used for the connection and can be changed independently of the actual media type used
+
+- Cisco's implementation of OSPF considers the various media and provides five OSPF network types:
+
+	- **Broadcast**: Default settings on OSPF-enabled Ethernet links, DR/BDR field in OSPF hellos: yes, Timers: Hello: 10, Wait: 40, Dead: 40
+
+	- **Non-broadcast**: Default setting on OSPF-enabled Frame Relay main interface or Frame Relay multipoint subinterfaces, DR/BDR field in OSPF hellos: yes, Timers: Hello: 30, Wait: 120, Dead 120
+
+	- **Point-to-point**": Default setting on OSPF-enabled Frame Relay point-to-point subinterfaces, DR/BDR field in OSPF hellos: no, Timers: Hello: 10, Wait: 40, Dead: 40
+
+	- **Point-to-multipoint**: Not enabled by default on any interface type. Interface is advertised as a host route (/32) and sets the next hop address to the outbound interface. Primarly used for hub and spoke topologies. DR/BDR field in OSPF hello: no, Timers: Hello:30, Wait: 120, Dead: 120
+
+	- **Loopback**: Default setting on OSPF-enabled loopback interfaces. Interface is advertised as a host route (/32). DR/BDR field in OSPF hellos: N/A, Timers: N/A
+
+#### Broadcast
+
+- Broadcast media such as Ethernet are better defined as broadcast multi-access to distinguish them from non-broadcast multi-access (NBMA) networks
+
+- Broadcast networks are multi-access in that they are capable of connecting more than two devices, and broadcasts sent out one interface are capable of reaching all interfaces attached to that segment
+
+- The OSPF network type is set to broadcast by default for Ethernet interfaces
+
+- A DR is required for this OSPF network type because of the possibility that multiple nodes can exist on a segment, and LSA flooding needs to be controlled
+
+- The hello timer defaults to 10 seconds, as defined in RFC 2328
+
+- Overriding the automatically configured setting and statically setting an interface as an OSPF broadcast network type:
+
+```
+conf t
+ interface gi0/1
+  ip ospf network broadcast
+```
+
+#### Point-to-Point Networks
+
+- A network circuit that allows only two devices to communicate is considered a point-to-point (P2P) network
+
+- Because of the nature of the medium, point-to-point networks do not use Address Resolution Protocol (ARP), and broadcast traffic does not become the limiting factor
+
+- The OSPF network type is set to point-to-point by default on serial interfaces (HDLC or PPP encapsulation), generic routing encapsulation (GRE) tunnels, and point-to-point serial subinterfaces
+
+- Only two nodes can exist on this type of network medium, so OSPF does not waste CPU cycles on DR functionality
+
+- The hello timer is set to 10 seconds on OSPF point-to-point network types
+
+![topology](./OSPF-point-to-point-network.png)
+
+- Relevant serial interface and OSPF configuration for R1 and R2:
+
+- R1:
+
+```
+conf t
+ interface serial 0/1
+  ip address 10.12.1.1 255.255.255.252
+
+ router ospf 1
+  router-id 192.168.1.1
+  network 0.0.0.0 255.255.255.255 area 0
+```
+
+- R2:
+
+```
+conf t
+ interface serial 0/1
+  ip address 10.12.1.2 255.255.255.252
+
+ router ospf 1
+  router-id 192.168.2.2
+  network 0.0.0.0 255.255.255.255 area 0
+```
+
+- Notice that there are not any special commands placed into configuration
+
+- Verifying that the OSPF network type is set to POINT_TO_POINT on these interfaces:
+
+- R1:
+
+```
+show ip ospf interface s0/1 | include Type
+	Process ID 1, Router ID 192.168.1.1, Network type POINT_TO_POINT, Cost 64
+```
+
+- R2:
+
+```
+show ip ospf interface s0/1 | include Type
+	Process ID 1, Router ID 192.168.2.2, Network type POINT_TO_POINT, Cost 64
+```
+
+- Point-to-point OSPF network type does not use a DR. Notice the hyphen (-) in the State field
+
+- R1:
+
+```
+show ip ospf neighbor
+
+Neighbor ID		PRI			State			Dead time		Address			Interface
+192.168.2.2		0			FULL/  -  		00:00:36		10.12.1.2		Serial0/1
+```
+
+- Interfaces using an OSPF P2P network type form an OSPF adjacency more quickly because the DR election is bypassed, and there is no wait timer
+
+- Ethernet interfaces that are directly connected with only two OSPF speakers in the subnet could be changed to the OSPF point-to-point network type to form adjacencies more quickly and to simplify the SPF computation
+
+- Setting an interface as OSPF point-to-point network type:
+
+```
+conf t
+ interface gi0/1
+  ip ospf network point-to-point
+```
+
+#### Loopback Networks
+
+- The OSPF network type loopback is enabled by default for loopback interfaces and can be used only on loopback interfaces
+
+- The OSPF loopback network type states that the IP address is always advertised with a /32 prefix length, even if the IP address configured on the loopback interface does not have a /32 prefix length
+
+- It is possible to demonstrate this by configuring a loopback interface on the above topology
+
+- Configuration:
+
+- R1:
+
+```
+conf t
+ interface l0
+  ip address 192.168.1.1 255.255.255.0
+
+ interface serial 0/0
+  ip address 10.12.1.1 255.255.255.252
+
+ router ospf 1
+  router-if 192.168.1.1
+  network 0.0.0.0 255.255.255.255 area 0
+```
+
+- R2:
+
+```
+conf t
+ interface l0
+  ip address 192.168.2.2 255.255.255.0
+  ip ospf network point-to-point
+ 
+ interface serial 0/0
+  ip address 10.12.1.2 255.255.255.252
+
+ router ospf 1
+  router-id 192.168.2.2
+  network 0.0.0.0 255.255.255.255 area 0
+```
+
+- The network types for R1 and R2 loopback interfaces are checked to verify they are changed and are different:
+
+- R1:
+
+```
+show ip ospf interface Loopback 0 | include Type
+	Process ID 1, Router ID 192.168.1.1, Network Type LOOPBACK, Cost 1
+```
+
+- R2:
+
+```
+show ip ospf interface Loopback 0 | include Type
+	Process ID 1, Router ID 192.168.2.2, Network Type POINT_TO_POINT, Cost 1
+```
+
+- Showing R1 and R2's routing tables:
+
+- R1:
+
+```
+show ip route ospf
+
+O 192.168.2.0/24 [110/65] via 10.12.1.2, 00:02:49, Serial0/0
+```
+
+- R2:
+
+```
+show ip route ospf
+
+	192.168.1.0/32 is subnetted, 1 subnets
+O		192.168.1.1 [110/65] via 10.12.1.1, 00:37:15, Serial0/0
+```
+
+- Notice that R1's loopback address is a /32 network and R2's loopback address is a /24 network
+
+- Both loopbacks were configured with a /24 network; however, because R1's Lo0 is an OSPF network type of loopback, it is advertised as a /32 network
