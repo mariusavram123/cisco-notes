@@ -527,5 +527,380 @@ Routing entry for 10.4.4.0/24
 
 - All interarea paths for a route must go through Area 0 to be considered
 
+![interarea-routes](./ospf-interarea-routes.png)
 
+- In the above picture R1 is computing the path to R6
+
+- R1 uses the path R1-R3-R5-R6 because it's total path metric is 35 versus R1-R2-R4-R6 path, with a metric of 40
+
+#### Equal-Cost Multipathing
+
+- If OSPF identifies multiple paths in the path selection algorithms, these routes are installed into the routing table as equal-cost multipathing (ECMP) routes
+
+- The default maximum number of ECMP paths is four paths
+
+- Modifying the default ECMP setting:
+
+```
+conf t
+ router ospf 1
+ maximum-paths <number>
+```
+
+### Summarization of Routes
+
+- Route scalability is a large factor for IGP routing protocols used by service providers because there can be thousands of routers running on a network
+
+- Splitting up an OSPF routing domain into multiple areas reduce the size of the LSDB for each area
+
+- While the number of routers and networks remain the same within the OSPF routing domain, the detailed type 1 and type 2 LSAs are exchanged for simpler type 3 LSAs
+
+- For example, in our multiarea topology (Area 1234, Area 0, Area 56), for Area 1234 there are three type 1 LSAs and one type 2 LSA for the 10.123.1.0/24 network
+
+- These four LSAs become one type 3 LSA outside of Area 1234
+
+![lsa-reduction](./lsa-reduction-area-segmentation.png)
+
+- The above scheme illustrates the reduction of LSAs through area segmentation for the 10.123.1.0/24 network
+
+#### Summarization Fundamentals
+
+- Another method of shrinking the LSDB involves summarizing network prefixes
+
+- Newer routers have more memory and faster processors than those in the past, but because all routers have an identical copy of the LSDB, an OSPF area needs to accomodate the smallest and slowest router in that area
+
+- Summarization of routes also helps SPF calculations run faster
+
+- A router that has 10000 network entries will take longer to run the SPF calculation than a router with 500 network entries
+
+- Because all routers within an area must maintain an identical copy of the LSDB, summarization occurs between areas on the ABRs
+
+- Summarization can eliminate the SPF calculation outside the area for the summarized prefixes because the smaller prefixes are hidden
+
+![summary-route](./summary-route-ospf-1.png)
+
+- In the above topology where the serial link between R3 and R5 adds to the path metric, and all traffic uses the other path to reach the 172.16.46.0/24 network
+
+- If the 10.1.12.0/24 link fails, all routers in Area 1 have to run SPF calculation
+
+- R4 identifies that the 10.1.13.0/24 and 10.1.34.0/24 networks will change their next hop through the serial link
+
+- Both the type 3 LSAs for these networks need to be updated with the new path metric and advertised into Area 0
+
+- The routers in Area 0 run an SPF calculation only on those two prefixes
+
+![summary-route2](./ospf-summarization-2.png)
+
+- The above diagram shows the networks in Area 1 being summarized at the ABR into the aggregate 10.1.0.0/18 prefix
+
+- If the 10.1.12.0/24 link fails, all the routers in Area 1 still needs to run the SPF calculation, but routers in Area 0 are not impacted because the 10.1.13.0/24 and 10.1.34.0/24 networks are not known outside Area 1
+
+- This concept applies to networks of various sizes but is beneficial for networks with carefully developed IP addressing scheme and proper summarization
+
+#### Interarea Summarization
+
+- Interarea summarization reduces the number of type 3 LSAs that an ABR advertises into an area when it receives type 1 LSA
+
+- The network summarization range is associated with a specific source area for type 1 LSAs
+
+- When a type 1 LSA within the summarization range reaches the ABR from the source area, the ABR creates a type 3 LSA for the summarized network range
+
+- The ABR suppresses the more specific type 3 LSAs thereby preventing the generation of the subordinate route's type 3 LSAs
+
+- Interarea summarization does not impact the type 1 LSAs in the source area
+
+![summary-lsas](./summarization-lsas.png)
+
+- In the above scheme, 15 type 1 LSAs (172.16.1.0/24 through 172.16.15.0/24) being summarized into one type 3 LSA (the 172.16.0.0/20 network)
+
+- Summarization works only on type 1 LSAs and is normally configured (or designed) so that summarization occurs as routers enter the backbone from nonbackbone areas
+
+#### Summarization Metrics
+
+- The default metric for the summary LSA is the smallest metric associated with an LSA; however, it can be set as part of the configuration
+
+![summarization-metric](./interarea-summarization-metric1.png)
+
+- In the above topology R1 summarizes three prefixes with various path costs
+
+- The 172.16.3.0/24 prefix has the lowest metric so that metric is used for the summarized route
+
+- OSPF behaves identically to Enhanced Interior Gateway Routing Protocol (EIGRP) and checks every prefix within the summarization range when a matching type 1 LSA is added or removed
+
+- If a lower metric is available, the summary LSA is advertised with the newer metric; if the lower metric is removed, a newer and higher metric is identified, and a new summary LSA is advertised with the higher metric
+
+#### Configuration of Interarea Summarization
+
+- Defining the summarization range and associated area under the OSPF process on the ABR:
+
+```
+conf t
+ router ospf 1
+  area <id> range <network> <subnet_mask> [advertise | not-advertise] [cost <metric>]
+```
+
+- The default behaviour is to advertise the summary prefix so the keyword `advertise` is not necessary
+
+- Appending the `cost <metric>` keyword to the command statically sets the metric on the summary route
+
+![summary-advertisement](./summary-advertisement-topology.png)
+
+- In the above topology R1 advertises the 172.16.1.0/24, 172.16.2.0/24 and 172.16.3.0/24 prefixes
+
+- Routing table of router R3 before summarization. Notice that 172.16.1.0/24, 172.16.2.0/24 and 172.16.3.0/24 networks are all present
+
+```
+show ip route ospf | b Gateway
+
+O IA		10.12.1.0/24 [110/20] via 10.23.1.2, 00:02:22, GigabitEthernet0/1
+
+O IA		172.16.1.0 [110/3] via 10.23.1.2, 00:02:12, GigabitEthernet0/1
+O IA		172.16.2.0 [110/3] via 10.23.1.2, 00:02:12, GigabitEthernet0/1
+O IA		172.16.3.0 [110/3] via 10.23.1.2, 00:02:12, GigabitEthernet0/1
+```
+
+- R2 summarizes the 172.16.1.0/24, 172.16.2.0/24 and 172.16.3.0/24 networks into a single summary network 172.16.0.0/16, as those networks are advertised into Area 0
+
+- R2's configuration for interarea summarization into an aggregate route of 172.16.0.0/16. A static cost of 45 is added to the summary route to reduce CPU load if any of the three networks flap
+
+```
+conf t
+ router ospf 1
+  router-id 192.168.2.2
+  area 12 range 172.16.0.0 255.255.0.0 cost 45
+  network 10.12.0.0 0.0.255.255 area 12
+  network 10.23.0.0 0.0.255.255 area 0
+```
+
+- Verifying on R3 that the smaller routes were supressed while the summary route was aggregated:
+
+```
+show ip route ospf | begin Gateway
+
+O IA		10.12.1.0/24 [110/2] via 10.23.1.2, 00:02:04, GigabitEthernet0/1
+O IA	172.16.0.0/16 [110/46] via 10.23.1.2, 00:00:22, GigabitEthernet0/1
+```
+
+- Notice that the path metric is 46, whereas previously the metric for the 172.16.1.0/24 network was 3
+
+- The ABR performing interarea summarization installs a discard route -- that is, a route to the Null0 interface that matched the summarized network range
+
+- Discard routes prevent routing loops where portions of the summarized network range do not have a more specific route in the RIB
+
+- The AD for OSPF summary discard route for internal networks is 110, and it is 254 for external networks
+
+### Route Filtering
+
+- Route filtering is a method for selectively identifying routes that are advertised or received from neighbor routers
+
+- Route filtering may be used to manipulate traffic flows, reduce memory utilization or improve security
+
+- Filtering of routes with vector-based routing protocols is straightforward as the route are filtered as the routing updates are advertised to downstream neighbors
+
+- However, with link-state routing protocols such as OSPF, every router in an area shares a complete copy of the link-state database
+
+- Therefore, filtering of routes generally occurs as routes enter the area on the ABR
+
+- Three techniques to filter routes with OSPF
+
+#### Filtering with Summarization
+
+- One of the easiest methodologies for filtering routes is to use the **not-advertise** keyword during prefix summarization
+
+- Using this keyword prevents creation of any type 3 LSAs for any networks in that range, thus making the subordonate routes visible only within the area where the route originates
+
+- The full command structure:
+
+```
+conf t
+ router ospf 1
+  area <id> range <network> <subnet-mask> not-advertise
+```
+
+- In our previous topology, where R1 is advertising 172.16.1.0/24, 172.16.2.0/24, and 172.16.3.0/24 networks we can see that R2 can filter out any of the type 1 LSAs that are generated in area 12 from being advertised into Area 0
+
+- The configuration for R2:
+
+```
+conf t
+ router ospf 1
+  area 12 range 172.16.2.0 255.255.255.0 not-advertise
+```
+
+- R3's routing table after the area filtering configuration has been placed on R2:
+
+```
+show ip route ospf | begin Gateway
+
+O IA		10.12.1.0/24 [110/3] via 10.34.1.3: 00:02:24, GigabitEthernet0/0
+O IA		172.16.1.0/24 [110/4] via 10.34.1.3, 00:00:17, GigabitEhernet0/0
+O IA		172.16.3.0/24 [110/4] via 10.34.1.3, 00:00:17, GigabitEthernet0/0 
+```
+
+#### Area filtering
+
+- Although filtering via summarization is very easy, it is limited in it's ability
+
+- For example:
+
+![area-filtering](./ospf-filtering-areas.png)
+
+- In the above scenario if the 172.16.1.0/24 network needs to be present in Area 0, but removed in Area 34, it is not possible to filter the route using summarization
+
+- Other network designs require filtering of OSPF routes based on other criteria
+
+- OSPF supports filtering when type 3 LSA generation occurs
+
+- This allows the original route to to be installed in the LSDB for the source area so that the route can be installed in the RIB of the ABR
+
+- Filtering can occur in either direction on the ABR
+
+![area-filtering](./ospf-area-filtering.png)
+
+- The ABR can filter routes as they advertise out of an area or into an area
+
+![route-filters](./ospf-route-filters.png)
+
+- R2 is able to filter routes (LSAs) outbound as they leave Area 12 or inbound as they enter Area 0
+
+- In addition, R3 can filter routes as they leave Area 0 or enter Area 34
+
+- The same logic applies with routes advertised in the opposite direction
+
+- OSPF area filtering on the ABR:
+
+```
+conf t
+ router ospf 1
+  area <id> filter-list prefix <prefix-list-name> {in | out}
+```
+
+- Say that R1 is advertising the 172.16.1.0/24, 172.16.2.0/24, and 172.16.3.0/24 network prefixes
+
+- R2 is configured to filter the 172.16.1.0/24 prefix as it enters Area 0
+
+- R3 is configured to filter the 172.16.2.0/24 prefix as it leaves Area 0
+
+- Configuration example on R2:
+
+```
+conf t
+ ip prefix-list PREFIX-FILTER seq 5 deny 172.16.1.0/24
+ ip prefix-list PREFIX-FILTER seq 10 permit 0.0.0.0/0 le 32
+
+ router ospf 1
+  router-id 192.168.2.2
+  network 10.12.1.0 0.0.0.255 area 12
+  network 10.23.1.0 0.0.0.255 area 0
+  area 0 filter-list prefix PREFIX-FILTER in
+```
+
+- Configuration on R3:
+
+```
+conf t
+ ip prefix-list PREFIX-FILTER seq 5 deny 172.16.2.0/24
+ ip prefix-list PREFIX-FILTER seq 10 permit 0.0.0.0/0 le 32
+
+ router ospf 1
+ router-id 192.168.3.3
+ network 10.23.1.0 0.0.0.255 area 0
+ network 10.34.1.0 0.0.0.255 area 34
+ area 0 filter-list prefix PREFIX-FILTER out
+```
+
+- Routing table of R3 after the route to 172.16.1.0/24 network has been filtered from all routers in Area 0
+
+- The 172.16.2.0/24 network has been filtered from all the routers in Area 34
+
+- This verifies that the area filtering was successfull for routes entering the backbone and leaving the backbone
+
+- R3:
+
+```
+show ip route ospf | begin Gateway
+
+O IA		10.12.1.0 [110/2] via 10.23.1.2, 00:17:39, GigabitEthernet0/1
+
+O IA		172.16.2.0 [110/3] via 10.23.1.2, 00:16:30, GigabitEthernet0/1
+O IA		172.16.3.0 [110/3] via 10.23.1.2, 00:16:30, GigabitEthernet0/1
+```
+
+- R4:
+
+```
+show ip route ospf | begin Gateway
+
+O IA 		10.12.1.0/24 [110/3] via 10.14.1.3, 00:19:41, GigabitEthernet0/0
+O IA		10.23.1.0/24 [110/2] via 10.34.1.3, 00:19:41, GigabitEthernet0/0
+O IA		172.16.3.0 [110/4] via 10.34.1.3, 00:17:07, GigabitEthernet0/0
+```
+
+#### Local OSPF Filtering
+
+- In some scenarios routes need to be removed only on specific routers in an area
+
+- OSPF is a link-state protocol and requires all routers in the same area to maintain an identical copy of the LSDB for that area
+
+- A route can exist in the OSPF LSDB, but it could be prevented from being installed in the local RIB
+
+- This is accomplished by using a Distribute List
+
+![lsa-distribute-list](./lsa-advertisement-with-distribute-list.png)
+
+- A distribute list on an ABR does not prevent the type 1 LSAs from becoming type 3 LSAs in a different area because the type 3 LSA generation occurs before the distribute list is processed
+
+- However, a distribute list on an ABR prevents the type 3 LSAs coming from the backbone from being regenerated into nonbackbone areas because this regeneration process happens after the distribute list is processed
+
+- A distribute list should not be used for filtering of prefixes between areas; the following lines identifies more preferred techniques
+
+- Configuring a distribute list under the OSPF process:
+
+```
+conf t
+ router ospf 1
+  distribute-list <acl-number|acl-name> | prefix <prefix-list-name> | route-map <route-map-name> in
+```
+
+- Say that R1 is advertising the 172.16.1.0/24, 172.16.2.0/24, and 172.16.3.0/24 network prefixes
+
+- R2 filters the 172.16.3.0/24 from entering it's RIB
+
+- Configuration on R2:
+
+```
+conf t
+ ip access-list standard ACL-OSPF-FILTER
+  deny 172.16.3.0
+  permit any
+ 
+ router ospf 1
+  router-id 192.168.2.2
+  network 10.12.1.0 0.0.0.255 area 12
+  network 10.23.1.0 0.0.0.255 area 0
+  distribute-list ACL-OSPF-FILTER in
+```
+
+- Routing tables for R2 and R3. The 172.16.3.0/24 network is removed from R2's RIB but is present on R3's RIB
+
+- R2:
+
+```
+show ip route ospf | begin Gateway
+
+O IA		10.34.1.0/24 [110/2] via 10.23.1.3, 00:02:21, GigabitEthernet0/1
+O IA		172.16.1.0 [110/2] via 10.12.1.1, 00:02:21, GigabitEthernet0/0
+O IA		172.16.2.0 [110/2] via 10.12.1.1, 00:02:21, GigabitEthernet0/0
+```
+
+- R3:
+
+```
+show ip route ospf | begin Gateway
+
+O IA		10.12.1.0/24 [110/2] via 10.23.1.2, 00:24:11, GigabitEthernet0/1
+O IA		172.16.1.0 [110/3] via 10.23.1.2, 00:01:54, GigabitEthernet0/1
+O IA		172.16.2.0 [110/3] via 10.23.1.2, 00:23:02, GigabitEthernet0/1
+O IA		172.16.3.0 [110/3] via 10.23.1.2, 00:23:02, GigabitEthernet0/1
+```
 
