@@ -1187,7 +1187,7 @@ show ospfv3 neighbor
 show ipv6 ospf interface | i auth 
 ```
 
-#### Authentication for an area using IPsec
+#### Authentication for an area using IPsec in OSPFv3
 
 - Area 0 authentication on R1 and R2:
 
@@ -1213,4 +1213,21 @@ conf t
 show ospfv3 1 neighbor
 show ipv6 ospf interface | include auth
 show crypto ipsec sa interface g0/1
+```
+
+#### Authentication for interface using a key chain in OSPFv2 (Lab with FRR in linux)
+
+![gns3-ospfv2](./ospf-frr-linux-gns3.png)
+
+- Alma1 + Alma2 + Alma3:
+
+```
+conf t
+ key chain TEST
+  key 1
+   key-string TEST
+   cryptographic-algorithm hmac-sha-256
+
+ interface eth0
+  ip ospf authentication key-chain TEST
 ```
