@@ -904,3 +904,313 @@ O IA		172.16.2.0 [110/3] via 10.23.1.2, 00:23:02, GigabitEthernet0/1
 O IA		172.16.3.0 [110/3] via 10.23.1.2, 00:23:02, GigabitEthernet0/1
 ```
 
+- Ignore MTU mismatch while establishing OSPF neighborship:
+
+```
+conf t
+ interface g0/1
+  ip ospf mtu-ignore
+  ip mtu 1350
+```
+
+- Route filtering with distribute-list using a prefix-list
+
+```
+conf t
+ ip prefix-list DENY_10.2.2.0 seq 10 deny 10.2.2.0/24
+ ip prefix-list DENY_10.2.2.0 seq 20 permit 0.0.0.0/0 le 32
+
+ router ospf 1
+  network 10.1.1.0 0.0.0.255 area 0
+  network 172.16.1.0 0.0.0.3 area 0
+  distribute-list prefix DENY_10.2.2.0 in
+```
+
+- Summarizing some networks at the ASBR (as they are redistributed from other protocol into OSPF)
+
+```
+conf t
+ router ospf 1
+  summary-address 172.18.0.0 255.255.252.0 
+```
+
+- Summarizing some networks at the ABR (as they come from one area into another)
+
+```
+conf t
+ router ospf 1
+  area 1 range 172.17.0.0 255.255.252.0
+```
+
+- Configure OSPF virtual link across Area 1 for routers in Area 2
+
+![virtual-link](./ospf-virtual-link.png)
+
+- The transit area (Area 1) must not be a stub area (or any form of stub area)
+
+- We specify the transit area in the command:
+
+- R2:
+
+```
+conf t
+ router ospf 1
+  area 1 virtual-link 3.3.3.3
+```
+
+- R3:
+
+```
+conf t
+ router ospf 1
+  area 1 virtual-link 2.2.2.2
+```
+
+### Configuring OSPFv3 "Traditional" mode
+
+![ospf-ipv6](./ospfv3-configuration.png)
+
+- Configure IPv4 first:
+
+- R1:
+
+```
+conf t
+ router ospf 1
+  network 0.0.0.0 255.255.255.255 area 0
+```
+
+- R2:
+
+```
+conf t
+ router ospf 1
+  network 172.16.1.0 0.0.0.3 area 0
+  network 2.2.2.2 0.0.0.0 area 1
+  network 192.168.1.0 0.0.0.3 area 1
+```
+
+- R3:
+
+```
+conf t
+ router ospf 1
+  network 0.0.0.0 255.255.255.255 area 1
+```
+
+- Configure IPv6 OSPF over the IPv4 already existing configuration:
+
+- R1:
+
+```
+conf t
+ ipv6 unicast-routing
+ ipv6 cef
+ ipv6 router ospf 1
+  router-id 1.1.1.1
+  passive-interface g0/1
+  passive-interface lo 0
+ 
+ int g0/1
+  ipv6 ospf 1 area 0
+ int g0/2
+  ipv6 ospf 1 area 0
+ int l0
+  ipv6 ospf 1 area 0
+```
+
+- R2:
+
+```
+conf t
+ ipv6 unicast-routing
+ ipv6 cef
+ ipv6 router ospf 1
+  router-id 2.2.2.2
+
+ interface g0/1
+  ipv6 ospf 1 area 0
+ interface g0/2
+  ipv6 ospf 1 area 1
+ interface lo0
+  ipv6 ospf 1 area 1
+```
+
+- R3:
+
+```
+conf t
+ ipv6 unicast-routing
+ ipv6 cef
+ ipv6 router ospf 1
+  router-id 3.3.3.3
+  passive-interface g0/2
+  passive-interface lo0
+
+ interface g0/1
+  ipv6 ospf 1 area 1
+ interface g0/2
+  ipv6 ospf 1 area 1
+ interface lo0
+  ipv6 ospf 1 area 1
+```
+
+- Verification:
+
+```
+show ipv6 ospf neighbor
+show ipv6 ospf interface g0/1
+show ipv6 ospf database
+show ipv6 route
+```
+
+### OSPFv3 IPv6 Address Families Configuration
+
+- First get rid of both IPv4 and IPv6 OSPF configuration on all the routers:
+
+```
+conf t
+ no router ospf 1
+ no ipv6 router ospf 1
+```
+
+- Configure OSPFv3:
+
+- R3:
+
+```
+conf t
+ router ospfv3 1
+  router-id 3.3.3.3
+  passive-interface g0/2
+  address-family ipv4
+  address-family ipv6
+
+ interface g0/1
+  ospfv3 1 ipv4 area 1
+  ospfv3 1 ipv6 area 1
+
+ interface g0/2
+  ospfv3 1 ipv4 area 1
+  ospfv3 1 ipv6 area 1
+
+ interface lo 0
+  ospfv3 1 ipv4 area 1
+  ospfv3 1 ipv6 area 1
+```
+
+- R2:
+
+```
+conf t
+ router ospfv3 1
+  router-id 2.2.2.2
+  address-family ipv4
+  address-family ipv6
+
+ interface g0/1
+  ospfv3 1 ipv4 area 0
+  ospfv3 1 ipv6 area 0
+
+ interface g0/2
+  ospfv3 1 ipv4 area 1
+  ospfv3 1 ipv6 area 1
+
+ interface lo 0
+  ospfv3 1 ipv4 area 1
+  ospfv3 1 ipv6 area 1
+```
+
+- R1:
+
+```
+conf t
+ router ospfv3 1
+  router-id 1.1.1.1
+  address-family ipv4
+  address-family ipv6
+  passive-interface g0/1
+  passive-inteface lo 0
+
+ interface g0/1
+  ospfv3 1 ipv4 area 0
+  ospfv3 1 ipv6 area 0
+  
+ interface g0/2
+  ospfv3 1 ipv4 area 0
+  ospfv3 1 ipv6 area 0
+
+ interface lo 0
+  ospfv3 1 ipv4 area 0
+  ospfv3 1 ipv6 area 0
+```
+
+- Verification:
+
+```
+show ospfv3 neighbor
+show ospfv3 database
+show ipv6 route
+show ip route
+```
+
+### OSPFv3 authentication
+
+1. Authentication for an interface
+
+2. Authentication for an area
+
+#### Authentication for an interface using IPsec 
+
+- R2 - R3 authentication for interfaces:
+
+- R2:
+
+```
+conf t
+ interface g0/2
+  ospfv3 authentication ipsec spi 256 sha1 0123456789012345678901234567890123456789 # this is a 40 characters sha hash
+```
+
+- R3:
+
+```
+conf t
+ interface g0/1
+  ospfv3 authentication ipsec spi 256 sha1 0123456789012345678901234567890123456789
+```
+
+- Verification:
+
+```
+show ospfv3 neighbor
+show ipv6 ospf interface | i auth 
+```
+
+#### Authentication for an area using IPsec
+
+- Area 0 authentication on R1 and R2:
+
+- R2:
+
+```
+conf t
+ router ospfv3 1
+  area 0 authentication ipsec spi 512 sha1 0123456789012345678901234567890123456789
+```
+
+- R1:
+
+```
+conf t
+ router ospfv3 1
+  area 0 authentication ipsec spi 512 sha1 0123456789012345678901234567890123456789
+```
+
+- Verification:
+
+```
+show ospfv3 1 neighbor
+show ipv6 ospf interface | include auth
+show crypto ipsec sa interface g0/1
+```
