@@ -1231,3 +1231,18 @@ conf t
  interface eth0
   ip ospf authentication key-chain TEST
 ```
+
+From Cisco docs:
+
+```
+The former OSPF implementation for sending update packets needed to be more efficient. Some update packets were getting lost in cases where the link was slow, a neighbor could not receive the updates quickly enough, or the router was out of buffer space. For example, packets might be dropped if either of the following topologies existed:
+
+A fast router was connected to a slower router over a point-to-point link.
+
+During flooding, several neighbors sent updates to a single router at the same time.
+
+OSPF update packets are now automatically paced so they are not sent less than 33 milliseconds apart. Pacing is also added between resends to increase efficiency and minimize lost retransmissions. Also, you can display the LSAs waiting to be sent out an interface. The benefit of pacing is that OSPF update and retransmission packets are sent more efficiently. There are no configuration tasks for this feature; it occurs automatically.
+```
+
+Source: [cisco-docs](https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/iproute_ospf/configuration/xe-16/iro-xe-16-book/iro-cfg.html)
+
