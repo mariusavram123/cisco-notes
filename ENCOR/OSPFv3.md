@@ -498,3 +498,10 @@ show ospfv3 database router
 show ospfv3 database network
 show ospfv3 database link
 ```
+
+- Trying to enable OSPFv3 without IPv6 routing enabled does not work:
+
+```
+R1(config)#router ospfv3 1
+% IPv6 routing not enabled
+```
