@@ -373,3 +373,128 @@ conf t
    area 0 range 2001:db8:0:0::/65
 ```
 
+#### Network Type
+
+- OSPFv3 supports the same network types as OSPFv2
+
+- Verifying the network type on an interface
+
+```
+show ospfv3 ipv6 interface <id> | include Network # or
+
+show ipv6 ospf interface <id> | include Network
+```
+
+- Verifying on R2:
+
+```
+R2#show ipv6 ospf interface e0/1 | i Network
+  Network Type BROADCAST, Cost: 10
+
+R2#show ospfv3 ipv6 interface e0/1 | i Network
+  Network Type BROADCAST, Cost: 10
+```
+
+- Setting a network type as point-to-point:
+
+```
+conf t
+ interface <type/number>
+  ospfv3 network point-to-point
+```
+
+- Setting it for e0/1 on R2:
+
+```
+conf t
+ interface e0/1
+  ospfv3 network point-to-point
+```
+
+- Setting it for e0/0 on R3:
+
+```
+conf t
+ int e0/0
+  ospfv3 network point-to-point
+```
+- If you have a network type mismatch they will not exchange routes with the neighbor with which the network type is mismatched. Checking IPv6 routing table after the change we can see only the routes from Area 0, not the other area. This happens only when you had the change on one side
+
+- Verifying the change was made:
+
+- R2:
+
+```
+R2(config-if)#do sh ospfv3 int br
+Interface    PID   Area            AF         Cost  State Nbrs F/C
+Lo0          1     0               ipv6       1     LOOP  0/0
+Et0/1        1     0               ipv6       10    P2P   1/1
+Et0/0        1     0               ipv6       10    DR    1/1
+```
+
+- R3:
+
+```
+R3(config-if)#do sh ospfv3 int br
+Interface    PID   Area            AF         Cost  State Nbrs F/C
+Et0/0        1     0               ipv6       10    P2P   1/1
+Lo0          1     34              ipv6       1     LOOP  0/0
+Et0/1        1     34              ipv6       10    BDR   1/1
+```
+
+- As you can see the interface is listed as "P2P"
+
+### IPv4 support in OSPFv3
+
+- OSPFv3 supports multiple address families by setting the instance ID value from the IPv6 reserved range to the IPv4 reserved range (64 to 95) in the link LSAs
+
+- Configuring IPv4 support for OSPFv3:
+
+	- **Step 1**: Ensure that the IPv4 interface has an IPv6 address (global or link-local) configured. Remember that configuring a global address, also adds a local address; alternatively a link-local address can statically be configured (you should manually configure IPv4 addressing on the interfaces to allow exchanges)
+
+	- **Step 2**: Enable the OSPFv3 process for the interface:
+
+	```
+	conf t
+	 interface <id>
+	  ospfv3 <process-id> ipv4 area <area-id>
+	```
+
+- Verifying the address families enabled on each interface:
+
+```
+R1#show ospfv3 interface brief
+Interface    PID   Area            AF         Cost  State Nbrs F/C
+Lo0          1     0               ipv4       1     LOOP  0/0
+Et0/1        1     0               ipv4       10    DR    1/1
+Et0/0        1     0               ipv4       10    DR    0/0
+Lo0          1     0               ipv6       1     LOOP  0/0
+Et0/1        1     0               ipv6       10    BDR   1/1
+Et0/0        1     0               ipv6       10    DR    0/0
+```
+
+- Verifying OSPFv3 neighbors for IPv4 and IPv6:
+
+```
+R3#show ospfv3 neighbor 
+
+          OSPFv3 1 address-family ipv4 (router-id 3.3.3.3)
+
+Neighbor ID     Pri   State           Dead Time   Interface ID    Interface
+2.2.2.2           0   FULL/  -        00:00:38    2               Ethernet0/0
+4.4.4.4           1   FULL/DR         00:00:37    1               Ethernet0/1
+
+          OSPFv3 1 address-family ipv6 (router-id 3.3.3.3)
+
+Neighbor ID     Pri   State           Dead Time   Interface ID    Interface
+2.2.2.2           0   FULL/  -        00:00:36    2               Ethernet0/0
+4.4.4.4           1   FULL/DR         00:00:30    1               Ethernet0/1
+```
+
+- Verifying the OSPFv3 database:
+
+```
+show ospfv3 database router
+show ospfv3 database network
+show ospfv3 database link
+```
