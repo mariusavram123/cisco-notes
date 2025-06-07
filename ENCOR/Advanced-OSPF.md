@@ -1246,3 +1246,73 @@ OSPF update packets are now automatically paced so they are not sent less than 3
 
 Source: [cisco-docs](https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/iproute_ospf/configuration/xe-16/iro-xe-16-book/iro-cfg.html)
 
+#### OSPF authentication - plain text and MD5 - CML lab
+
+![topology](./ospf-auth-plain-md5.png)
+
+- R1 - Plain text auth:
+
+```
+conf t
+ router ospf 1
+  router-id 10.1.1.1
+  area 0 authentication
+
+  interface Ethernet0/0
+   ip address 10.12.1.1 255.255.255.252
+   ip ospf authentication-key cisco
+   ip ospf 1 area 0
+```
+
+- R2 plain text auth - area 0, md5 auth area 1
+
+```
+conf t
+ router ospf 1
+  router-id 10.2.2.2
+  area 0 authentication
+  area 1 authentication message-digest
+
+ interface Ethernet0/0
+  ip address 10.12.1.2 255.255.255.252
+  ip ospf authentication-key cisco
+  ip ospf 1 area 0
+
+ interface Ethernet0/1
+  ip address 10.23.1.1 255.255.255.252
+  ip ospf message-digest-key 1 md5 cisco
+  ip ospf 1 area 1
+```
+
+- R3 - MD5 authentication:
+
+```
+conf t
+ router ospf 1
+  router-id 10.3.3.3
+  area 1 authentication message-digest
+
+ interface Ethernet0/0
+  ip address 10.23.1.2 255.255.255.252
+  ip ospf message-digest-key 1 md5 cisco
+  ip ospf 1 area 1
+```
+
+- Verification:
+
+```
+show ip ospf neighbor
+
+R1#show ip ospf int e0/0 | i auth 
+  Simple password authentication enabled
+
+R2#show ip ospf int e0/1 | i auth
+  Cryptographic authentication enabled
+
+show ip route
+```
+
+- Documentation for OSPF authentication:
+
+[cisco-docs](https://www.cisco.com/c/en/us/support/docs/ip/open-shortest-path-first-ospf/13697-25.html)
+
