@@ -309,3 +309,122 @@ show tcp brief
 
 - Notice that the TCP source port is 179 and the destination port is 59884 on R1; the ports are opposite on R2
 
+##### Active
+
+- In the Active state, BGP starts a new 3-way TCP handshake. If a connection is established, an Open message is sent, the hold timer is set to 4 minutes and the state moves to OpenSent. If this attempt for TCP connection fails, the state moves back to the Connect state and the ConnectRetryTimer is reset
+
+##### OpenSent
+
+- In the OpenSent state an Open message has been sent from the originating router and is awaiting an Open message from the other router
+
+- Once the originating router receives the Open message from the other router, both Open messages are checked for errors 
+
+- The following items are examined:
+
+    - BGP versions must match
+
+    - The source IP address of the Open message must match IP address that is configured for the neighbor
+
+    - The AS number in the OPEN message must match what is configured for the neighbor
+
+    - BGP identifiers (RIDs) must be unique. If a RID does not exist, this condition is not met
+
+    - Security parameters (such as password and TTL) must be set appropriately
+
+- If the OPEN message does not have any errors, the hold time is negotiated (using the lower value), and a KEEPALIVE message is sent (assuming that the value is not set to 0). The connection state is then moved to OpenConfirm. If an error is seen in the OPEN message, a NOTIFICATION message is sent, and the state is moved back to Idle
+
+- If TCP receives a disconnect message, BGP closes the connection, resets the ConnectRetryTimer and sets the state to Active. Any other input in this process results in the state moving to Idle
+
+##### OpenConfirm
+
+- In the OpenConfirm state, BGP waits for a KEEPALIVE or NOTIFICATION message
+
+- Upon receipt of a neighbor's KEEPALIVE message, the state is moved to Established
+
+- If the hold timer expires, a stop event occurs or if a NOTIFICATION message is received, the state is moved to Idle
+
+##### Established
+
+- In the Established state, the BGP connection is established
+
+- BGP neighbors exchange routes using UPDATE messages
+
+- As UPDATE and KEEPALIVE messages are received, the hold timer is reset
+
+- If the hold timer expires, an error is detected, and BGP moves the neighbor back to the Idle state
+
+### Basic BGP Configuration
+
+- BGP router configuration requires the following components:
+
+    - **BGP Session Parameters**: BGP session parameters provide settings that involve establishing communication to the remote BGP neighbor. Session settings include the ASN of the BGP peer, authentication and keepalive timers
+
+    - **Address family initialization**: The address family is initialized under the BGP router configuration mode. Network advertisement and summarization occur within the address family
+
+    - **Activate the address family on the BGP peer**: In order for a session to initiate, one address family for a neighbor must be activated. The router's IP address is added to the neighbor table, and BGP attempts to establish a BGP session or accepts a BGP session initiated from the peer router
+
+- Steps to configure BGP:
+
+    - **Step 1**: Initialize the BGP routing process:
+
+    ```
+    conf t
+     router bgp <as-number>
+    ```
+
+    - **Step 2**: Optional - Statically define the BGP router ID (RID). The dynamic RID allocation logic uses the highest IP address on any up loopback interface. If there is not an up loopback interface, then the highest IP address of any up interface becomes the RID when the BGP process initializes
+
+    - To ensure that the RID does not change, a static RID is assigned (typically representing an IPv4 address that resides on the router(such as a loopback address). Any IPv4 address can be used, including IP addresses not configured on the router
+
+    - When the BGP router ID changes, the BGP sessions reset and need to be reestablished
+
+    - Configuring a static BGP router ID:
+
+    ```
+    conf t
+     router bgp <as-number>
+      bgp router-id <router-id>
+    ```
+
+    - **Step 3**: Identify the BGP neighbor's IP address and autonomous system number within the BGP router configuration:
+
+    ```
+    router bgp <as-number>
+     neighbor <ip-address> remote-as <as-number>
+    ```
+
+    - It is important to understand the traffic flow of the BGP packets within the peers
+
+    - The source IP address of the BGP packets still reflects the IP address of the outbound interface. When a BGP packet is received, the router correlates the source IP address of the packet with the IP address configured for that neighbor. If the BGP packet source does not match an entry in the neighbor table, the packet cannot be associated to a neighbor and it is discarded
+
+    - Cisco IOS activates IPv4 address family by default. This can simplify the configuration in IPv4 endvironments as step 4 and step 5 are optional but may cause confusion when working with other address families
+
+    - Disabling the defaul IPv4 address family configuration:
+
+    ```
+    conf t
+     router bgp <as-number>
+      no bgp default ipv4 unicast
+    ```
+
+    - **Step 4**: Initialize the address family with the BGP router configuration:
+
+    ```
+    conf t
+     router bgp <as-number>
+      address-family <afi> <safi>
+    ```
+
+    - AFI values are IPv4 or IPv6, SAFI values are unicast or multicast
+
+    - **Step 5**: Activate the address family for the BGP neighbor on the BGP address family configuration:
+
+    ```
+    conf t
+     router bgp <as-number>
+      addresss-family <afi> <safi>
+       neighbor <ip-address> activate
+    ```
+
+    - On IOS and IOS XE devices, the default subsequent address family identifier (SAFI) for IPv4 and IPv6 address families is unicast and is optional
+
