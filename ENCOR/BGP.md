@@ -1606,3 +1606,534 @@ R1#sh bgp ipv4 uni | b Net
  *>   192.168.1.1/32   0.0.0.0                  0         32768 i
 ```
 
+### Multiprotocol BGP for IPv6
+
+- Multiprotocol BGP (MP-BGP) enables BGP to carry NLRI for multiple protocols, such as IPv4, IPv6 and Multiprotocol Label Switching (MPLS) Layer 3 virtual private networks (L3VPNs)
+
+- RFC 4760 defines the following new features:
+
+    - A new address family identifier (AFI) model
+
+    - New BGPv4 optional and non-transitive attributes:
+
+        - Multiprotocol reachable NLRI
+
+        - Multiprotocol unreachable NLRI
+
+- The new multiprotocol reachable NLRI attribute describe IPv6 route information, and the multiprotocol unreachable NLRI attribute withdraws the IPv6 route from service
+
+- The attributes are optional and nontransitive, so if an older router does not understand the attributes, the information can just be ignored
+
+- All the same underlying IPv4 path vector routing protocol features and rules also apply to MP-BGP for IPv6
+
+- MP-BGP for IPv6 continues to use the same well-known TCP port 179 for session peering as BGP uses for IPv4
+
+- During the initial open message negotiation, the BGP peer routers exchange capabilities
+
+- The MP-BGP extension includes an address family identifier (AFI) that describes the supported protocols, along with subsequent address family identifier (SAFI) attibute field that describe wether the prefix applies to the unicast or multicast routing table
+
+    - **IPv4 unicast**: AFI 1, SAFI 1
+
+    - **IPv6 unicast**: AFI 2, SAFI 1
+
+![bgp-ipv6](./bgp-ipv6.png)
+
+- The simple topology with three different AS-es and R2 forming an eBGP session with R1 and R3
+
+- All of R1's links are configured to FE80::1, all of R2's links are set to FE80::2, and all of R3's links are configured for FE80::3
+
+#### IPv6 configuration
+
+- All the BGP configuration rules demonstrated early apply with ipv6, except that the IPv6 address family must be initialized and the neighbor must be activated
+
+- Routers with only IPv6 must statically define the BGP RID to allow sessions to form
+
+- The protocol used to establish the BGP session is dependent of the AFI/SAFI route advertisement
+
+- The TCP session used by BGP is a Layer 4 protocol and it can use either an IPv4 or IPv6 address to form a session adjacency and exchange routes
+
+- Advertising IPv6 prefixes over an IPv4 BGP session is possible and feasible
+
+- Unique global unicast addressing is the recommended method for BGP peering to avoid operational complexity. BGP peering using the link-local address may introduce risk if the address is not manually assigned to an interface
+
+- A hardware failure or cabling move will change the MAC address resulting in a new link-local address
+
+- This will cause the session to fail because the stateless address autoconfiguration will generate a new IPv6 address
+
+- IPv6 BGP configuration for R1, R2 and R3:
+
+- (I have enabled graceful restart for R2 and R3 neighbors, default timer is advertised as 120)
+
+- R1:
+
+```
+router bgp 65100
+ bgp router-id 192.168.1.1
+ bgp log-neighbor-changes
+ no bgp default ipv4-unicast
+ neighbor 2001:DB8:0:12::2 remote-as 65200
+ !
+ address-family ipv4
+ exit-address-family
+ !
+ address-family ipv6
+  redistribute static
+  network 2001:DB8::1/128
+  network 2001:DB8:0:12::/64
+  neighbor 2001:DB8:0:12::2 activate
+ exit-address-family
+```
+
+- R2:
+
+```
+R2#show run | s router bgp
+router bgp 65200
+ bgp router-id 192.168.2.2
+ bgp log-neighbor-changes
+ no bgp default ipv4-unicast
+ neighbor 2001:DB8:0:12::1 remote-as 65100
+ neighbor 2001:DB8:0:23::3 remote-as 65300
+ neighbor 2001:DB8:0:23::3 ha-mode graceful-restart
+ !
+ address-family ipv4
+ exit-address-family
+ !
+ address-family ipv6
+  network 2001:DB8::2/128
+  network 2001:DB8:0:12::/64
+  network 2001:DB8:0:23::/64
+  neighbor 2001:DB8:0:12::1 activate
+  neighbor 2001:DB8:0:23::3 activate
+ exit-address-family
+```
+
+- R3:
+
+```
+router bgp 65300
+ bgp router-id 192.168.3.3
+ bgp log-neighbor-changes
+ no bgp default ipv4-unicast
+ neighbor 2001:DB8:0:23::2 remote-as 65200
+ neighbor 2001:DB8:0:23::2 ha-mode graceful-restart
+ !
+ address-family ipv4
+ exit-address-family
+ !
+ address-family ipv6
+  network 2001:DB8::3/128
+  network 2001:DB8:0:3::/64
+  network 2001:DB8:0:23::/64
+  neighbor 2001:DB8:0:23::2 activate
+ exit-address-family
+```
+
+- IPv4 unicast routing capability is advertised by default in IOS unless the neighbor is specifically shut down within the IPv4 address family or globally within the BGP process as follows:
+
+```
+conf t
+ router bgp <as>
+  no bgp default ipv4-unicast
+```
+
+- Routers exchange AFI capabilities during the initial BGP session negotiation 
+
+- Displaying detailed information on wether the IPv6 capabilities were negotiated sucessfully
+
+```
+show bgp ipv6 unicast neighbor <IPv6-address> [detail]
+```
+
+```
+R1#show bgp ipv6 uni neigh 2001:db8:0:12::2
+BGP neighbor is 2001:DB8:0:12::2,  remote AS 65200, external link
+  BGP version 4, remote router ID 192.168.2.2
+  BGP state = Established, up for 00:12:17
+  Last read 00:00:15, last write 00:00:25, hold time is 180, keepalive interval is 60 seconds
+  Neighbor sessions:
+    1 active, is not multisession capable (disabled)
+  Neighbor capabilities:
+    Route refresh: advertised and received(new)
+    Four-octets ASN Capability: advertised and received
+    Address family IPv6 Unicast: advertised and received
+    Enhanced Refresh Capability: advertised and received
+    Multisession Capability: 
+    Stateful switchover support enabled: NO for session 1
+  Message statistics:
+    InQ depth is 0
+    OutQ depth is 0
+    
+                         Sent       Rcvd
+    Opens:                  1          1
+    Notifications:          0          0
+    Updates:                3          4
+    Keepalives:            14         13
+    Route Refresh:          0          0
+    Total:                 18         18
+  Do log neighbor state changes (via global configuration)
+  Default minimum time between advertisement runs is 30 seconds
+
+ For address family: IPv6 Unicast
+  Session: 2001:DB8:0:12::2
+  BGP table version 8, neighbor version 8/0
+  Output queue size : 0
+  Index 1, Advertise bit 0
+  1 update-group member
+  Slow-peer detection is disabled
+  Slow-peer split-update-group dynamic is disabled
+                                 Sent       Rcvd
+  Prefix activity:               ----       ----
+    Prefixes Current:               3          5 (Consumes 540 bytes)
+    Prefixes Total:                 3          5
+    Implicit Withdraw:              0          0
+    Explicit Withdraw:              0          0
+    Used as bestpath:             n/a          4
+    Used as multipath:            n/a          0
+    Used as secondary:            n/a          0
+          
+                                   Outbound    Inbound
+  Local Policy Denied Prefixes:    --------    -------
+    Bestpath from this peer:              4        n/a
+    Total:                                4          0
+  Number of NLRIs in the update sent: max 2, min 0
+  Last detected as dynamic slow peer: never
+  Dynamic slow peer recovered: never
+  Refresh Epoch: 1
+  Last Sent Refresh Start-of-rib: never
+  Last Sent Refresh End-of-rib: never
+  Last Received Refresh Start-of-rib: never
+  Last Received Refresh End-of-rib: never
+                                       Sent       Rcvd
+        Refresh activity:              ----       ----
+          Refresh Start-of-RIB          0          0
+          Refresh End-of-RIB            0          0
+
+  Address tracking is enabled, the RIB does have a route to 2001:DB8:0:12::2
+  Route to peer address reachability Up: 1; Down: 0
+    Last notification 00:14:27
+  Connections established 1; dropped 0
+  Last reset never
+  External BGP neighbor configured for connected checks (single-hop no-disable-connected-check)
+  Interface associated: GigabitEthernet0/0 (peering address in same link)
+  Transport(tcp) path-mtu-discovery is enabled
+  Graceful-Restart is disabled
+  SSO is disabled
+Connection state is ESTAB, I/O status: 1, unread input bytes: 0            
+Connection is ECN Disabled, Mininum incoming TTL 0, Outgoing TTL 1
+Local host: 2001:DB8:0:12::1, Local port: 48341
+Foreign host: 2001:DB8:0:12::2, Foreign port: 179
+Connection tableid (VRF): 0
+Maximum output segment queue size: 50
+
+Enqueued packets for retransmit: 0, input: 0  mis-ordered: 0 (0 bytes)
+
+Event Timers (current time is 0xDC51A):
+Timer          Starts    Wakeups            Next
+Retrans            16          0             0x0
+TimeWait            0          0             0x0
+AckHold            17         15             0x0
+SendWnd             0          0             0x0
+KeepAlive           0          0             0x0
+GiveUp              0          0             0x0
+PmtuAger           74         73         0xDC94F
+DeadWait            0          0             0x0
+Linger              0          0             0x0
+ProcessQ            0          0             0x0
+
+iss: 1318049116  snduna: 1318049678  sndnxt: 1318049678
+irs: 1031383429  rcvnxt: 1031384067
+
+sndwnd:  15823  scale:      0  maxrcvwnd:  16384
+rcvwnd:  15747  scale:      0  delrcvwnd:    637
+
+SRTT: 882 ms, RTTO: 1768 ms, RTV: 886 ms, KRTT: 0 ms
+minRTT: 7 ms, maxRTT: 1000 ms, ACK hold: 200 ms
+uptime: 737998 ms, Sent idletime: 15246 ms, Receive idletime: 15447 ms 
+Status Flags: active open
+Option Flags: nagle, path mtu capable
+IP Precedence value : 6
+
+Datagrams (max data segment is 1440 bytes):
+Rcvd: 33 (out of order: 0), with data: 17, total data bytes: 637
+Sent: 34 (retransmit: 0, fastretransmit: 0, partialack: 0, Second Congestion: 0), with data: 34, total data bytes: 1929
+
+ Packets received in fast path: 0, fast processed: 0, slow path: 0
+ fast lock acquisition failures: 0, slow path: 0
+TCP Semaphore      0x10F8A804  FREE 
+```
+
+- Displaying the status of the sessions, including the number of routes that have been exchanged and the session uptime:
+
+```
+show bgp ipv6 unicast summary
+```
+
+```
+R1#show bgp ipv6 uni summ  
+BGP router identifier 192.168.1.1, local AS number 65100
+BGP table version is 8, main routing table version 8
+7 network entries using 1176 bytes of memory
+8 path entries using 864 bytes of memory
+4/4 BGP path/bestpath attribute entries using 640 bytes of memory
+2 BGP AS-PATH entries using 48 bytes of memory
+0 BGP route-map cache entries using 0 bytes of memory
+0 BGP filter-list cache entries using 0 bytes of memory
+BGP using 2728 total bytes of memory
+BGP activity 7/0 prefixes, 8/0 paths, scan interval 60 secs
+
+Neighbor        V           AS MsgRcvd MsgSent   TblVer  InQ OutQ Up/Down  State/PfxRcd
+2001:DB8:0:12::2
+                4        65200      22      22        8    0    0 00:16:06        5
+```
+
+- IPv6 unicast BGP tables for R1, R2 and R3:
+
+- R1:
+
+```
+R1#sh bgp ipv6 uni | b Net
+     Network          Next Hop            Metric LocPrf Weight Path
+ *>   2001:DB8::1/128  ::                       0         32768 i
+ *>   2001:DB8::2/128  2001:DB8:0:12::2
+                                                0             0 65200 i
+ *>   2001:DB8::3/128  2001:DB8:0:12::2
+                                                              0 65200 65300 i
+ *>   2001:DB8:0:3::/64
+                       2001:DB8:0:12::2
+                                                              0 65200 65300 i
+ *    2001:DB8:0:12::/64
+                       2001:DB8:0:12::2
+                                                0             0 65200 i
+ *>                    ::                       0         32768 i
+ *>   2001:DB8:0:23::/64
+                       2001:DB8:0:12::2
+                                                0             0 65200 i
+ *>   2001:DB8:4:4::4/128
+                       2001:DB8:0:1::4          0         32768 ?
+```
+
+- R2:
+
+```
+R2#show bgp ipv6 unicast | b Net
+     Network          Next Hop            Metric LocPrf Weight Path
+ *>   2001:DB8::1/128  2001:DB8:0:12::1
+                                                0             0 65100 i
+ *>   2001:DB8::2/128  ::                       0         32768 i
+ *>   2001:DB8::3/128  2001:DB8:0:23::3
+                                                0             0 65300 i
+ *>   2001:DB8:0:3::/64
+                       2001:DB8:0:23::3
+                                                0             0 65300 i
+ *    2001:DB8:0:12::/64
+                       2001:DB8:0:12::1
+                                                0             0 65100 i
+ *>                    ::                       0         32768 i
+ *    2001:DB8:0:23::/64
+                       2001:DB8:0:23::3
+                                                0             0 65300 i
+ *>                    ::                       0         32768 i
+ *>   2001:DB8:4:4::4/128
+                       2001:DB8:0:12::1
+                                                0             0 65100 ?
+```
+
+- R3:
+
+```
+R3#show bgp ipv6 uni | b Net
+     Network          Next Hop            Metric LocPrf Weight Path
+ *>   2001:DB8::1/128  2001:DB8:0:23::2
+                                                              0 65200 65100 i
+ *>   2001:DB8::2/128  2001:DB8:0:23::2
+                                                0             0 65200 i
+ *>   2001:DB8::3/128  ::                       0         32768 i
+ *>   2001:DB8:0:3::/64
+                       ::                       0         32768 i
+ *>   2001:DB8:0:12::/64
+                       2001:DB8:0:23::2
+                                                0             0 65200 i
+ *    2001:DB8:0:23::/64
+                       2001:DB8:0:23::2
+                                                0             0 65200 i
+ *>                    ::                       0         32768 i
+ *>   2001:DB8:4:4::4/128
+                       2001:DB8:0:23::2
+                                                              0 65200 65100 ?
+```
+
+- Notice that some of the routes include an unspecified address (::) as the next hop
+
+- An unspecified address indicates that the local router is generating the prefix for the BGP table
+
+- The weight value of 32768 also indicates that the prefix is locally originated by the router
+
+- Displaying the BGP path attributes for an IPv6 route:
+
+```
+show bgp ipv6 unicast <prefix>/<prefix-length>
+```
+
+- R3 examining the R1's loopback address:
+
+```
+R3#show bgp ipv6 uni 2001:db8::1/128
+BGP routing table entry for 2001:DB8::1/128, version 2
+Paths: (1 available, best #1, table default)
+Flag: 0x100
+  Not advertised to any peer
+  Refresh Epoch 2
+  65200 65100
+    2001:DB8:0:23::2 (FE80::22) from 2001:DB8:0:23::2 (192.168.2.2)
+      Origin IGP, localpref 100, valid, external, best
+      rx pathid: 0, tx pathid: 0x0
+```
+
+- Some of the common fields, such as AS_Path, origin and local preference are identical to those for IPv4 routes
+
+- IPv6 BGP route entries on R2:
+
+```
+R2#show ipv6 route bgp
+IPv6 Routing Table - default - 10 entries
+Codes: C - Connected, L - Local, S - Static, U - Per-user Static route
+       B - BGP, HA - Home Agent, MR - Mobile Router, R - RIP
+       H - NHRP, I1 - ISIS L1, I2 - ISIS L2, IA - ISIS interarea
+       IS - ISIS summary, D - EIGRP, EX - EIGRP external, NM - NEMO
+       ND - ND Default, NDp - ND Prefix, DCE - Destination, NDr - Redirect
+       RL - RPL, O - OSPF Intra, OI - OSPF Inter, OE1 - OSPF ext 1
+       OE2 - OSPF ext 2, ON1 - OSPF NSSA ext 1, ON2 - OSPF NSSA ext 2
+       la - LISP alt, lr - LISP site-registrations, ld - LISP dyn-eid
+       lA - LISP away, a - Application
+B   2001:DB8::1/128 [20/0]
+     via FE80::1, GigabitEthernet0/0
+B   2001:DB8::3/128 [20/0]
+     via FE80::3, GigabitEthernet0/1
+B   2001:DB8:0:3::/64 [20/0]
+     via FE80::3, GigabitEthernet0/1
+B   2001:DB8:4:4::4/128 [20/0]
+     via FE80::1, GigabitEthernet0/0
+```
+
+- Notice that the next-hop address is the link-local address for the next-hop forwarding address which is resolved through a recursive lookup
+
+#### IPv6 Summarization
+
+- The same process for summarizing or agregating IPv4 routes occur within IPv6 routes, and the format is identical except that the configuration is placed under the IPv6 address family using the following command:
+
+```
+router bgp <as-nr>
+ address-family ipv6
+  aggregate-address <prefix>/<prefix-length> [summary-only] [as-set]
+```
+
+- The same previous IPv6 deployment but now want to summarize all the loopback addresses (2001:db8::1/128, 2001:db8::2/128, 2001:db8::3/128) along with the peering link between R1 and R2 (2001:db8:0:12::/64)
+
+- R2 configuration for this:
+
+```
+router bgp 65200
+ bgp router-id 192.168.2.2
+ bgp log-neighbor-changes
+ no bgp default ipv4-unicast
+ neighbor 2001:DB8:0:12::1 remote-as 65100
+ neighbor 2001:DB8:0:23::3 remote-as 65300
+ neighbor 2001:DB8:0:23::3 ha-mode graceful-restart
+ !
+ address-family ipv4
+ exit-address-family
+ !
+ address-family ipv6
+  network 2001:DB8::2/128
+  network 2001:DB8:0:12::/64
+  network 2001:DB8:0:23::/64
+  aggregate-address 2001:DB8::/59 summary-only
+  neighbor 2001:DB8:0:12::1 activate
+  neighbor 2001:DB8:0:23::3 activate
+ exit-address-family
+```
+
+- BGP tables on R1 and R3:
+
+- R1:
+
+```
+R1#show bgp ipv6 uni | b Net
+     Network          Next Hop            Metric LocPrf Weight Path
+ *>   2001:DB8::/59    2001:DB8:0:12::2
+                                                0             0 65200 i
+ *>   2001:DB8::1/128  ::                       0         32768 i
+ *>   2001:DB8:0:12::/64
+                       ::                       0         32768 i
+ *>   2001:DB8:0:23::/64
+                       2001:DB8:0:12::2
+                                                0             0 65200 i
+ *>   2001:DB8:4:4::4/128
+                       2001:DB8:0:1::4          0         32768 ?
+```
+
+- R3:
+
+```
+R3#show bgp ipv6 uni | b Net
+     Network          Next Hop            Metric LocPrf Weight Path
+ *>   2001:DB8::/59    2001:DB8:0:23::2
+                                                0             0 65200 i
+ *>   2001:DB8::3/128  ::                       0         32768 i
+ *>   2001:DB8:0:3::/64
+                       ::                       0         32768 i
+ *    2001:DB8:0:23::/64
+                       2001:DB8:0:23::2
+                                                0             0 65200 i
+ *>                    ::                       0         32768 i
+ *>   2001:DB8:4:4::4/128
+                       2001:DB8:0:23::2
+                                                              0 65200 65100 ?
+```
+
+- You can see that all smaller routes have been aggregated and supressed into 2001:db8::/59 as expected
+
+- The summarization of the IPv6 loopback addresses (2001:db8:0:1::/128, 2001:db8:0:2::/128, 2001:db8:0:3::/128) is fairly simple as they fall into the base IPv6 summary range 2001:db8:0:0/64
+
+- The fourth hextet beginning with a decimal value 1, 2 or 3 would consume only 2 bits; the range could be summarized easily into 2001:db8:0:0::/62 or 2001:db8::/62 network range
+
+- The peering link between R1 and R2 requires thinking in hex first, rather than in decimal values
+
+- The fourth hextet carries a decimal value 18 (not 12), which requires minimum 5 bits
+
+- Bits needed for summarization (IPv6 summary address) and the component networks in the summary range:
+
+![summ-range](./bgp-ipv6-summary-range.png)
+
+- Currently the peering between R2 and R3 (2001:db8:0:23::/64) is not being summarized and supressed, as it is still visible in R1's routing table
+
+- The hex value of 23 (0x23) converts to a decimal value of 35, which requires 6 bits
+
+- The summarized network range must be changed to 2001:db8::/58 for summarization of the 2001:db8:0:23::/64 network to occur:
+
+- Configuration change on R2:
+
+```
+R2#conf t
+Enter configuration commands, one per line.  End with CNTL/Z.
+R2(config)#router bgp 65200
+R2(config-router)#address-family ipv6
+R2(config-router-af)#no aggregate-address 2001:DB8::/59 summary-only
+R2(config-router-af)#aggregate-address 2001:db8::/58 summary-only 
+```
+
+- Verifying that the 2001:db8:0:23::/64 network is not advertised anymore to R1:
+
+```
+R1#show bgp ipv6 uni  | b Net 
+     Network          Next Hop            Metric LocPrf Weight Path
+ *>   2001:DB8::/58    2001:DB8:0:12::2
+                                                0             0 65200 i
+ *>   2001:DB8::1/128  ::                       0         32768 i
+ *>   2001:DB8:0:12::/64
+                       ::                       0         32768 i
+ *>   2001:DB8:4:4::4/128
+                       2001:DB8:0:1::4          0         32768 ?
+```
+
