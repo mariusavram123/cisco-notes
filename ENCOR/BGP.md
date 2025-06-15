@@ -1389,3 +1389,220 @@ B     192.168.0.0/16 [20/0] via 10.12.1.2, 00:16:06
 
 - Notice that R1's stub networks have been supressed, and the summary discard route for the 172.16.0.0/20 network has been installed in the RIB as well
 
+#### Atomic Aggregate
+
+- Aggregated routes act as new BGP routes with a shorter prefix length
+
+- When a BGP router summarizes a route, it does not advertise the AS_Path information from before the aggregation
+
+- BGP path attributes like AS_Path, MED and BGP communities are not included in the new  BGP advertisement
+
+- The atomic aggregate attribute indicates that a lost of path information has occured
+
+- To demonstrate this best, the previous route aggregation on R1 has been removed and added to R2 so that R2 is now aggregating the 172.16.0.0/20 and 192.168.0.0/16 networks with suppresion
+
+- R1: - removing aggregate-address
+
+```
+conf t
+ router bgp 65100
+  no aggregate-address 172.16.0.0 255.255.240.0 summary-only
+```
+
+- R2:
+
+```
+conf t
+ router bgp 65200
+  bgp log-neighbor-changes
+  no bgp default ipv4-unicast
+  neighbor 10.12.1.1 remote-as 65100
+  neighbor 10.23.1.2 remote-as 65300
+  !
+  address-family ipv4
+   network 10.12.1.0 mask 255.255.255.0
+   network 10.23.1.0 mask 255.255.255.0
+   network 192.168.2.2 mask 255.255.255.255
+   aggregate-address 192.168.0.0 255.255.0.0 summary-only
+   aggregate-address 172.16.0.0 255.255.240.0 summary-only
+   redistribute connected
+   neighbor 10.12.1.1 activate
+   neighbor 10.23.1.2 activate
+  exit-address-family
+```
+
+- R2 and R3 BGP tables are below. R2 is aggregating and supressing R1's stub networks (172.16.1.0/24, 172.16.2.0/24, 172.16.3.0/24) into 172.16.0.0/20 network
+
+- R2:
+
+```
+R2(config-router-af)#do sh bgp ipv4 uni | b Net
+     Network          Next Hop            Metric LocPrf Weight Path
+ *    10.12.1.0/24     10.12.1.1                0             0 65100 i
+ *>                    0.0.0.0                  0         32768 i
+ *    10.23.1.0/24     10.23.1.2                0             0 65300 i
+ *>                    0.0.0.0                  0         32768 i
+ *>   172.16.0.0/20    0.0.0.0                            32768 i
+ s>   172.16.1.0/24    10.12.1.1                0             0 65100 i
+ s>   172.16.2.0/24    10.12.1.1                0             0 65100 i
+ s>   172.16.3.0/24    10.12.1.1                0             0 65100 i
+ *>   192.168.0.0/16   0.0.0.0                            32768 i
+ s>   192.168.1.1/32   10.12.1.1                0             0 65100 i
+ s>   192.168.2.2/32   0.0.0.0                  0         32768 i
+ s>   192.168.3.3/32   10.23.1.2                0             0 65300 i
+```
+
+- R3:
+
+```
+R3#show bgp ipv4 un | b Net
+     Network          Next Hop            Metric LocPrf Weight Path
+ *>   10.12.1.0/24     10.23.1.1                0             0 65200 i
+ *    10.23.1.0/24     10.23.1.1                0             0 65200 i
+ *>                    0.0.0.0                  0         32768 i
+ *>   172.16.0.0/20    10.23.1.1                0             0 65200 i
+ *>   192.168.0.0/16   10.23.1.1                0             0 65200 i
+ *>   192.168.3.3/32   0.0.0.0                  0         32768 i
+```
+
+- The component network prefixes maintain the AS_Path of 65100 on R2 while the aggregate 172.16.0.0/20 network appears locally generated on R2
+
+- From R3's perspective R2 does not advertise R1's stub networks; instead it advertises the 172.16.0.0/20 network as it's own
+
+- The AS_Path for the 172.16.0.0/20 network on R3 is simply AS 65200 and does not include AS 65100
+
+- Showing the explicit 172.16.0.0/20 prefix on R3:
+
+```
+R3#show bgp ipv4 unicast 172.16.0.0
+BGP routing table entry for 172.16.0.0/20, version 11
+Paths: (1 available, best #1, table default)
+  Not advertised to any peer
+  Refresh Epoch 1
+  65200, (aggregated by 65200 192.168.2.2)
+    10.23.1.1 from 10.23.1.1 (192.168.2.2)
+      Origin IGP, metric 0, localpref 100, valid, external, atomic-aggregate, best
+      rx pathid: 0, tx pathid: 0x0
+      Updated on Jun 15 2025 08:55:20 UTC
+```
+
+- The route's NLRI information indicates that the routes were aggregated in AS 65200 by the router with the RID 192.168.2.2
+
+- In addition the atomic aggregate attribute has been set to indicate a lost of path attributes, such as AS_Path in this scenario
+
+#### Route Aggregation with AS_SET
+
+- To keep the BGP path information history, the optional `as-set` keyword may be used with the `aggregate-address` command
+
+- As the router generates the aggregate route, BGP attributes from the component aggregate routes are copied over it
+
+- The AS_Path setting from the original prefixes are stored in the AS_SET portion of the AS_Path
+
+- The AS_SET which is displayed within brackets, only counts as one hop, even if multiple AS-es are listed 
+
+- R2 BGPs configuration updated for summarizing both networks with the AS_SET keyword:
+
+```
+conf t
+ router bgp 65200
+  bgp log-neighbor-changes
+  no bgp default ipv4-unicast
+  neighbor 10.12.1.1 remote-as 65100
+  neighbor 10.23.1.2 remote-as 65300
+  !
+  address-family ipv4
+   network 10.12.1.0 mask 255.255.255.0
+   network 10.23.1.0 mask 255.255.255.0
+   network 192.168.2.2 mask 255.255.255.255
+   aggregate-address 192.168.0.0 255.255.0.0 as-set summary-only
+   aggregate-address 172.16.0.0 255.255.240.0 as-set summary-only
+   redistribute connected
+   neighbor 10.12.1.1 activate
+   neighbor 10.23.1.2 activate
+  exit-address-family
+```
+
+- The 172.16.0.0/20 route on R3. Notice that the AS_Path information now contains AS 65100 as part of the information
+
+```
+R3#show bgp ipv4 uni 172.16.0.0
+BGP routing table entry for 172.16.0.0/20, version 30
+Paths: (1 available, best #1, table default)
+  Not advertised to any peer
+  Refresh Epoch 2
+  65200 {65100}, (aggregated by 65200 192.168.2.2)
+    10.23.1.1 from 10.23.1.1 (192.168.2.2)
+      Origin IGP, metric 0, localpref 100, valid, external, best
+      rx pathid: 0, tx pathid: 0x0
+      Updated on Jun 15 2025 09:28:28 UTC
+```
+
+```
+R3#show bgp ipv4 uni | b Net
+     Network          Next Hop            Metric LocPrf Weight Path
+ *>   10.12.1.0/24     10.23.1.1                0             0 65200 i
+ *    10.23.1.0/24     10.23.1.1                0             0 65200 i
+ *>                    0.0.0.0                  0         32768 i
+ *>   172.16.0.0/20    10.23.1.1                0             0 65200 {65100} i
+ *>   192.168.3.3/32   0.0.0.0                  0         32768 i
+```
+
+- Notice that the 192.168.0.0/16 network prefix is no longer present in R3's BGP table
+
+- The reason for this is that on R2, R2 is aggregating all the loopback networks from R1 (AS 65100), R2 (AS 65200) and R3 (AS 65300)
+
+- Now that R2 is copying all component route's BGP path attributes into the AS_SET information, the AS path for 192.168.0.0/16 contains AS 65300
+
+- When the aggregate is advertised to R3, R3 discards that route because it sees it's own AS_Path in the advertisement and thinks that it is a loop
+
+- R2's BGP table and path attributes for 192.168.0.0/16 network:
+
+```
+R2#show bgp ipv4 uni | b Net
+     Network          Next Hop            Metric LocPrf Weight Path
+ *    10.12.1.0/24     10.12.1.1                0             0 65100 i
+ *>                    0.0.0.0                  0         32768 i
+ *    10.23.1.0/24     10.23.1.2                0             0 65300 i
+ *>                    0.0.0.0                  0         32768 i
+ *>   172.16.0.0/20    0.0.0.0                       100  32768 {65100} i
+ s>   172.16.1.0/24    10.12.1.1                0             0 65100 i
+ s>   172.16.2.0/24    10.12.1.1                0             0 65100 i
+ s>   172.16.3.0/24    10.12.1.1                0             0 65100 i
+ *>   192.168.0.0/16   0.0.0.0                       100  32768 {65100,65300} i
+ s>   192.168.1.1/32   10.12.1.1                0             0 65100 i
+ s>   192.168.2.2/32   0.0.0.0                  0         32768 i
+ s>   192.168.3.3/32   10.23.1.2                0             0 65300 i
+```
+
+```
+R2#sh bgp ipv4 uni 192.168.0.0
+BGP routing table entry for 192.168.0.0/16, version 46
+Paths: (1 available, best #1, table default)
+  Advertised to update-groups:
+     1         
+  Refresh Epoch 1
+  {65100,65300}, (aggregated by 65200 192.168.2.2)
+    0.0.0.0 from 0.0.0.0 (192.168.2.2)
+      Origin IGP, localpref 100, weight 32768, valid, aggregated, local, best
+      rx pathid: 0, tx pathid: 0x0
+      Updated on Jun 15 2025 09:33:11 UTC
+```
+
+- R1 does not install the 192.168.0.0/16 prefix for the same reason that R3 does not install the 192.168.0.0/16 network
+
+- R1 thinks that the advertisement is a loop because it detects AS 65100 in the advertisement
+
+- R1's BGP table:
+
+```
+R1#sh bgp ipv4 uni | b Net   
+     Network          Next Hop            Metric LocPrf Weight Path
+ *    10.12.1.0/24     10.12.1.2                0             0 65200 i
+ *>                    0.0.0.0                  0         32768 i
+ *>   10.23.1.0/24     10.12.1.2                0             0 65200 i
+ *>   172.16.1.0/24    0.0.0.0                  0         32768 i
+ *>   172.16.2.0/24    0.0.0.0                  0         32768 i
+ *>   172.16.3.0/24    0.0.0.0                  0         32768 i
+ *>   192.168.1.1/32   0.0.0.0                  0         32768 i
+```
+
