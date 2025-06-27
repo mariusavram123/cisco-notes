@@ -406,3 +406,107 @@ conf t
  (this is used only to permit any other prefixes)
 ```
 
+### Conditional Matching
+
+- Can match IP prefixes based on ACLs, AS-Path ACLs, or prefix-lists:
+
+```
+conf t
+ route-map <name> <permit|deny> <seq>
+  match as-path <acl-nr>
+
+ route-map <name> <permit|deny> <seq>
+  match ip address <acl-nr|acl-name>
+
+ route-map <name> <permit|deny> <seq>
+  match ip address prefix-list <prefix-list-name>
+
+ route-map <name> <permit|deny> <seq>
+  match local-preference <local-preference>
+
+ route-map <name> <permit|deny> <seq>
+  match metric <1-4294967295 | external> <metric-value|deviation(+/-)>
+
+ route-map <name> <permit|deny> <seq>
+  match tag <tag-nr>
+```
+
+- You can also match multiple access-lists on the same route-map
+
+- For this situation the prefixes just need to be matched by only one ACL/prefix list (a logical OR operation is used)
+
+```
+conf t
+ route-map EXAMPLE permit 10
+  match ip address ACL-ONE ACL-TWO
+
+ route-map EXAMPLE permit 20
+```
+
+- If multiple match statements are configured on the same sequence of a route-map, then both match statements must match in order for the prefix/route to be matched further (a logical AND is used for that)
+
+```
+conf t
+ route-map EXAMPLE permit 10
+  match ip address ACL-ONE
+  match metric 550 +- 50
+```
+
+- Complex matching route maps:
+
+```
+conf t
+ ip access-list standard ACL-ONE
+  deny 172.16.1.0 0.0.0.255
+  permit 172.16.0.0 0.0.255.255
+
+ route-map EXAMPLE permit 10
+  match ip address ACL-ONE
+
+ route-map EXAMPLE deny 20
+  match ip address ACL-ONE
+
+ route-map EXAMPLE permit 30
+  set metric 20
+```
+
+- Optional actions for route maps:
+
+```
+conf t
+ route-map EXAMPLE permit 10
+  set as-path prepend <pattern | last-as 1-10>
+  set ip next-hop <ip_address | peer-address | self>
+  set local preference <0 - 4294967295>
+  set origin <igp | incomplete>
+  set tag <tag-value>
+  set weight <0 - 65535>
+```
+
+- Using the continue keyword on route-maps allows the processing of the sequences to be continued for some route types
+
+```
+conf t
+ ip access-list standard ACL-ONE
+  permit 192.168.1.1 0.0.0.0
+  permit 172.16.0.0 0.0.255.255
+
+ ip access-list standard ACL-TWO
+  permit 192.168.1.1 0.0.0.0
+  permit 172.31.0.0 0.0.255.255
+
+ route-map EXAMPLE permit 10
+  match ip address ACL-ONE
+  set metric 20
+  continue
+
+ route-map EXAMPLE permit 20
+  match ip address ACL-TWO
+  set ip next-hop 10.12.1.1
+
+ route-map EXAMPLE permit 30
+  set ip next-hop 10.13.1.3
+```
+
+- The 192.168.1.1/32 prefix will have metric 20 and will have next-hop set to 10.12.1.1
+
