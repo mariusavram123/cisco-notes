@@ -183,3 +183,226 @@ router bgp 65002
  neighbor 10.23.1.3 distribute-list TEST-acl out
 ```
 
+### IPv6 prefix lists
+
+- Configuring an IPv6 prefix list:
+
+```
+conf t
+ ipv6 prefix-list <name> [seq <seq_nr>] <permit | deny> <high-order-bit-pattern/high-order-bit-count> [ge <ge-value>] [le <le-value>]
+```
+
+- Example IPv6 prefix-list
+
+```
+ipv6 prefix-list PRIVATE-IPV6 seq 5 permit 2001:2::/48 ge 48
+ipv6 prefix-list PRIVATE-IPV6 seq 10 permit 2001:db8::/32 ge 32
+```
+
+### Regular Expressions (regex)
+
+- Regex used to match the BGP AS_Path
+
+- Example:
+
+```
+show bgp <afi> <safi> regexp <regexp-pattern>
+```
+
+- List and description of the common regex modifiers:
+
+```
+_ (underscore)      Matches a space
+^ (caret)       Indicates the start of a string
+$ (dollar sign)         Indicates the end of a string
+[] (brackets)          Matches a single character or nesting within a range
+- (hyphen)          Indicates a range of numbers in brackets
+[^] (caret in brackets)         Excludes the characters listed in brackets
+() (parentheses)            Used for nesting of search patterns
+| (pipe)            Provides OR functionality to the query
+. (period)              Matches a single character, including a space
+* (asterisk)            Matches zero or more characters or patterns
++ (plus sign)           Matches one or more instances of the character or pattern
+? (question mark)           Matches one or no instances of the character or pattern
+```
+
+- Common BGP regular expressions:
+
+- Only routes locally originated (regexp do not work with "| b Net" in the command)
+
+```
+R1#show bgp ipv4 uni rege ^$       
+BGP table version is 9, local router ID is 192.168.1.1
+Status codes: s suppressed, d damped, h history, * valid, > best, i - internal, 
+              r RIB-failure, S Stale, m multipath, b backup-path, f RT-Filter, 
+              x best-external, a additional-path, c RIB-compressed, 
+              t secondary path, 
+Origin codes: i - IGP, e - EGP, ? - incomplete
+RPKI validation codes: V valid, I invalid, N Not found
+
+     Network          Next Hop            Metric LocPrf Weight Path
+ *>   10.12.1.0/24     0.0.0.0                  0         32768 i
+ *>   10.15.1.0/24     0.0.0.0                  0         32768 i
+ *>   100.64.0.1/32    0.0.0.0                  0         32768 i
+```
+
+- Routes originating from AS 65002
+
+```
+R1#show bgp ipv4 uni reg ^65002_  
+BGP table version is 9, local router ID is 192.168.1.1
+Status codes: s suppressed, d damped, h history, * valid, > best, i - internal, 
+              r RIB-failure, S Stale, m multipath, b backup-path, f RT-Filter, 
+              x best-external, a additional-path, c RIB-compressed, 
+              t secondary path, 
+Origin codes: i - IGP, e - EGP, ? - incomplete
+RPKI validation codes: V valid, I invalid, N Not found
+
+     Network          Next Hop            Metric LocPrf Weight Path
+ *    10.12.1.0/24     10.12.1.2                0             0 65002 i
+ *>   10.23.1.0/24     10.12.1.2                0             0 65002 i
+ *>   10.34.1.0/24     10.12.1.2                              0 65002 65003 i
+ *>   172.16.66.64/28  10.12.1.2                0             0 65002 i
+ *>   192.168.2.2/32   10.12.1.2                0             0 65002 i
+ *>   192.168.22.22/32 10.12.1.2                0             0 65002 i
+```
+
+- Routes containing 65003 in the path:
+
+```
+R1#show bgp ipv4 uni reg ^.*65003$
+BGP table version is 9, local router ID is 192.168.1.1
+Status codes: s suppressed, d damped, h history, * valid, > best, i - internal, 
+              r RIB-failure, S Stale, m multipath, b backup-path, f RT-Filter, 
+              x best-external, a additional-path, c RIB-compressed, 
+              t secondary path, 
+Origin codes: i - IGP, e - EGP, ? - incomplete
+RPKI validation codes: V valid, I invalid, N Not found
+
+     Network          Next Hop            Metric LocPrf Weight Path
+ *>   10.34.1.0/24     10.12.1.2                              0 65002 65003 i
+```
+
+- Route originating from AS 65001:
+
+```
+R3#show bgp ipv4 uni reg _65001_
+BGP table version is 6, local router ID is 192.168.3.3
+Status codes: s suppressed, d damped, h history, * valid, > best, i - internal, 
+              r RIB-failure, S Stale, m multipath, b backup-path, f RT-Filter, 
+              x best-external, a additional-path, c RIB-compressed, 
+              t secondary path, 
+Origin codes: i - IGP, e - EGP, ? - incomplete
+RPKI validation codes: V valid, I invalid, N Not found
+
+     Network          Next Hop            Metric LocPrf Weight Path
+ *>   10.15.1.0/24     10.23.1.2                              0 65002 65001 i
+```
+
+- Show routes passing through AS 65003:
+
+```
+R4#show bgp ipv4 uni regex _65003_
+BGP table version is 7, local router ID is 192.168.4.4
+Status codes: s suppressed, d damped, h history, * valid, > best, i - internal, 
+              r RIB-failure, S Stale, m multipath, b backup-path, f RT-Filter, 
+              x best-external, a additional-path, c RIB-compressed, 
+              t secondary path, 
+Origin codes: i - IGP, e - EGP, ? - incomplete
+RPKI validation codes: V valid, I invalid, N Not found
+
+     Network          Next Hop            Metric LocPrf Weight Path
+ *>   10.12.1.0/24     10.34.1.3                              0 65003 65002 i
+ *>   10.15.1.0/24     10.34.1.3                              0 65003 65002 65001 i
+ *>   10.23.1.0/24     10.34.1.3                0             0 65003 i
+ *    10.34.1.0/24     10.34.1.3                0             0 65003 i
+ *>   172.16.66.64/28  10.34.1.3                              0 65003 65002 i
+```
+
+- Show routes with AS path containing 2 or more AS-es:
+
+```
+R4#show bgp ipv4 uni regexp ^[0-9]+ [0-9]+
+BGP table version is 7, local router ID is 192.168.4.4
+Status codes: s suppressed, d damped, h history, * valid, > best, i - internal, 
+              r RIB-failure, S Stale, m multipath, b backup-path, f RT-Filter, 
+              x best-external, a additional-path, c RIB-compressed, 
+              t secondary path, 
+Origin codes: i - IGP, e - EGP, ? - incomplete
+RPKI validation codes: V valid, I invalid, N Not found
+
+     Network          Next Hop            Metric LocPrf Weight Path
+ *>   10.12.1.0/24     10.34.1.3                              0 65003 65002 i
+ *>   10.15.1.0/24     10.34.1.3                              0 65003 65002 65001 i
+ *>   172.16.66.64/28  10.34.1.3                              0 65003 65002 i
+```
+
+- Or:
+
+```
+R4#show bgp ipv4 uni regexp ^[0-9]+ [0-9]? 
+BGP table version is 8, local router ID is 192.168.4.4
+Status codes: s suppressed, d damped, h history, * valid, > best, i - internal, 
+              r RIB-failure, S Stale, m multipath, b backup-path, f RT-Filter, 
+              x best-external, a additional-path, c RIB-compressed, 
+              t secondary path, 
+Origin codes: i - IGP, e - EGP, ? - incomplete
+RPKI validation codes: V valid, I invalid, N Not found
+
+     Network          Next Hop            Metric LocPrf Weight Path
+ *>   10.12.1.0/24     10.34.1.3                              0 65003 65002 i
+ *>   10.15.1.0/24     10.34.1.3                              0 65003 65002 65001 i
+ *>   10.56.1.0/24     10.34.1.3                              0 65003 65002 65001 65005 i
+ *>   172.16.66.64/28  10.34.1.3                              0 65003 65002 i
+```
+
+- Routes coming from AS 65001:
+
+```
+R6#show bgp ipv4 uni regex _65001$
+BGP table version is 11, local router ID is 192.168.6.6
+Status codes: s suppressed, d damped, h history, * valid, > best, i - internal, 
+              r RIB-failure, S Stale, m multipath, b backup-path, f RT-Filter, 
+              x best-external, a additional-path, c RIB-compressed, 
+              t secondary path, 
+Origin codes: i - IGP, e - EGP, ? - incomplete
+RPKI validation codes: V valid, I invalid, N Not found
+
+     Network          Next Hop            Metric LocPrf Weight Path
+ *>   10.12.1.0/24     10.56.1.5                              0 65005 65001 i
+ *>   100.64.0.1/32    10.56.1.5                              0 65005 65001 i
+```
+
+- Common expressions:
+
+```
+^$                  Local originating routes
+permit ^200_        Only routes from neighbor AS 200
+permit _200$        Only routes originating from AS 200
+permit _200_        Only routes that pass through AS 200
+permit ^[0-9]+ [0-9]+ [0-9]+?           Routes with three or fewer AS_Path entries
+```
+
+### Route Maps
+
+- Route-Maps are mostly used in combination with access-lists and prefix lists
+
+- Are used to do more granular filtering and set up of path attributes or route metrics
+
+- Configuring route maps:
+
+```
+conf t
+ route-map EXAMPLE permit 10
+  match ip address ACL-ONE
+
+ route-map EXAMPLE deny 20
+  match ip address ACL-TWO
+
+ route-map EXAMPLE permit 30
+  match ip address ACL-THREE
+   set metric 20
+ route-map EXAMPLE permit 40
+ (this is used only to permit any other prefixes)
+```
+
