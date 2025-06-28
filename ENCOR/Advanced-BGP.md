@@ -510,3 +510,338 @@ conf t
 
 - The 192.168.1.1/32 prefix will have metric 20 and will have next-hop set to 10.12.1.1
 
+### BGP Route Filtering and Manipulation
+
+- Filtering can be done using many methods:
+
+    - Using distribute lists (matching based on ACLs)
+
+    - Using prefix lists
+
+    - Using AS path ACLs
+
+    - Using route-maps - route-maps also allow for modifications of BGP path attributes and can match using either distribute lists and prefix lists
+
+    - You cannot use both a distribute list and a prefix list at the same time to filter incoming or outgoing BGP routes (only one in and one out, but not two on the same direction)
+
+#### Distribute List Filtering
+
+ - Topology: R1 (AS 65000) connected and establishing a eBGP session with R2 (65001). R2 may be connected to a router in AS 65002. We are interested of the BGP tables between R1 and R2:
+
+ ```
+R1#show  bgp ipv4 uni | b Net
+     Network          Next Hop            Metric LocPrf Weight Path
+ *>   10.1.1.1/32      0.0.0.0                  0         32768 i
+ *>   10.3.3.3/32      10.12.1.2                              0 65001 65002 i
+ *>   10.11.11.0/24    0.0.0.0                  0         32768 i
+ *    10.12.1.0/30     10.12.1.2                0             0 65001 i
+ *>                    0.0.0.0                  0         32768 i
+ *>   10.23.1.0/30     10.12.1.2                0             0 65001 ?
+ *>   10.33.1.0/24     10.12.1.2                              0 65001 65002 ?
+ *>   10.33.33.0/24    10.12.1.2                              0 65001 65002 ?
+ *>   100.64.2.0/25    10.12.1.2                0             0 65001 ?
+ *>   100.64.2.192/26  10.12.1.2                0             0 65001 ?
+ *>   100.64.3.0/25    10.12.1.2                              0 65001 65002 65004 ?
+ *>   192.168.1.1/32   0.0.0.0                  0         32768 i
+ *>   192.168.2.2/32   10.12.1.2                0             0 65001 i
+ *>   192.168.3.3/32   10.12.1.2                              0 65001 65002 ?
+ ```
+
+- Configuration of R1 and the access list:
+
+```
+R1#show access-lists 
+Extended IP access list ACL-ALLOW
+    10 permit ip 192.168.0.0 0.0.255.255 host 255.255.255.255 (8 matches)
+    20 permit ip 100.64.0.0 0.0.255.0 host 255.255.255.128 (2 matches)
+
+R1#sh run | s router bgp
+router bgp 65000
+ bgp log-neighbor-changes
+ network 10.1.1.1 mask 255.255.255.255
+ network 10.11.11.0 mask 255.255.255.0
+ network 10.12.1.0 mask 255.255.255.252
+ network 100.64.0.0 mask 255.255.255.0
+ network 192.168.1.1 mask 255.255.255.255
+ neighbor 10.12.1.2 remote-as 65001
+ neighbor 10.12.1.2 soft-reconfiguration inbound
+ neighbor 10.12.1.2 distribute-list ACL-ALLOW in
+```
+
+- BGP routing table of R1:
+
+```
+R1#show bgp ipv4 uni | b Net
+     Network          Next Hop            Metric LocPrf Weight Path
+ *>   10.1.1.1/32      0.0.0.0                  0         32768 i
+ *>   10.11.11.0/24    0.0.0.0                  0         32768 i
+ *>   10.12.1.0/30     0.0.0.0                  0         32768 i
+ *>   100.64.2.0/25    10.12.1.2                0             0 65001 ?
+ *>   100.64.3.0/25    10.12.1.2                              0 65001 65002 65004 ?
+ *>   192.168.1.1/32   0.0.0.0                  0         32768 i
+ *>   192.168.2.2/32   10.12.1.2                0             0 65001 i
+ *>   192.168.3.3/32   10.12.1.2                              0 65001 65002 ?
+```
+
+#### Prefix List Filtering
+
+- Filtering using a prefix list:
+
+- R1 configuration:
+
+```
+R1(config-router)#do sh ip prefix-list
+ip prefix-list RFC1918: 5 entries
+   seq 5 permit 192.168.0.0/13 ge 32
+   seq 10 deny 0.0.0.0/0 ge 32
+   seq 15 permit 10.0.0.0/7 ge 8
+   seq 20 permit 172.0.0.0/11 ge 12
+   seq 25 permit 192.168.0.0/15 ge 16
+
+R1(config-router)#do sh run | s router bgp
+router bgp 65000
+ bgp log-neighbor-changes
+ network 10.1.1.1 mask 255.255.255.255
+ network 10.11.11.0 mask 255.255.255.0
+ network 10.12.1.0 mask 255.255.255.252
+ network 100.64.0.0 mask 255.255.255.0
+ network 192.168.1.1 mask 255.255.255.255
+ neighbor 10.12.1.2 remote-as 65001
+ neighbor 10.12.1.2 soft-reconfiguration inbound
+ neighbor 10.12.1.2 prefix-list RFC1918 in
+```
+
+- BGP table on R1:
+
+```
+R1(config-router)#do sh bgp ipv4 uni | b Net
+     Network          Next Hop            Metric LocPrf Weight Path
+ *>   10.1.1.1/32      0.0.0.0                  0         32768 i
+ *>   10.11.11.0/24    0.0.0.0                  0         32768 i
+ *>   10.12.1.0/30     0.0.0.0                  0         32768 i
+ *                     10.12.1.2                0             0 65001 i
+ *>   10.23.1.0/30     10.12.1.2                0             0 65001 ?
+ *>   10.33.1.0/24     10.12.1.2                              0 65001 65002 ?
+ *>   10.33.33.0/24    10.12.1.2                              0 65001 65002 ?
+ *>   192.168.1.1/32   0.0.0.0                  0         32768 i
+ *>   192.168.2.2/32   10.12.1.2                0             0 65001 i
+ *>   192.168.3.3/32   10.12.1.2                              0 65001 65002 ?
+```
+
+- Cannot apply distribute list and prefix list to a neighbor in the same direction:
+
+```
+R1(config-router)#neighbor 10.12.1.2 distribute-list ACL-ALLOW in
+Prefix/distribute list can not co-exist
+R1(config-router)#neighbor 10.12.1.2 distribute-list ACL-ALLOW out
+R1(config-router)#no neighbor 10.12.1.2 distribute-list ACL-ALLOW out
+```
+
+- But can be configured in the other direction as shown above
+
+#### AS Path ACL Filtering
+
+- Filtering based on an AS Path ACL
+
+- Routing table of R2
+
+```
+R2#show bgp ipv4 uni neighbors 10.12.1.1 advertised-routes | b Net
+     Network          Next Hop            Metric LocPrf Weight Path
+ *>   10.1.1.1/32      10.12.1.1                0             0 65000 i
+ *>   10.3.3.3/32      10.23.1.2                0             0 65002 i
+ *>   10.11.11.0/24    10.12.1.1                0             0 65000 i
+ *>   10.12.1.0/30     0.0.0.0                  0         32768 i
+ *>   10.23.1.0/30     0.0.0.0                  0         32768 ?
+ *>   10.33.1.0/24     10.23.1.2                0             0 65002 ?
+ *>   10.33.33.0/24    10.23.1.2                0             0 65002 ?
+ *>   100.64.2.0/25    0.0.0.0                  0         32768 ?
+ *>   100.64.2.192/26  0.0.0.0                  0         32768 ?
+ *>   100.64.3.0/25    10.23.1.2                              0 65002 65004 ?
+ *>   192.168.1.1/32   10.12.1.1                0             0 65000 i
+ *>   192.168.2.2/32   0.0.0.0                  0         32768 i
+ *>   192.168.3.3/32   10.23.1.2                0             0 65002 ?
+```
+
+- Configuring an AS Path ACL:
+
+```
+conf t
+ ip as-path access-list <number> <permit | deny> <regexp_query>
+
+ router bgp <as-nr>
+  address-family <afi> <safi>
+   neighbor <ip-address> filter-list <acl-nr> <in | out>
+```
+
+- R2's configuration to allow only locally originated routes to be advertised to neighbors
+
+- The AS Path ACL is applied to all neighbors
+
+```
+R2(config)#ip as-path access-list 1 permit ^$
+
+R2(config)#router bgp 65001
+R2(config-router)#address-family ipv4
+R2(config-router-af)#neighbor 10.12.1.1 filter-list 1 out 
+
+R2(config-router-af)#neighbor 10.23.1.2 filter-list 1 out
+```
+
+- Checking the advertised routes again:
+
+```
+R2#show bgp ipv4 uni neighbors 10.12.1.1 advertised-routes | b Net
+     Network          Next Hop            Metric LocPrf Weight Path
+ *>   10.12.1.0/30     0.0.0.0                  0         32768 i
+ *>   10.23.1.0/30     0.0.0.0                  0         32768 ?
+ *>   100.64.2.0/25    0.0.0.0                  0         32768 ?
+ *>   100.64.2.192/26  0.0.0.0                  0         32768 ?
+ *>   192.168.2.2/32   0.0.0.0                  0         32768 i
+```
+
+```
+R2#show bgp ipv4 uni neighbors 10.23.1.2 advertised-routes | b Net
+     Network          Next Hop            Metric LocPrf Weight Path
+ *>   10.12.1.0/30     0.0.0.0                  0         32768 i
+ *>   10.23.1.0/30     0.0.0.0                  0         32768 ?
+ *>   100.64.2.0/25    0.0.0.0                  0         32768 ?
+ *>   100.64.2.192/26  0.0.0.0                  0         32768 ?
+ *>   192.168.2.2/32   0.0.0.0                  0         32768 i
+```
+
+#### Route Maps
+
+- Route maps provide also the possibility of modifying path attributes for a BGP neighbor
+
+- Reverted the filtering done before and showing the BGP table of R1:
+
+```
+R1#show bgp ipv4 uni | b Net
+     Network          Next Hop            Metric LocPrf Weight Path
+ *>   10.1.1.1/32      0.0.0.0                  0         32768 i
+ *>   10.3.3.3/32      10.12.1.2                              0 65001 65002 i
+ *>   10.11.11.0/24    0.0.0.0                  0         32768 i
+ *    10.12.1.0/30     10.12.1.2                0             0 65001 i
+ *>                    0.0.0.0                  0         32768 i
+ *>   10.23.1.0/30     10.12.1.2                0             0 65001 ?
+ *>   10.33.1.0/24     10.12.1.2                              0 65001 65002 ?
+ *>   10.33.33.0/24    10.12.1.2                              0 65001 65002 ?
+ *>   100.64.2.0/25    10.12.1.2                0             0 65001 ?
+ *>   100.64.2.192/26  10.12.1.2                0             0 65001 ?
+ *>   100.64.3.0/25    10.12.1.2                              0 65001 65002 ?
+ *>   192.168.1.1/32   0.0.0.0                  0         32768 i
+ *>   192.168.2.2/32   10.12.1.2                0             0 65001 i
+ *>   192.168.3.3/32   10.12.1.2                              0 65001 65002 ?
+```
+
+- Route maps can have multiple steps:
+
+    1. Deny any routes in the 192.168.0.0/16 range using a prefix list
+
+    2. Match any routes originating from AS 65200 that are within 100.64.0.0/10 range and set the local preference to 222
+
+    3. Match any routes originating from AS 65200 that did not match step 2 and set BGP weight to 65200
+
+    4. Permit all other routes to process
+
+- R1
+
+```
+conf t
+ ip prefix-list FIRST-RFC1918 permit 192.168.0.0/15 ge 16
+ ip as-path access-list 1 permit _65001$
+ ip prefix-list SECOND-CGNAT permit 100.64.0.0/10 ge 11
+
+ route-map AS65200IN deny 10
+  match ip address prefix-list FIRST-RFC1918
+ route-map AS65200IN permit 20
+  match ip address prefix-list SECOND_CGNAT
+  match as-path 1
+  set local-preference 222
+ route-map AS65200IN permit 30
+  match as-path 1
+  set weight 65200
+ route-map AS65200IN permit 40
+ router bgp 65000
+  address-family ipv4
+   neighbor 10.12.1.2 route-map AS65200IN in
+```
+
+- Carefull trying to use a route map with set tag for an neighbor in inbound direction:
+
+```
+R1(config-router-af)#neighbor 10.12.1.2 route-map AS65200IN in 
+% "AS65200IN" used as BGP inbound route-map, set tag not supported
+```
+
+- Same when applying a route-map with weight to outbound
+
+```
+R1(config-router-af)#neighbor 10.12.1.2 route-map AS65200IN out 
+% "AS65200IN" used as BGP outbound route-map, set weight not supported
+```
+
+```
+R1(config-route-map)#do sh route-ma
+route-map AS65200IN, deny, sequence 10
+  Match clauses:
+    ip address prefix-lists: FIRST-RFC1918 
+  Set clauses:
+  Policy routing matches: 0 packets, 0 bytes
+route-map AS65200IN, permit, sequence 20
+  Match clauses:
+    ip address prefix-lists: SECOND-CGNAT 
+    as-path (as-path filter): 1 
+  Set clauses:
+    local-preference 222
+  Policy routing matches: 0 packets, 0 bytes
+route-map AS65200IN, permit, sequence 30
+  Match clauses:
+    as-path (as-path filter): 1 
+  Set clauses:
+    weight 65200
+  Policy routing matches: 0 packets, 0 bytes
+route-map AS65200IN, permit, sequence 40
+  Match clauses:
+  Set clauses:
+  Policy routing matches: 0 packets, 0 bytes
+```
+
+```
+R1(config)#do sh bgp ipv4 uni | b Net
+     Network          Next Hop            Metric LocPrf Weight Path
+ *>   10.1.1.1/32      0.0.0.0                  0         32768 i
+ *>   10.3.3.3/32      10.12.1.2                2         65200 65001 ?
+ *>   10.11.11.0/24    0.0.0.0                  0         32768 i
+ r    10.12.1.0/30     0.0.0.0                  0         32768 i
+ r>                    10.12.1.2                0         65200 65001 i
+ *>   10.23.1.0/30     10.12.1.2                0         65200 65001 ?
+ *>   10.33.1.0/24     10.12.1.2                2         65200 65001 ?
+ *>   10.33.33.0/24    10.12.1.2                2         65200 65001 ?
+ *>   100.64.2.0/25    10.12.1.2                0    222      0 65001 ?
+ *>   100.64.2.192/26  10.12.1.2                0    222      0 65001 ?
+ *>   100.64.3.0/25    10.12.1.2                3    222      0 65001 ?
+ *>   192.168.1.1/32   0.0.0.0                  0         32768 i
+```
+
+#### Clearing the BGP sessions
+
+- Two modes of clearing a BGP session:
+
+    - Hard reset:
+    ```
+    clear ip bgp <ip address|*>
+    ```
+
+    - Soft reset:
+    ```
+    clear ip bgp <ip-address|*> soft
+    ```
+- Performing a soft reset on a BGP peer that supports the route refresh capability, in fact initiates a route refresh
+
+- Initiating a route refresh for a specific address family:
+
+```
+clear bgp <afi> <safi> <ip-address | *> soft <in | out>
+```
