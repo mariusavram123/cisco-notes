@@ -276,3 +276,200 @@ Paths: (2 available, best #1, table default)
       rx pathid: 0, tx pathid: 0
 ```
 
+### BGP Confederations
+
+- Confederations are used to solve the need for full mesh iBGP peerings within an AS
+
+- Basically the routers get an additional AS number as part of their internal AS (not advertised to eBGP peers)
+
+- The BGP peerings are made using the loopback addresses on the routers, which are shared via OSPF
+
+![bgp-confederations-topology](./bgp-confederations-topology.png)
+
+- R1 - AS 65001 - configuration - eBGP peer:
+
+```
+router bgp 65001
+ bgp log-neighbor-changes
+ no bgp default ipv4-unicast
+ neighbor 10.2.2.2 remote-as 65002
+ neighbor 10.2.2.2 ebgp-multihop 5
+ neighbor 10.2.2.2 update-source Loopback0
+ !
+ address-family ipv4
+  network 10.1.1.1 mask 255.255.255.255
+  neighbor 10.2.2.2 activate
+ exit-address-family
+```
+
+- R2 - AS 65002, confederation AS 65100:
+
+```
+router bgp 65100
+ bgp log-neighbor-changes
+ bgp confederation identifier 65002
+ bgp confederation peers 65200 
+ no bgp default ipv4-unicast
+ neighbor 10.1.1.1 remote-as 65001
+ neighbor 10.1.1.1 ebgp-multihop 5
+ neighbor 10.1.1.1 update-source Loopback0
+ neighbor 10.3.3.3 remote-as 65100
+ neighbor 10.3.3.3 update-source Loopback0
+ neighbor 10.4.4.4 remote-as 65200
+ neighbor 10.4.4.4 ebgp-multihop 2
+ neighbor 10.4.4.4 update-source Loopback0
+ !
+ address-family ipv4
+  neighbor 10.1.1.1 activate
+  neighbor 10.3.3.3 activate
+  neighbor 10.4.4.4 activate
+ exit-address-family
+
+router ospf 1
+ network 10.2.2.2 0.0.0.0 area 0
+ network 10.23.1.0 0.0.0.3 area 0
+ network 10.24.1.0 0.0.0.3 area 0
+```
+
+- R3 - AS 65002, confederation AS 65100:
+
+```
+router bgp 65100
+ bgp log-neighbor-changes
+ bgp confederation identifier 65002
+ bgp confederation peers 65200 
+ no bgp default ipv4-unicast
+ neighbor 10.2.2.2 remote-as 65100
+ neighbor 10.2.2.2 update-source Loopback0
+ neighbor 10.5.5.5 remote-as 65200
+ neighbor 10.5.5.5 ebgp-multihop 2
+ neighbor 10.5.5.5 update-source Loopback0
+ !
+ address-family ipv4
+  neighbor 10.2.2.2 activate
+  neighbor 10.5.5.5 activate
+ exit-address-family
+
+! OSPF enabled per interfaces:
+
+show run | i ospf 1
+ ip ospf 1 area 0
+ ip ospf 1 area 0
+ ip ospf 1 area 0
+router ospf 1
+```
+
+- R4 - AS 65002 - confederation AS 65200:
+
+```
+router bgp 65200
+ bgp log-neighbor-changes
+ bgp confederation identifier 65002
+ bgp confederation peers 65100 
+ no bgp default ipv4-unicast
+ neighbor 10.2.2.2 remote-as 65100
+ neighbor 10.2.2.2 ebgp-multihop 2
+ neighbor 10.2.2.2 update-source Loopback0
+ neighbor 10.5.5.5 remote-as 65200
+ neighbor 10.5.5.5 update-source Loopback0
+ !
+ address-family ipv4
+  neighbor 10.2.2.2 activate
+  neighbor 10.5.5.5 activate
+ exit-address-family
+
+! OSPF still on interfaces
+
+R4#show running-config | i ospf 1     
+ ip ospf 1 area 0
+ ip ospf 1 area 0
+ ip ospf 1 area 0
+router ospf 1
+```
+
+- R5 - AS 65002, confederation AS 65200 - a network advertised into BGP
+
+```
+router bgp 65200
+ bgp log-neighbor-changes
+ bgp confederation identifier 65002
+ bgp confederation peers 65100 
+ no bgp default ipv4-unicast
+ neighbor 10.3.3.3 remote-as 65100
+ neighbor 10.3.3.3 ebgp-multihop 2
+ neighbor 10.3.3.3 update-source Loopback0
+ neighbor 10.4.4.4 remote-as 65200
+ neighbor 10.4.4.4 update-source Loopback0
+ !
+ address-family ipv4
+  network 10.128.70.5 mask 255.255.255.255
+  neighbor 10.3.3.3 activate
+  neighbor 10.4.4.4 activate
+ exit-address-family
+
+! OSPF on interfaces
+
+show run | i  ospf      
+ ip ospf 1 area 0
+ ip ospf 1 area 0
+ ip ospf 1 area 0
+router ospf 1
+```
+
+- Verifying the BGP routes on R2 and R3
+
+- R2:
+
+```
+show bgp ipv4 uni | b Net
+     Network          Next Hop            Metric LocPrf Weight Path
+ r>   10.1.1.1/32      10.1.1.1                 0             0 65001 i
+ *>   10.128.70.5/32   10.5.5.5                 0    100      0 (65200) i
+
+R2#show bgp ipv4 uni 10.128.70.5
+BGP routing table entry for 10.128.70.5/32, version 22
+Paths: (1 available, best #1, table default)
+  Advertised to update-groups:
+     7          9         
+  Refresh Epoch 1
+  (65200)
+    10.5.5.5 (metric 3) from 10.4.4.4 (10.4.4.4)
+      Origin IGP, metric 0, localpref 100, valid, confed-external, best
+      rx pathid: 0, tx pathid: 0x0
+```
+
+- R3:
+
+```
+R3#show ip bgp | b Net
+     Network          Next Hop            Metric LocPrf Weight Path
+ r>i  10.1.1.1/32      10.1.1.1                 0    100      0 65001 i
+ *>i  10.128.70.5/32   10.5.5.5                 0    100      0 (65200) i
+ *                     10.5.5.5                 0    100      0 (65200) i
+
+ R3#show ip bgp 10.128.70.5
+BGP routing table entry for 10.128.70.5/32, version 23
+Paths: (2 available, best #1, table default)
+  Advertised to update-groups:
+     4         
+  Refresh Epoch 1
+  (65200)
+    10.5.5.5 (metric 2) from 10.2.2.2 (10.2.2.2)
+      Origin IGP, metric 0, localpref 100, valid, confed-internal, best
+      rx pathid: 0, tx pathid: 0x0
+  Refresh Epoch 1
+  (65200)
+    10.5.5.5 (metric 2) from 10.5.5.5 (10.5.5.5)
+      Origin IGP, metric 0, localpref 100, valid, confed-external
+      rx pathid: 0, tx pathid: 0
+```
+
+- R1:
+
+```
+R1#show ip bgp | b Net      
+     Network          Next Hop            Metric LocPrf Weight Path
+ *>   10.1.1.1/32      0.0.0.0                  0         32768 i
+ *>   10.128.70.5/32   10.2.2.2                               0 65002 i
+```
+
