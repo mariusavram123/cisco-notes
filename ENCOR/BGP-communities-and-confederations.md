@@ -473,3 +473,99 @@ R1#show ip bgp | b Net
  *>   10.128.70.5/32   10.2.2.2                               0 65002 i
 ```
 
+### BGP Dynamic neighbors
+
+- Can be done with peer groups, we define a limit and a range of IP addresses for BGP peers
+
+![dynamic-neighbors](./bgp-peer-group-topology.png)
+
+- R1:
+
+```
+router bgp 65001
+ bgp log-neighbor-changes
+ bgp listen range 10.23.45.0/24 peer-group BGP-PEER
+ bgp listen limit 10
+ no bgp default ipv4-unicast
+ neighbor BGP-PEER peer-group
+ neighbor BGP-PEER remote-as 65002 alternate-as 65003 
+ neighbor BGP-PEER ebgp-multihop 5
+ !
+ address-family ipv4
+  network 10.1.1.1 mask 255.255.255.255
+  neighbor BGP-PEER activate
+ exit-address-family
+```
+
+- R2 - Only static routes to carry loopback traffic, no BGP:
+
+```
+R2#show ip route static | b Gate 
+Gateway of last resort is not set
+
+      10.0.0.0/8 is variably subnetted, 8 subnets, 2 masks
+S        10.1.1.1/32 [1/0] via 10.12.1.1
+S        10.4.4.4/32 [1/0] via 10.23.45.4
+S        10.5.5.5/32 [1/0] via 10.23.45.5
+```
+
+- R3:
+
+```
+router bgp 65002
+ bgp log-neighbor-changes
+ no bgp default ipv4-unicast
+ neighbor 10.12.1.1 remote-as 65001
+ neighbor 10.12.1.1 ebgp-multihop 5
+ !
+ address-family ipv4
+  neighbor 10.12.1.1 activate
+ exit-address-family
+
+ R3#show ip route static | b Gate
+Gateway of last resort is not set
+
+      10.0.0.0/8 is variably subnetted, 7 subnets, 2 masks
+S        10.12.1.0/24 [1/0] via 10.23.45.1
+```
+
+- R4:
+
+```
+router bgp 65002
+ bgp log-neighbor-changes
+ no bgp default ipv4-unicast
+ neighbor 10.12.1.1 remote-as 65001
+ neighbor 10.12.1.1 ebgp-multihop 5
+ !
+ address-family ipv4
+  network 10.4.4.4 mask 255.255.255.255
+  neighbor 10.12.1.1 activate
+ exit-address-family
+R4#sh ip route static | b Gate
+Gateway of last resort is not set
+
+      10.0.0.0/8 is variably subnetted, 6 subnets, 2 masks
+S        10.12.1.0/24 [1/0] via 10.23.45.1
+```
+
+- R5:
+
+```
+router bgp 65003
+ bgp log-neighbor-changes
+ no bgp default ipv4-unicast
+ neighbor 10.12.1.1 remote-as 65001
+ neighbor 10.12.1.1 ebgp-multihop 5
+ !
+ address-family ipv4
+  network 10.5.5.5 mask 255.255.255.255
+  neighbor 10.12.1.1 activate
+ exit-address-family
+R5#sh ip route static | b Gate
+Gateway of last resort is not set
+
+      10.0.0.0/8 is variably subnetted, 6 subnets, 2 masks
+S        10.12.1.0/24 [1/0] via 10.23.45.1
+```
+
