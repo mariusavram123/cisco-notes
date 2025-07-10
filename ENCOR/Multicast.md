@@ -280,4 +280,121 @@ MAC address in binary format:             00000001.00000000.01011110.0  1111111.
 
     - **Max Response Time**: This field is set only in general and group-specific membership query messages (type value 0x11); it specifies the maximum allowed time before sending a responding report in units of one-tenth of a second. In all other messages it is set to 0x00 by the sender and ignored by the receivers
 
-    
+    - **Checksum**: This field is the 16-bit 1s complement of the sum of the IGMP message. This is the standard checksum algorithm used by TCP/IP
+
+    - **Group Address**: This field is set to 0.0.0.0 in general query messages and is set to the group address in group-specific messages. Membership report carry the address of the group being reported in this field; group leave messages carry the address of the group being left in this field
+
+- When a receiver wants to receive a multicast stream, it sends an unsolicited membership report, commonly referred to as an IGMP join, to the local router for the group it wants to join
+
+- The local router then sends this request upstream toward the source using a PIM join message
+
+- When the local router starts receiving the multicast stream, it forwards it downstream to the subnet where the receiver that requested it resides
+
+- IGMP join is not a valid message type in IGMP RFC specification but the therm is commonly used in the field in place of IGMP membership reports because it is easier to say and write
+
+- The router then starts periodically sending general membership query messages to the subnet, to the all hosts group address 224.0.0.1, to see whether any members are in the attached subnet
+
+- The general query message contains a max response time field that is set to 10 seconds by default
+
+- In response to the query receivers set an internal random timer between 0 and 10 seconds (which can change if the max response time is using a non-default value)
+
+- When the timer expires, receivers send membership reports for each group they belong to
+
+- If a receiver receives another receiver's report for one of the groups it belong to while it has a timer running, it stops it's timer for the specified group and does not sent a report; this is meant to supress duplicate reports
+
+- When a receiver wants to leave a group, if it was the last receiver to respond to a query, it sends a leave-group message to the all-routers group address 224.0.0.2. Otherwise, it can leave quietly because there must be another receiver on the subnet
+
+- When the leave group message is received by the router, it follow with a specific membership query to the group multicast address to determine wether there are any receivers interested in the group remaining in the subnet
+
+- If there are none, the router removes the IGMP state for that group
+
+- If there is more than one router in a LAN segment, an IGMP querier election takes place to determine which router will be the querier
+
+- IGMPv2 routers send general membership query messages with their interface address as the source IP address and destined to the 224.0.0.1 multicast IP address
+
+- When an IGMPv2 router receives such as message, it checks the source IP address and compares it to it's own interface IP address
+
+- The router with the lowest interface IP address in the LAN subnet is elected as the IGMP querier
+
+- At this point, all the non-querier routers start a timer that resets each time they receive a membership query report from the querier router
+
+- If the querier router stops sending membership queries for some reason (for instance it is powered down), a new querier election takes place
+
+- A non-querier router waits twice the query interval, which is by default 60 seconds, and if it has heard no queries from the IGMP querier, it triggers IGMP querier election
+
+#### IGMPv3
+
+- In IGMPv2 when a receiver sends a membership report to join a multicast group, it does not specify which source it would like to receive multicast traffic from
+
+- IGMPv3 is an extension of IGPMv2 that adds support for multicast source filtering, which gives the receivers the capability to pick the source they wish to accept multicast traffic from
+
+- IGMPv3 is designed to coexist with IGMPv1 and IGMPv2
+
+- IGMPv3 supports all IGMPv2's IGMP message types and is backward compatible with IGMPv2
+
+- The difference between the two are that IGMPv3 added new fields to the IGMP memberhip query and introduced a new IGMP message type called Version 3 membership report to support source filtering
+
+- IGMPv3 supports applications that explicitly signal sources from which they want to receive traffic
+
+- With IGMPv3, receivers signal membership to a multicast group address using a membership report in the following two modes
+
+    - **Include Mode**: In this mode the receiver announces membership to a multicast group address and provides a list of source addresses (the include list) from which it wants to receive traffic
+
+    - **Exclude Mode**: In this mode, the receiver announces membership to a multicast group address and provides a list of source addresses (the exclude list) from which it does not want to receive traffic. The receiver then receives traffic only from sources whose IP addresses are not listed in the exclude list. To receive traffic from all sources, which is the behaviour of IGMPv2, a receiver use exclude mode membership with an empty exclude list
+
+- IGMPv3 is used to provide source filtering for Source Specific Multicast (SSM)
+
+#### IGMP Snooping
+
+- To optimize forwarding and minimize flooding, switches need a method of sending traffic only to interested receivers
+
+- In the case of unicast traffic, Cisco switches learn about Layer 2 MAC addresses and what ports they belong to by inspecting the Layer 2 MAC address source; they store this information in the MAC address table
+
+- If they receive a Layer 2 frame with a destination MAC address that is not in this table, they treat it as an unknown frame and flood it out all the ports within the same VLAN except the interface the frame was received on
+
+- Uninterested workstations will notice that the destination MAC address in the frame is not theirs and will discard the packet
+
+- SW1 starts with an empty MAC address table
+
+- When workstation A sends a frame, it stores it's source MAC address and interface in the MAC address table and floods the frame it receives out all ports (except the port it receives the frame on)
+
+![mac-addr-flooding](./mac-address-flooding.png)
+
+- If any other workstation sends a frame destined to the MAC address of Workstation A, the frame is not flooded anymore because it's already in the MAC address table, and it is sent only to workstation A
+
+![mac-address-unicast](./mac-address-learned.png)
+
+- In the case of multicast traffic, a multicast MAC address is never used as a source MAC address
+
+- Switches treat multicast MAC addresses as unknown frames and flood them out all ports; all workstations then process these frames
+
+- It is then up to the workstations to select interested frames for processing and select the frames that should be discarded
+
+- The flooding of multicast traffic on a switch wastes bandwidth utilization on each LAN segment
+
+- Cisco switches use two methods to reduce multicast flooding on a LAN segment
+
+    - IGMP snooping
+
+    - Static MAC address entries
+
+- IGMP snooping, defined in RFC 4541, is the most widely used method and works by examining IGMP joins 
+
+- When the switch receives a multicast frame destined for a multicast group, it forwards the packets only out of the ports where IGMP joins were received for that specific multicast group
+
+- Workstation A and workstation C sending IGMP joins to 239.255.1.1, which translates to the multicast MAC address 01:00:5E:7F:01:01
+
+- Switch 1 has IGMP snooping enabled and populates the MAC address table with this information
+
+- Even with IGMP snooping enabled, some multicast group are still flooded on all ports (for example 224.0.0.0/24 reserved addresses)
+
+![igmp-snooping](./igmp-snooping.png)
+
+- Above picture illustrates the source sending traffic to 239.255.1.1(01:00:5E:7F:01:01) 
+
+- Switch 1 receives this traffic, and it forwards it out only on g0/0 and g0/2 interfaces because these are the only ports that received IGMP joins for that group
+
+- A multicast static entry can also be manually programmed into the MAC address table, but this is not a scalable solution because it cannot react dynamically to changes; for this reason, it is not a recommended approach
+
+![igmp-noflooding](./igmp-snooping-noflood.png)
+
