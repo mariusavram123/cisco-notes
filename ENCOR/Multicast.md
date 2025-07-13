@@ -398,3 +398,379 @@ MAC address in binary format:             00000001.00000000.01011110.0  1111111.
 
 ![igmp-noflooding](./igmp-snooping-noflood.png)
 
+### Protocol Independent Multicast
+
+- Receivers use IGMP to join a multicast group, which is sufficient if the group's source connects to the same router to which the receiver is attached
+
+- A multicast routing protocol is necessary to route the multicast traffic throughout the network so that routers can locate and request multicast streams from other routers
+
+- Multiple multicast routing protocols exist but Cisco fully supports only Protocol Independent Multicast (PIM)
+
+- PIM is a multicast routing protocol that routes multicast traffic between network segments
+
+- PIM can use any of the unicast routing protocols to identify the path between the source and receivers
+
+#### PIM Distribution Trees
+
+- Multicast routers create distribution trees that define the path that IP multicast traffic follows throughout the network to reach the receivers
+
+- The two basic types of multicast distribution trees are source trees, also known as shortest path trees (SPTs), and shared trees
+
+##### Source Trees
+
+- A source tree is a multicast distribution tree where the source is the root of the tree, and branches form a distribution tree throughout the network all the way down to the receivers
+
+- When this tree is built it uses the shortest path throughout the network from the source to the leaves of the tree; for this reason it is also referred to as a shortest path tree (SPT)
+
+- The forwarding state of the SPT is known by the notation (S,G), pronounced "S comma G", where S is the source of the multicast stream (server), and G is the multicast group address
+
+- Using this notation, the SPT state for the below topology is (10.1.1.2,239.1.1.1), where the multicast source S is 10.1.1.2, and the multicast group G is 239.1.1.1, joined by Receivers A and B
+
+![source-tree](./multicast-source-tree.png)
+
+- Because every SPT is routed at the source S, every source sending to a multicast group requires an SPT
+
+##### Shared Trees
+
+- A shared tree is a multicast distribution tree where the root of the shared tree is not the source but a router designated as the rendezvous point (RP)
+
+- For this reason shared trees are also referred to as RP trees (RPTs)
+
+- Multicast traffic is forwarded down the shared tree according to the group address G that the packets are addressed to, regardless of the source address
+
+- For this reason, the forwarding state of the shared tree is referred by the notation (*,G), pronounced "star comma G"
+
+- A shared tree where R2 is the RP and the (*,G) is (*,239.1.1.1)
+
+- In any-source multicast (ASM), the (S,G) state requires a parent (*,G) 
+
+- For this reason in the topology below R1 and R2 are having (*,G) state
+
+![shared-tree](./multicast-shared-tree.png)
+
+- One of the benefits of shared trees over source trees is that they require fewer multicast entries (for example S,G and *,G)
+
+- For instance as more sources are introduced into the network, sending traffic to the same multicast group, the number of multicast entries for R3 and R4 will always remain the same (*,239.1.1.1)
+
+- The major drawback of the shared trees is that the receivers receive traffic from all the sources sending traffic to the same multicast group
+
+- Even though the receiver's applications can filter out unwanted traffic, this situation still generates a lot of unwanted network traffic wasting bandwidth
+
+- In addition, because shared trees can allow multiple sources in an IP multicast group, there is a potential network security issue because unintended sources could send unwanted packets to receivers
+
+#### PIM Terminology
+
+- A reference topology for some multicast routing terminology
+
+![multicast-terminilogy](.//multicast-terminology.png)
+
+- The common PIM terminology illustrated above:
+
+    - **Reverse Path Forwarding (RPF) interface**: The interface with the lowest-cost path based on Administrative Distance (AD) and metric to the IP address of the source (SPT) or the RP, in case of shared trees. If multiple interfaces have the same cost, the interface with the highest IP address is chosen as the tie breaker. An example of this interface is Te1/0/2 on R5 because it is the shortest path to the source. Another example is Te1/1/1 on R7 because the shortest path to the source was determined to be through R4
+
+    - **RPF neighbor**: The PIM neighbor on the RPF interface. If R7 is using the RPT shared three, the RPF neighbor would be R3, which is the lowest cost path to the RP. If it is using the SPT, R4 would be it's RPF neighbor because it offers the lowest cost to the source
+
+    - **Upstream**: Toward the source of the tree, which could be the actual source in source-based trees or the RP in shared trees. A PIM join travel upstream towards the source
+
+    - **Upstream Interface**: The interface toward the source of the tree. It is also known as the RPF interface or the incoming interface (IIF). An example of an upstream interface is R5's Te0/1/2 interface, which can send PIM joins upstream to it's RPF neighbor
+
+    - **Downstream**: Away from the source of the tree and towards the receivers
+
+    - **Downstream Interface**: Any interface that is used to forward multicast traffic down the tree, also known as an outgoing interface (OIF). An example of a downstream interface is R1's Te0/0/0 interface, which forwards multicast traffic to R3's Te0/0/1 interface
+
+    - **Incoming Interface (IIF)**: The only type of interface that can accept multicast traffic coming from the source, which is the same as the RPF interface. An example of this type of interface is Te0/0/1 interface on R3 because the shortest path to the source is known through this interface
+
+    - **Outgoing Interface (OIF)**: Any interface that is used to forward multicast traffic down the tree, also known as the ownsttream interface
+
+    - **Outgoing Inteface List (OIL)**: A group of OIFs that are forwarding multicast traffic to the same group. An example of this is R1's Te0/0/0 and Te0/0/1 interfaces sending multicast traffic downstream to R3 and R4 for the same multicast group
+
+    - **Last-hop Router (LHR)**: A router that is directly attached to the receivers, also known as a leaf router. It is responsible for sending PIM joins upstream toward the RP or to the source
+
+    - **First-hop Router (FHR)**: A router that is directly attached to the source, also known as a root router. It is responsible for sending register messages to the RP
+
+    - **Multicast Routing Information Base (MRIB)**: A topology table that is also known as the multicast route table (mroute), which derives from the unicast route table and PIM. MRIB contains the source S, group G, incoming interface (IIF), outgoing interfaces (OIFs), and RPF neighbor information for each multicast route as well as other multicast related information
+
+    - **Multicast Forwarding Information Base (MFIB)**: A forwarding table that uses the MRIB to program multicast forwarding information in hardware for faster forwarding
+
+    - **Multicast State**: The multicast traffic forwarding state that is used by a router to forward multicast traffic. The multicast state is composed of the entries found in the mroute table(S, G, IIF, OIF and so on)
+
+- There are currently 5 PIM operating modes:
+
+    - PIM Dense Mode (PIM-DM)
+
+    - PIM Sparse Mode (PIM-SM)
+
+    - PIM Sparse Dense Mode
+
+    - PIM Source Specific Multicast (PIM-SSM)
+
+    - PIM Bidirectional Mode (Bidir-PIM)
+
+- PIM DM and PIM SM are also commonly referred to as Any Source Multicast (ASM)
+
+- All PIM Control Messages use the IP protocol number 103; they are either unicast (that is register and register stop messages) or multicast with a TTL of 1, to the all PIM routers address 224.0.0.13
+
+- List of PIM control messages:
+
+```
+Type    Message Type                    Destination                     PIM Protocol
+
+0       Hello                           224.0.0.13(All PIM routers)     PIM-SM, PIM-DM, Bidir-PIM and PIM-SSM
+
+1       Register                        RP address(unicast)             PIM-SM
+
+2       Register-stop                   First-hop router (unicast)      PIM-SM
+
+3       Join/prune                      224.0.0.13 (All PIM routers)    PIM-SM, Bidir-PIM and PIM-SSM
+
+4       Bootstrap                       224.0.0.13 (All PIM routers)    PIM-SM and Bidir-PIM
+
+5       Assert                          224.0.0.13 (All PIM routers)    PIM-SM, PIM-DM and Bidir-Pim
+
+8       Candidate RP advertisement      Bootstrap router (BSR)          PIM-SM and Bidir-PIM
+                                        address (unicast to BSR)
+
+9       State refresh                   224.0.0.13 (All PIM routers)    PIM-DM
+
+10      DF election                     224.0.0.13 (All PIM routers)    Bidir-PIM
+```
+
+- PIM hello messages are sent by default every 30 seconds out each PIM enabled interface to learn about the neighboring PIM routers on each interface to all PIM routers address
+
+- Hello messages are also a mechanism used to elect a designated router (DR) and negotiate additional capabilities
+
+- All PIM routers must record the hello information received from each PIM neighbor
+
+#### PIM Dense Mode
+
+- PIM routers can be configured for PIM dense mode (PIM-DM) when it is safe to assume that the receivers of a multicast group are located on every subnet within the network - in other words, when the multicast group is densely populated across the network
+
+- For PIM-DM the multicast tree is built by flooding traffic out every interface from the source to every Dense-Mode router in the network
+
+- The tree is grown from the root towards the leaves
+
+- As each router receives traffic for the multicast group, it must decide whether it already has active receivers wanting to receive the multicast traffic
+
+- If so, the router remains quiet and lets the multicast flow continue
+
+- If no receivers have requested the multicast stream on the multicast group on the LHR, the router sends a prune message towards the source
+
+- That branch of the tree is then pruned off so that the unnecessary traffic does not continue
+
+- The resulting tree is a source tree because it is unique from the source to the receivers
+
+- The flood and prune operations of dense mode. The multicast traffic from the source is flooding throughout the entire network
+
+- As each router receives the multicast traffic from it's upstream neighbor via it's RPF interface, it forwards the multicast traffic to all it's PIM-DM neighbors
+
+- This results in some traffic arriving via a non-RPF interface, as in the case of R3 receiving traffic from R2 on it's non-RPF interface
+
+- Packets arriving via non-RPF interface are discarded
+
+![pim-dm-flood-prune](./pim-dm-flooding-and-pruning.png)
+
+- These non-RPF multicast flows are normal for the initial flooding of multicast traffic and are corrected by the normal PIM-DM flooding mechanism
+
+- The pruning mechanism is used to stop the flow of unwanted traffic
+
+- Prunes (denoted by dashed arrows) are sent out the RPF interface when the router has no downstream members that need the multicast traffic, as is the case for R4, which has no interested receivers and they are also sent out non-RPF interfaces to stop the flow of multicast traffic that is arriving throughout a non-RPF interface from R2, which results in a prune message
+
+- The resulting topology after all unnecessary links have been pruned off
+
+- This result in an SPT from the source to the receiver
+
+- Even though the flow of multicast traffic is no longer reaching most of the routers in the network, the (S,G) state still remains in all routers in the network. This (S,G) state remains until the source stops transmitting
+
+![remaining-topology](./resulting-multicast-topology.png)
+
+- In PIM-DM prunes expire every 3 minutes. This causes the multicast traffic to be reflooded to all routers just as was done during initial flooding
+
+- This periodic (every 3 minutes) flood and prune behaviour is normal and must be taken into account when a network is designed to use PIM-DM
+
+- PIM-DM is applicable to small networks where there are active receivers on every subnet of the network
+
+- Because this is rarely the case, PIM-DM is not generally recomended for production environments; however, it can be useful for a lab environment because it is easy to set up
+
+#### PIM Sparse Mode
+
+- PIM Sparse Mode (PIM-SM) was designed for networks with multicast application receivers scaterred throughout the network - in other words when the multicast group is sparsely populated across the network
+
+- However, PIM-SM also works well in densely populated networks
+
+- It also assumes that no receivers are interested in multicast traffic unless they explicitly request it
+
+- Just like PIM-DM, PIM-SM uses the unicast routing table to perform RPF checks, and it does not care which routing protocol (including static routes) populates the unicast routing table, therefore it is protocol independent
+
+##### PIM Shared and Source Path Trees
+
+- PIM-SM uses a explicit join model where receivers sent an IGMP join to their locally connected router which is also known as the last-hop router (LHR), and this join causes the LHR to sent a PIM join in the direction of the root of the tree, which is either the RP in the case of a shared tree (RPT) or the first-hop router (FHR) where the source transmitting the multicast streams is connected in the case of an SPT
+
+- A multicast forwarding state is created as the result of these explicit joins; it is very different from the flood and prune or implicit flood behaviour of PIM-DM, where the multicast packet arriving on the router dictates the forwarding state
+
+- A multicast source sending traffic to the FHR. The FHR then sends this multicast traffic to the RP, which takes the multicast source known to the RP
+
+- It also illustrates a receiver sending an IGMP join to the LHR to join the multicast group
+
+- The LHR then sends a PIM join (*,G) to the RP and this forms a shared tree from the RP to the LHR
+
+- The RP then sends a PIM join (S,G) to the FHR, forming a source tree between the source and the RP
+
+- In essence, two trees are created: an SPT from the FHR to the RP (S,G) and a shared tree from the RP to the LHR (*,G)
+
+![pim-sm-tree](./pim-sm-tree.png)
+
+- At this point multicast starts flowing down from the source to the RP and ans from the RP to the LHR and then finally to the receiver
+
+- This is an oversimplified view of how PIM-SM achieves multicast forwarding
+
+##### Shared Tree Join
+
+- Receiver A attached to the LHR joining multicast group G. The LHR knows the IP address of the RP for group G, and then it sends a (*,G) PIM join for this group to the RP
+
+- If the RP were not directly connected, this (*,G) PIM join would travel hop-by-hop to the RP building a branch of the shared tree that would extend from the RP to the LHR
+
+- At this point, group G multicast traffic arriving at the RP can flow down the shared tree to the receiver
+
+##### Source Registration
+
+- As soon as a source for a group G sends a packet, the FHR that is attached to this source is responsible for registering this source with the RP and requesting the RP to build a tree back to that router
+
+- The FHR encapsulates the multicast data from the source in a special PIM-SM message called the register message and unicasts that data to the RP using a unidirectional PIM tunnel
+
+- When the RP receives the register message, it decapsulates the multicast data packet, inside the register message, and if there is no active shared tree because there are no interested receivers, the RP sends a register stop message directly to the registering FHR, without traversing the PIM tunnel, instructing it to stop sending the register messages
+
+- If there is an active shared tree for the group, it forwards the multicast packet down the shared tree and it sends an (S,G) join back the source network S to create a (S,G) SPT
+
+- If there are multiple hops (routers), between the RP and the source, this results in an (S,G) state being created in all the routers along the SPT, including the RP
+
+- There will also be a (*,G) in R1 and all of the routers between the FHR and the RP
+
+- As soon as the SPT is built from the source router to the RP, multicast traffic begins to flow natively from the source S to the RP
+
+- Once the RP begins receiving data natively (that is, down the SPT), from source S it sends a register stop message to the source's FHR to inform it that it can stop sending the unicast register messages
+
+- At this point, multicast traffic from the source is flowing down the SPT to the RP, and from there down the SPT to the RP and, from there down the shared tree (SPT) to the receiver
+
+- The PIM register tunnel from the FHR to the RP remains in an active up/up state even when there are no active multicast streams, and it remains active as long as there is a valid RPF path for the RP
+
+##### PIM SPT Switchover
+
+- PIM-SM allows the LHR to switch from the shared tree to a SPT for a specific source 
+
+- In Cisco routers this is the default behavior, and it happens immediately after the first multicast packet is received from the RP via the shared tree, even if the shortest path to the source is through the RP
+
+- When the LHR receives the first multicast packet from the RP it becomes aware of the IP address of the multicast source
+
+- At this point the LHR checks it's unicast routing table to see which is the shortest path to the source, and it sends a (S,G) PIM join hop-by-hop to the FHR to form an SPT
+
+- Once it receives a multicast packet from the FHR through the SPT, if necessary, it switches the RPF interface to be the one in the direction to the SPT to the FHR, and then it sends a PIM prune message to the RP to shut off the duplicate multicast traffic coming from it through the shared tree
+
+- The shortest path to the source is between R1 and R3; if that link were shut down or not present, the shortest path would be through the RP, in which case a SPT switchover would still take place
+
+- The PIM SPT switchover mechanism can be disabled for all group or for specific groups
+
+![pim-spt-switchover](./pim-spt-swithover.png)
+
+- If the RP has no other interfaces that are interested in the multicast traffic, it sends a PIM prune message in the direction of the FHR
+
+- If there are any routers between the RP and the FHR, this prune message would travel hop-by-hop until it reaches the FHR
+
+##### Designated Routers
+
+- When multiple PIM-SM routers exist on a LAN segment, PIM hello messages are used to elect a designated router (DR) and avoid sending duplicate multicast traffic into the LAN or the RP
+
+- By default, the DR priority value of all PIM routers is 1, and it can be changed to force a particular router to become the DR during the DR election process, where a higher DR priority is preferred
+
+- If a router does not support the DR priority option or if all routers have the same DR priority, the highest IP address on the subnet is used as a tiebreaker
+
+- On an FHR, the designated router is responsible for encapsulating in unicast register messages any multicast packets originated by a source that are destined to the RP
+
+- On an LHR, the designated router is responsible for sending PIM join and prune messages toward the RP and inform it about host group membership, and it is also responsible for performing a PIM STP switchover
+
+- Without DRs, all LHRs on the same LAN segment would be capable of sending PIM joins upstream, which could result in duplicate multicast traffic arriving on the LAN
+
+- On the source side, if multiple FHRs exist on the same LAN, they all send register messages to the RP at the same time
+
+- The default DR hold time is 3.5 times the hello interval, or 105 seconds by default
+
+- If there are no hellos after this interval, a new DR is elected
+
+- To reduce DR failover time, the hello query interval can be reduced to speed up failover with a tradeoff of more control plane traffic and CPU resource utilization on the router
+
+#### Reverse Path Forwarding
+
+- Reverse Path Forwarding (RPF) is an algorithm used to prevent loops and ensure that multicast is arriving on the correct interface
+
+- RPF functions as follows:
+
+    - If a router receives an multicast packet on an interface it uses to send multicast packets to the source, the packet has arrived at the RPF interface
+
+    - If a packet arrives on the RPF interface, a router forwards the packet out the interface present in the outgoing interface list (OIL) of a multicast routing table entry
+
+    - If the packet does not arrive on the RPF interface, the packet is discarded to prevent loops
+
+- PIM uses multicast source trees between the source an the LHR and between the source and the RP
+
+- It also uses multicast shared trees between the RP and the LHRs
+
+- The RPF check is performed differently for each, as follows:
+
+    - If a PIM router has an (S,G) entry present in the multicast routing table (an SPT state), the router performs the RPF check against the IP address of the source for the multicast packet
+
+    - If a PIM router has no explicit source-tree state, this is considered a shared-tree state
+
+    - The router performs the RPF check on the address of the RP, which is known when members join the group
+
+- PIM-SM uses the RPF lookup function to determine where it needs to send joins and prunes
+
+- (S,G) joins (which are SPT states) are sent toward the source 
+
+- (*,G) joins (which are shared tree states) are sent toward the RP
+
+- Topology from the left, a failed RPF check on R3 for the (S,G) entry, because the packet is arriving via a non-RPF interface
+
+- The topology on the right shows the multicast traffic arriving on the correct interface on R3, it is then forwarded out the OIFs
+
+![failed-and-correct-rpf-check](./failed-and-correct-rpf-check.png)
+
+#### PIM Forwarder
+
+- There are certain scenarios in which duplicate multicast packets could flow into a multi-access network
+
+- The PIM assert mechanism stops these dupicate flows
+
+- In the below topology, R2 and R3 both are receiving the same (S,G) traffic via their RPF interfaces and forwarding the packets on to the same LAN segment
+
+- R2 and R3 therefore receive an (S,G) packet via their downstream OIF that is in the OIF of their (S,G) entry
+
+- In other words, they detect multicast traffic for a specific (S,G) coming into their OIF that is also going out the same OIF for the same (S,G) 
+
+- This triggers the assert mechanism
+
+- R2 and R3 both send PIM assert messages into the LAN
+
+- The assert messages sent their administrative distance (AD) and the route metric back to the source to determine which router should forward the multicast traffic to that network segment
+
+- Each router compares it's own values with the received values
+
+- Preference is given to the PIM message with the lowest AD to the source
+
+- If a tie exists, the lowest route metric for the protocol wins; and as a final tie breaker, the highest IP address is used
+
+- The losing router prunes it's interface just as if it had received a prune on this interface, and the wining router is the PIM forwarder for the LAN
+
+- The prune times out after 3 minutes on the losing router and causes it to begin forwarding on the interface again
+
+- This triggers the assert process to repeat
+
+- If the wining router were to go offline, the loser would take over the job of forwarding on to this LAN segment after it's prune timed out
+
+- The PIM forwarder concept applies to PIM-DM and PIM-SM
+
+- It is commonly used by PIM-DM but rarely used by PIM-SM because the only time duplicate packets can end up in a LAN is if there is some sort of routing inconsistency
+
+![pim-assert](./pim-assert.png)
+
+- With the above topology, PIM-SM will not send duplicate flows into the LAN as PIM-DM would because of the way PIM-SM operates
+
+- For example, assuming that R1 is the RP, when R4 sends a PIM join message upstream toward it, it sends it to all PIM routers address 224.0.0.13 and R2 and R3 receive it
