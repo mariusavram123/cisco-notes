@@ -774,3 +774,185 @@ Type    Message Type                    Destination                     PIM Prot
 - With the above topology, PIM-SM will not send duplicate flows into the LAN as PIM-DM would because of the way PIM-SM operates
 
 - For example, assuming that R1 is the RP, when R4 sends a PIM join message upstream toward it, it sends it to all PIM routers address 224.0.0.13 and R2 and R3 receive it
+
+- One of the fields of the PIM join messages includes the IP address of the upstream neighbor, also known as the RPF neighbor
+
+- Assuming that R3 is the RPF neighbor, R3 is the only one that will send a PIM join to R1
+
+- R2 will not because the PIM join was not meant for it
+
+- At this point a shared tree exists between R1, R3 and R4 and no traffic dupplication exists
+
+- The below scheme shows how duplicate flows could exist in a LAN using PIM-SM
+
+- On the topology on the left side, R2 and R4 are running the OSPF protocol, and R3 and R4 are running EIGRP
+
+- R4 learns about the RP (R1) through R2, and R5 learns about the RP through R3
+
+- R4's RPF neighbor is R2 and R5's RPF neighbor is R3
+
+- Assuming that receiver A and receiver B join the same group, R4 would send a PIM join to it's upstream neighbor R2, which would in turn send a PIM join to R1
+
+- R5 would send a PIM join to it's upstream neighbor R3, which would send a PIM join to R1
+
+- At this point traffic starts flowing downstream from R1 into R2 and R3 and duplicate packets are sent out into the lan and to the receivers
+
+- At this point the PIM assert mechanism kicks in, R3 is elected as PIM forwarder and and R2's OIF interface is pruned
+
+![pim-prune](./pim-prune-mechanism.png)
+
+### Rendezvous Points
+
+- In PIM-SM it is mandatory to choose one or more routers to operate as rendezvous points (RPs)
+
+- An RP is a single common root placed at a chosen point of a shared distribution tree
+
+- An RP can be either configured statically on each router or learned through a dynamic mechanism
+
+- A PIM router can be configured to function as an RP either statically in each router in the multicast domain or dynamically by configuring Auto-RP or a PIM bootstrap router (BSR)
+
+- BSR and Auto-RP were not designed to work together and may introduce unnecessary complexities when deployed on the same network
+
+- The recommendation is not to use them concurrentely
+
+#### Static RP
+
+- It is possible to statically configure RP for a multicast group range by configuring the address of the RP on every router in the multicast domain
+
+- Configuring static RPs is relatively simple and can be achieved with one or two lines of configuration on each router
+
+- If the network does not have many different RPs defined or if the RPs does not change very often, this could be the simplest method for defining RPs
+
+- It can also be an attractive option if the network is small
+
+- However, static configuration can increase the administrative overhead in a large and complex network
+
+- Every router must have the same RP address
+
+- This means changing the RP address requires reconfiguring every router
+
+- If several RPs are active for different groups, information about which RP is handling which multicast group must be known by all routers
+
+- To ensure this information is complete, multiple configuration commands may be required
+
+- If a manually configured RP fails, there is no failover procedure for another router to take over the function performed by the failed RP, and this method by itself does not provide any kind of load-splitting
+
+#### Auto-RP
+
+- Auto-RP is a Cisco proprietary mechanism that automates the distribution of group-to-RP mapping on a PIM network
+
+- Auto-RP has the following benefits:
+
+    - It is easy to use multiple RPs within a network to serve different group ranges
+
+    - It allows load-splitting between different RPs
+
+    - It simplifies RP placement according to the locations of group participants
+
+    - It prevents inconsistent manual static RP configurations that might cause connectivity problems
+
+    - Multiple RPs can be used to serve different group ranges or to serve as backups for each-other
+
+    - The Auto-RP mechanism operates using two basic components, candidate RPs (C-RPs) and RP mapping agents (MAs)
+
+##### Candidate RPs
+
+- A C-RP advertises it's wilingness to be an RP via RP announcement messages
+
+- These messages are sent by default every RP announce interval, which is 60 seconds by default, to the reserved well-known multicast group 224.0.1.39 (Cisco-RP-Announce)
+
+- The RP announcement contain the default group range 224.0.0.0/4, the C-RPs address and the hold time which is three times the RP announce interval 
+
+- If there are multiple C-RPs, the C-RP with the highest IP address is preferred
+
+##### RP Mapping Agents
+
+- RP MAs join group 224.0.1.39 to receive RP announcements
+
+- They store the information contained in the announcements in a group-to-RP mapping cache along with hold times
+
+- If multiple RPs advertise the same group range, the C-RP with the highest IP address is elected
+
+- The RP MAs advertise the RP mappings to another well-known multicast group address, 224.0.1.40 (Cisco-RP-Discovery)
+
+- These messages are advertised by default every 60 seconds or when changes are detected
+
+- The MA announcements contain the elected RPs and the group-to-RP mappings
+
+- All PIM-enabled routers join 224.0.1.40 and store the RP mappings in their private cache
+
+- Multiple RP MAs can be configured on the same network to provide redundancy in case of failure
+
+- There is no election mechanism between them, and they act independently of each other; they all advertise identical group-to-RP mapping information to all routers in the PIM domain
+
+- On the below topology shows the Auto-RP mechanism where MA periodically receives the C-RP Cisco RP announcements to build a group-to-RP mapping cache and then periodically multicasts the information to all PIM routers in the network using Cisco RP discovery messages
+
+![cisco-rp-mechanism](./cisco-auto-rp-mechanism.png)
+
+- With Auto-RP, all routers automatically learn RP information, which makes it easier to administer and update RP information
+
+- Auto-RP permits backup RPs to be configured, thus enabling an RP failover mechanism
+
+#### PIM Bootstrap Router
+
+- The bootstrap router (BSR), described in RFC 5059, is a non-proprietary mechanism that provides a fault-tolerant, automated RP discovery and distribution mechanism
+
+- PIM uses the BSR to discover and announce RP set information for each group prefix to all the routers in a PIM domain
+
+- This is the same function accomplished by the Auto-RP, but the BSR is part of the PIM version 2 specification
+
+- The RP set is a group-to-RP mapping that contains the following components:
+
+    - Multicast group range
+
+    - RP priority
+
+    - RP address
+
+    - Hash mask length
+
+    - SM/Bidir flag
+
+- Generally, BSR messages originate on the BSR, and they are flooded hop-by-hop by intermediate routers
+
+- When a bootstrap message is forwarded, it is forwarded out of every PIM-enabled interface that has PIM neighbors (including the one over which the message was received)
+
+- BSR messages use the all-PIM routers address 224.0.0.13 with a TTL of 1
+
+- To avoid a single point of failure, multiple candidate BSRs (C-BSRs) can be deployed in a PIM domain
+
+- All C-BSRs participate in the BSR election process by sending PIM BSR messages containing their BSR priority out all interfaces
+
+- The C-BSR with the highest priority is elected as the BSR and sends BSR messages to all PIM routers in the PIM domain
+
+- If the BSR priorities are equal or if the BSR priority is not configured, the C-BSR with the highest IP address is elected as the BSR
+
+##### Candidate RPs
+
+- A router that is configured as a candidate RP (C-RP) receives the BSR messages, which contains the IP address of the currently active BSR
+
+- Because it knows the IP address of the BSR, it can unicast candidate RP advertisement directly to it (C-RP-Adv) messages directly to it
+
+- A C-RP-Adv message carries a list of group address and group mask field pairs
+
+- This enables a C-RP to specify the group ranges for which it is willing to be the RP
+
+- The active BSR stores all incoming C-RP advertisements in it's group-to-RP mapping cache
+
+- The BSR then sends the entire list of C-RPs from it's group-to-RP mapping cache in BSR messages every 60 seconds by default to all PIM routers in the entire network
+
+- As the routers receive copies of these BSR messages, they update the information in their local group-to-RP mapping caches, and these allows them to have full visibility into IP addresses of all C-RPs in the network
+
+- Unlike with Auto-RP where the mapping agent elects the active RP for a group range and announces the election results to the network, the BSR does not elect the active RP for a group
+
+- Instead it leaves this task to each invididual router in the network
+
+- Each router in the network uses a well-known hashing algorithm to elect the currently active RP for a particular group range
+
+- Because each router is running the same algorithm against the same list of C-RPs, they will all select the same RP for a particular group range
+
+- C-RPs with a lower priority are preferred. If the priorities are the same, the C-RP with the highest IP address is elected as the RP for a particular group range
+
+- Below is illustrated the BSR mechanism, where the elected BSR receives candidate RP advertisement messages, to all candidate RP's in the domain, and it then sends BSR messages with RP set information out all PIM-enabled interfaces, which are flooded hop-by-hop to all routers in the network
+
+![bsr-mechanism](./bsr-mechanism.png)
