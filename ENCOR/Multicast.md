@@ -956,3 +956,535 @@ Type    Message Type                    Destination                     PIM Prot
 - Below is illustrated the BSR mechanism, where the elected BSR receives candidate RP advertisement messages, to all candidate RP's in the domain, and it then sends BSR messages with RP set information out all PIM-enabled interfaces, which are flooded hop-by-hop to all routers in the network
 
 ![bsr-mechanism](./bsr-mechanism.png)
+
+### Multicast Configuration
+
+- Topology:
+
+![multicast-config](./ip-multicast-config.png)
+
+- First set IP addresses and a routing protocol between the devices
+
+- On the switch set an IP address on vlan 1 interface
+
+- On the routers enable pim per interfaces
+
+- Enable multicast routing and set PIM version per interface
+
+- R1:
+
+```
+conf t
+ ip multicast-routing
+ interface g0/1
+  ip pim dense-mode
+```
+
+- R2:
+
+```
+conf t
+ ip multicast-routing
+ interface range g0/0 - 1
+  ip prim dense-mode
+```
+
+- SW1:
+
+```
+conf t
+ ip multicast-routing
+ interface vlan 1
+  no sh
+  ip pim dense-mode     # configuring PIM also enable IGMP
+```
+
+- R3:
+
+```
+conf t
+ ip multicast-routing
+  interface g0/0
+   ip pim dense-mode
+```
+
+- Viewing the PIM neighbors:
+
+- R1:
+
+```
+R1(config)#do sh ip pim nei
+PIM Neighbor Table
+Mode: B - Bidir Capable, DR - Designated Router, N - Default DR Priority,
+      P - Proxy Capable, S - State Refresh Capable, G - GenID Capable,
+      L - DR Load-balancing Capable
+Neighbor          Interface                Uptime/Expires    Ver   DR
+Address                                                            Prio/Mode
+10.12.1.2         GigabitEthernet0/0       00:08:43/00:01:23 v2    1 / DR S P G
+```
+
+- R2:
+
+```
+R2(config)#do sh ip pim nei
+PIM Neighbor Table
+Mode: B - Bidir Capable, DR - Designated Router, N - Default DR Priority,
+      P - Proxy Capable, S - State Refresh Capable, G - GenID Capable,
+      L - DR Load-balancing Capable
+Neighbor          Interface                Uptime/Expires    Ver   DR
+Address                                                            Prio/Mode
+10.12.1.1         GigabitEthernet0/0       00:09:14/00:01:21 v2    1 / S P G
+10.23.1.2         GigabitEthernet0/1       00:07:36/00:01:33 v2    1 / S P G
+10.23.1.10        GigabitEthernet0/1       00:08:51/00:01:33 v2    1 / DR S P G
+```
+
+- As you can see the switch is also a PIM neighbor, and the DR in this case
+
+- SW1:
+
+```
+SW1(config-if)#do sh ip pim nei
+PIM Neighbor Table
+Mode: B - Bidir Capable, DR - Designated Router, N - Default DR Priority,
+      P - Proxy Capable, S - State Refresh Capable, G - GenID Capable,
+      L - DR Load-balancing Capable
+Neighbor          Interface                Uptime/Expires    Ver   DR
+Address                                                            Prio/Mode
+10.23.1.2         Vlan1                    00:08:54/00:01:43 v2    1 / S P G
+10.23.1.1         Vlan1                    00:10:10/00:01:41 v2    1 / S P G
+SW1(config-if)#
+```
+
+- R3
+
+```
+R3(config-if)#do sh ip pim nei
+PIM Neighbor Table
+Mode: B - Bidir Capable, DR - Designated Router, N - Default DR Priority,
+      P - Proxy Capable, S - State Refresh Capable, G - GenID Capable,
+      L - DR Load-balancing Capable
+Neighbor          Interface                Uptime/Expires    Ver   DR
+Address                                                            Prio/Mode
+10.23.1.10        GigabitEthernet0/0       00:00:16/00:01:28 v2    1 / DR S P G
+10.23.1.1         GigabitEthernet0/0       00:00:16/00:01:28 v2    1 / S P G
+```
+
+- Verifying multicast interfaces:
+
+```
+R2#show ip multicast interface 
+GigabitEthernet0/0 is up, line protocol is up
+  Internet address is 10.12.1.2/24
+  Multicast routing: enabled
+  Multicast switching: fast
+  Multicast packets in/out: 0/0
+  Multicast TTL threshold: 0
+  Multicast Tagswitching: disabled
+GigabitEthernet0/1 is up, line protocol is up
+  Internet address is 10.23.1.1/24
+  Multicast routing: enabled
+  Multicast switching: fast
+  Multicast packets in/out: 0/0
+  Multicast TTL threshold: 0
+  Multicast Tagswitching: disabled
+```
+
+- Set the IGMP version on an interface
+
+SW1:
+
+```
+conf t
+ interface vlan 1
+  ip igmp version 3 # (default is v2), if PIM is enabled, IGMP is enabled too
+```
+
+- Also set IP IGMP to version 3 on R2's G0/1 and R3's G0/0
+
+```
+conf t
+ interface g0/1
+  ip igmp version 3
+```
+
+- Configure a RP address manually:
+
+- R1 + R2 + SW1 + R3:
+
+```
+conf t
+ ip pim rp-address 10.2.2.2
+```
+
+- Doing this will create a tunnel between the router and the RP
+
+```
+R1(config)#
+*Jul 19 16:27:39.418: %LINEPROTO-5-UPDOWN: Line protocol on Interface Tunnel0, changed state to up
+```
+
+```
+R1(config)#do sh ip pim rp
+Group: 224.0.1.40, RP: 10.2.2.2, uptime 00:04:31, expires never
+```
+
+- The RP must be configured on all routers, including the RP itself
+
+- R2:
+
+```
+R2(config)#do sh ip int br
+Interface                  IP-Address      OK? Method Status                Protocol
+GigabitEthernet0/0         10.12.1.2       YES manual up                    up      
+GigabitEthernet0/1         10.23.1.1       YES manual up                    up      
+GigabitEthernet0/2         unassigned      YES NVRAM  administratively down down    
+GigabitEthernet0/3         unassigned      YES NVRAM  administratively down down    
+Loopback0                  10.2.2.2        YES manual up                    up      
+Tunnel0                    10.12.1.2       YES unset  up                    up      
+Tunnel1                    10.2.2.2        YES unset  up                    up      
+```
+
+- Extended topology - PIM dense mode:
+
+![extended-topology](./multicast-lab-topology.png)
+
+- On the M-CAST source:
+
+```
+M-CAST_SOURCE#ping 239.1.1.1 repeat 999999999
+Type escape sequence to abort.
+Sending 999999999, 100-byte ICMP Echos to 239.1.1.1, timeout is 2 seconds:
+```
+
+- On the Receiver:
+
+```
+conf t
+ interface g0/0
+  ip igmp join-group 239.1.1.1
+```
+
+- Viewing multicast routing table:
+
+- R3:
+
+```
+R3(config)#do sh ip mroute
+IP Multicast Routing Table
+Flags: D - Dense, S - Sparse, B - Bidir Group, s - SSM Group, C - Connected,
+       L - Local, P - Pruned, R - RP-bit set, F - Register flag,
+       T - SPT-bit set, J - Join SPT, M - MSDP created entry, E - Extranet,
+       X - Proxy Join Timer Running, A - Candidate for MSDP Advertisement,
+       U - URD, I - Received Source Specific Host Report, 
+       Z - Multicast Tunnel, z - MDT-data group sender, 
+       Y - Joined MDT-data group, y - Sending to MDT-data group, 
+       G - Received BGP C-Mroute, g - Sent BGP C-Mroute, 
+       N - Received BGP Shared-Tree Prune, n - BGP C-Mroute suppressed, 
+       Q - Received BGP S-A Route, q - Sent BGP S-A Route, 
+       V - RD & Vector, v - Vector, p - PIM Joins on route, 
+       x - VxLAN group
+Outgoing interface flags: H - Hardware switched, A - Assert winner, p - PIM Join
+ Timers: Uptime/Expires
+ Interface state: Interface, Next-Hop or VCD, State/Mode
+
+(*, 239.1.1.1), 00:04:40/stopped, RP 0.0.0.0, flags: D
+  Incoming interface: Null, RPF nbr 0.0.0.0
+  Outgoing interface list:
+    GigabitEthernet0/2, Forward/Dense, 00:04:40/stopped
+    GigabitEthernet0/0, Forward/Dense, 00:04:40/stopped
+
+(10.20.15.10, 239.1.1.1), 00:01:38/00:01:21, flags: PT
+  Incoming interface: GigabitEthernet0/2, RPF nbr 10.34.1.2
+  Outgoing interface list:
+    GigabitEthernet0/0, Prune/Dense, 00:01:38/00:01:21
+
+(*, 224.0.1.40), 00:12:33/00:02:16, RP 0.0.0.0, flags: DCL
+  Incoming interface: Null, RPF nbr 0.0.0.0
+  Outgoing interface list:
+    GigabitEthernet0/2, Forward/Dense, 00:12:33/stopped
+    GigabitEthernet0/0, Forward/Dense, 00:12:33/stopped
+
+```
+
+- R2:
+
+```
+R2#show ip mroute 
+IP Multicast Routing Table
+Flags: D - Dense, S - Sparse, B - Bidir Group, s - SSM Group, C - Connected,
+       L - Local, P - Pruned, R - RP-bit set, F - Register flag,
+       T - SPT-bit set, J - Join SPT, M - MSDP created entry, E - Extranet,
+       X - Proxy Join Timer Running, A - Candidate for MSDP Advertisement,
+       U - URD, I - Received Source Specific Host Report, 
+       Z - Multicast Tunnel, z - MDT-data group sender, 
+       Y - Joined MDT-data group, y - Sending to MDT-data group, 
+       G - Received BGP C-Mroute, g - Sent BGP C-Mroute, 
+       N - Received BGP Shared-Tree Prune, n - BGP C-Mroute suppressed, 
+       Q - Received BGP S-A Route, q - Sent BGP S-A Route, 
+       V - RD & Vector, v - Vector, p - PIM Joins on route, 
+       x - VxLAN group
+Outgoing interface flags: H - Hardware switched, A - Assert winner, p - PIM Join
+ Timers: Uptime/Expires
+ Interface state: Interface, Next-Hop or VCD, State/Mode
+
+(*, 239.1.1.1), 00:05:08/stopped, RP 0.0.0.0, flags: D
+  Incoming interface: Null, RPF nbr 0.0.0.0
+  Outgoing interface list:
+    GigabitEthernet0/1, Forward/Dense, 00:05:08/stopped
+    GigabitEthernet0/0, Forward/Dense, 00:05:08/stopped
+
+(10.20.15.10, 239.1.1.1), 00:02:06/00:00:53, flags: PT
+  Incoming interface: GigabitEthernet0/0, RPF nbr 10.12.1.1
+  Outgoing interface list:
+    GigabitEthernet0/1, Prune/Dense, 00:02:02/00:00:57, A
+
+(*, 224.0.1.40), 00:13:25/00:02:52, RP 0.0.0.0, flags: DCL
+  Incoming interface: Null, RPF nbr 0.0.0.0
+  Outgoing interface list:
+    GigabitEthernet0/1, Forward/Dense, 00:13:25/stopped
+    GigabitEthernet0/0, Forward/Dense, 00:13:25/stopped
+
+```
+
+- R1:
+
+```
+R1#show ip mroute 
+IP Multicast Routing Table
+Flags: D - Dense, S - Sparse, B - Bidir Group, s - SSM Group, C - Connected,
+       L - Local, P - Pruned, R - RP-bit set, F - Register flag,
+       T - SPT-bit set, J - Join SPT, M - MSDP created entry, E - Extranet,
+       X - Proxy Join Timer Running, A - Candidate for MSDP Advertisement,
+       U - URD, I - Received Source Specific Host Report, 
+       Z - Multicast Tunnel, z - MDT-data group sender, 
+       Y - Joined MDT-data group, y - Sending to MDT-data group, 
+       G - Received BGP C-Mroute, g - Sent BGP C-Mroute, 
+       N - Received BGP Shared-Tree Prune, n - BGP C-Mroute suppressed, 
+       Q - Received BGP S-A Route, q - Sent BGP S-A Route, 
+       V - RD & Vector, v - Vector, p - PIM Joins on route, 
+       x - VxLAN group
+Outgoing interface flags: H - Hardware switched, A - Assert winner, p - PIM Join
+ Timers: Uptime/Expires
+ Interface state: Interface, Next-Hop or VCD, State/Mode
+
+(*, 239.1.1.1), 00:05:44/stopped, RP 0.0.0.0, flags: D
+  Incoming interface: Null, RPF nbr 0.0.0.0
+  Outgoing interface list:
+    GigabitEthernet0/2, Forward/Dense, 00:05:44/stopped
+    GigabitEthernet0/0, Forward/Dense, 00:05:44/stopped
+
+(10.20.15.10, 239.1.1.1), 00:05:44/00:02:48, flags: PT
+  Incoming interface: GigabitEthernet0/1, RPF nbr 0.0.0.0
+  Outgoing interface list:
+    GigabitEthernet0/0, Prune/Dense, 00:02:38/00:00:21
+    GigabitEthernet0/2, Prune/Dense, 00:02:42/00:00:17
+
+(*, 224.0.1.40), 00:14:14/00:02:06, RP 0.0.0.0, flags: DCL
+  Incoming interface: Null, RPF nbr 0.0.0.0
+  Outgoing interface list:
+    GigabitEthernet0/2, Forward/Dense, 00:14:14/stopped
+    GigabitEthernet0/0, Forward/Dense, 00:14:14/stopped
+
+```
+
+- R4:
+
+```
+R4(config)#do sh ip mroute
+IP Multicast Routing Table
+Flags: D - Dense, S - Sparse, B - Bidir Group, s - SSM Group, C - Connected,
+       L - Local, P - Pruned, R - RP-bit set, F - Register flag,
+       T - SPT-bit set, J - Join SPT, M - MSDP created entry, E - Extranet,
+       X - Proxy Join Timer Running, A - Candidate for MSDP Advertisement,
+       U - URD, I - Received Source Specific Host Report, 
+       Z - Multicast Tunnel, z - MDT-data group sender, 
+       Y - Joined MDT-data group, y - Sending to MDT-data group, 
+       G - Received BGP C-Mroute, g - Sent BGP C-Mroute, 
+       N - Received BGP Shared-Tree Prune, n - BGP C-Mroute suppressed, 
+       Q - Received BGP S-A Route, q - Sent BGP S-A Route, 
+       V - RD & Vector, v - Vector, p - PIM Joins on route, 
+       x - VxLAN group
+Outgoing interface flags: H - Hardware switched, A - Assert winner, p - PIM Join
+ Timers: Uptime/Expires
+ Interface state: Interface, Next-Hop or VCD, State/Mode
+
+(*, 239.1.1.1), 00:06:45/stopped, RP 0.0.0.0, flags: D
+  Incoming interface: Null, RPF nbr 0.0.0.0
+  Outgoing interface list:
+    GigabitEthernet0/1, Forward/Dense, 00:06:45/stopped
+    GigabitEthernet0/0, Forward/Dense, 00:06:45/stopped
+
+(10.20.15.10, 239.1.1.1), 00:00:41/00:02:18, flags: PT
+  Incoming interface: GigabitEthernet0/0, RPF nbr 10.14.1.1
+  Outgoing interface list:
+    GigabitEthernet0/1, Prune/Dense, 00:00:41/00:02:18
+
+(*, 224.0.1.40), 00:26:28/00:02:05, RP 0.0.0.0, flags: DCL
+  Incoming interface: Null, RPF nbr 0.0.0.0
+  Outgoing interface list:
+    GigabitEthernet0/1, Forward/Dense, 00:25:41/stopped
+    GigabitEthernet0/0, Forward/Dense, 00:26:28/stopped
+
+```
+
+- This means that the multicast flow goes via R4 (as expected - shortest path)
+
+- Configuring PIM sparse mode:
+
+- On all routers and the switch move the interfaces into sparse mode
+
+- Configure a static RP on R2's l0 interface, on all the routers, including R2
+
+- R4:
+
+```
+conf t
+ ip pim rp-address 10.2.2.2
+ int range g0/0 - 1
+  ip pim sparse-mode
+```
+
+- R4's multicast routing table:
+
+```
+R4#sh ip mroute 
+IP Multicast Routing Table
+Flags: D - Dense, S - Sparse, B - Bidir Group, s - SSM Group, C - Connected,
+       L - Local, P - Pruned, R - RP-bit set, F - Register flag,
+       T - SPT-bit set, J - Join SPT, M - MSDP created entry, E - Extranet,
+       X - Proxy Join Timer Running, A - Candidate for MSDP Advertisement,
+       U - URD, I - Received Source Specific Host Report, 
+       Z - Multicast Tunnel, z - MDT-data group sender, 
+       Y - Joined MDT-data group, y - Sending to MDT-data group, 
+       G - Received BGP C-Mroute, g - Sent BGP C-Mroute, 
+       N - Received BGP Shared-Tree Prune, n - BGP C-Mroute suppressed, 
+       Q - Received BGP S-A Route, q - Sent BGP S-A Route, 
+       V - RD & Vector, v - Vector, p - PIM Joins on route, 
+       x - VxLAN group
+Outgoing interface flags: H - Hardware switched, A - Assert winner, p - PIM Join
+ Timers: Uptime/Expires
+ Interface state: Interface, Next-Hop or VCD, State/Mode
+
+(*, 239.1.1.1), 00:04:47/stopped, RP 10.2.2.2, flags: S
+  Incoming interface: GigabitEthernet0/1, RPF nbr 10.34.1.1
+  Outgoing interface list:
+    GigabitEthernet0/0, Forward/Sparse, 00:04:47/stopped
+
+(10.20.15.10, 239.1.1.1), 00:02:55/00:00:04, flags: PJT
+  Incoming interface: GigabitEthernet0/0, RPF nbr 10.14.1.1
+  Outgoing interface list:
+    GigabitEthernet0/1, Prune/Sparse, 00:02:43/00:00:16
+
+(*, 224.0.1.40), 00:44:01/00:02:34, RP 10.2.2.2, flags: SJCL
+  Incoming interface: GigabitEthernet0/1, RPF nbr 10.34.1.1
+  Outgoing interface list:
+    GigabitEthernet0/0, Forward/Sparse, 00:44:01/00:02:34
+
+```
+
+- Notice the PJT flags on the (S,G) route
+
+- R2:
+
+```
+R2#show ip mroute 
+IP Multicast Routing Table
+Flags: D - Dense, S - Sparse, B - Bidir Group, s - SSM Group, C - Connected,
+       L - Local, P - Pruned, R - RP-bit set, F - Register flag,
+       T - SPT-bit set, J - Join SPT, M - MSDP created entry, E - Extranet,
+       X - Proxy Join Timer Running, A - Candidate for MSDP Advertisement,
+       U - URD, I - Received Source Specific Host Report, 
+       Z - Multicast Tunnel, z - MDT-data group sender, 
+       Y - Joined MDT-data group, y - Sending to MDT-data group, 
+       G - Received BGP C-Mroute, g - Sent BGP C-Mroute, 
+       N - Received BGP Shared-Tree Prune, n - BGP C-Mroute suppressed, 
+       Q - Received BGP S-A Route, q - Sent BGP S-A Route, 
+       V - RD & Vector, v - Vector, p - PIM Joins on route, 
+       x - VxLAN group
+Outgoing interface flags: H - Hardware switched, A - Assert winner, p - PIM Join
+ Timers: Uptime/Expires
+ Interface state: Interface, Next-Hop or VCD, State/Mode
+
+(*, 239.1.1.1), 00:05:48/00:03:29, RP 10.2.2.2, flags: S
+  Incoming interface: Null, RPF nbr 0.0.0.0
+  Outgoing interface list:
+    GigabitEthernet0/1, Forward/Sparse, 00:05:48/00:03:29
+    GigabitEthernet0/0, Forward/Sparse, 00:05:48/00:02:54
+
+(10.20.15.10, 239.1.1.1), 00:04:52/00:02:20, flags: T
+  Incoming interface: GigabitEthernet0/0, RPF nbr 10.12.1.1
+  Outgoing interface list:
+    GigabitEthernet0/1, Forward/Sparse, 00:04:52/00:03:29
+
+(*, 224.0.1.40), 00:33:35/00:02:56, RP 10.2.2.2, flags: SJCL
+  Incoming interface: Null, RPF nbr 0.0.0.0
+  Outgoing interface list:
+    GigabitEthernet0/1, Forward/Sparse, 00:33:35/00:02:31
+    GigabitEthernet0/0, Forward/Sparse, 00:33:35/00:02:56
+```
+
+- R1:
+
+```
+R1#show ip mroute 
+IP Multicast Routing Table
+Flags: D - Dense, S - Sparse, B - Bidir Group, s - SSM Group, C - Connected,
+       L - Local, P - Pruned, R - RP-bit set, F - Register flag,
+       T - SPT-bit set, J - Join SPT, M - MSDP created entry, E - Extranet,
+       X - Proxy Join Timer Running, A - Candidate for MSDP Advertisement,
+       U - URD, I - Received Source Specific Host Report, 
+       Z - Multicast Tunnel, z - MDT-data group sender, 
+       Y - Joined MDT-data group, y - Sending to MDT-data group, 
+       G - Received BGP C-Mroute, g - Sent BGP C-Mroute, 
+       N - Received BGP Shared-Tree Prune, n - BGP C-Mroute suppressed, 
+       Q - Received BGP S-A Route, q - Sent BGP S-A Route, 
+       V - RD & Vector, v - Vector, p - PIM Joins on route, 
+       x - VxLAN group
+Outgoing interface flags: H - Hardware switched, A - Assert winner, p - PIM Join
+ Timers: Uptime/Expires
+ Interface state: Interface, Next-Hop or VCD, State/Mode
+
+(*, 239.1.1.1), 00:07:47/stopped, RP 10.2.2.2, flags: SF
+  Incoming interface: GigabitEthernet0/0, RPF nbr 10.12.1.2
+  Outgoing interface list:
+    GigabitEthernet0/2, Forward/Sparse, 00:07:47/stopped
+
+(10.20.15.10, 239.1.1.1), 00:07:27/00:02:02, flags: FT
+  Incoming interface: GigabitEthernet0/1, RPF nbr 0.0.0.0
+  Outgoing interface list:
+    GigabitEthernet0/0, Forward/Sparse, 00:07:27/00:02:30
+
+(*, 224.0.1.40), 00:35:47/00:02:31, RP 10.2.2.2, flags: SJCL
+  Incoming interface: GigabitEthernet0/0, RPF nbr 10.12.1.2
+  Outgoing interface list:
+    GigabitEthernet0/2, Forward/Sparse, 00:35:47/stopped
+
+```
+
+- Receiver:
+
+```
+Receiver#sh ip igmp interface 
+Global IGMP State Limit : 0 active out of 500 max
+GigabitEthernet0/0 is up, line protocol is up
+  Internet address is 10.38.1.100/24
+  IGMP is enabled on interface
+  Current IGMP host version is 2
+  Current IGMP router version is 2
+  IGMP query interval is 60 seconds
+  IGMP configured query interval is 60 seconds
+  IGMP querier timeout is 120 seconds
+  IGMP configured querier timeout is 120 seconds
+  IGMP max query response time is 10 seconds
+  Last member query count is 2
+  Last member query response interval is 1000 ms
+  Inbound IGMP access group is not set
+  IGMP activity: 3 joins, 1 leaves
+  Multicast routing is enabled on interface
+  Multicast TTL threshold is 0
+  Multicast designated router (DR) is 10.38.1.100 (this system)
+  IGMP querying router is 10.38.1.1  
+  Multicast groups joined by this system (number of users):
+      224.0.1.40(1)  239.1.1.1(1)
+```
+
