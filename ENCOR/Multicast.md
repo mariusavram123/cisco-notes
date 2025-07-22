@@ -1757,6 +1757,7 @@ conf t
 ```
 conf t
  ip pim bsr-candidate l0
+ ip pim rp-candidate l0
  interface l0
   ip pim bsr-border
 ```
@@ -1764,7 +1765,7 @@ conf t
 - R1:
 
 ```
-R1#show ip mroute 
+R1#sh ip mroute 
 IP Multicast Routing Table
 Flags: D - Dense, S - Sparse, B - Bidir Group, s - SSM Group, C - Connected,
        L - Local, P - Pruned, R - RP-bit set, F - Register flag,
@@ -1782,29 +1783,20 @@ Outgoing interface flags: H - Hardware switched, A - Assert winner, p - PIM Join
  Timers: Uptime/Expires
  Interface state: Interface, Next-Hop or VCD, State/Mode
 
-(*, 239.1.1.1), 00:01:18/stopped, RP 0.0.0.0, flags: D
-  Incoming interface: Null, RPF nbr 0.0.0.0
-  Outgoing interface list:
-    GigabitEthernet0/2, Forward/Sparse-Dense, 00:01:18/stopped
-    GigabitEthernet0/0, Forward/Sparse-Dense, 00:01:18/stopped
+(*, 239.1.1.1), 00:08:35/stopped, RP 10.2.2.2, flags: SPF
+  Incoming interface: GigabitEthernet0/0, RPF nbr 10.12.1.2
+  Outgoing interface list: Null
 
-(10.20.15.10, 239.1.1.1), 00:01:18/00:01:41, flags: PT
+(10.20.15.10, 239.1.1.1), 00:08:35/00:02:54, flags: FT
   Incoming interface: GigabitEthernet0/1, RPF nbr 0.0.0.0
   Outgoing interface list:
-    GigabitEthernet0/0, Prune/Sparse-Dense, 00:01:13/00:01:46
-    GigabitEthernet0/2, Prune/Sparse-Dense, 00:01:18/00:01:41
+    GigabitEthernet0/2, Forward/Sparse, 00:01:26/00:03:03
+    GigabitEthernet0/0, Forward/Sparse, 00:01:27/00:02:46
 
-(*, 224.0.1.39), 00:33:43/00:02:06, RP 0.0.0.0, flags: D
+(*, 224.0.1.40), 00:18:46/00:02:19, RP 0.0.0.0, flags: DCL
   Incoming interface: Null, RPF nbr 0.0.0.0
   Outgoing interface list:
-    GigabitEthernet0/2, Forward/Sparse-Dense, 00:33:43/stopped
-    GigabitEthernet0/0, Forward/Sparse-Dense, 00:33:43/stopped
-
-(*, 224.0.1.40), 00:37:46/00:02:36, RP 0.0.0.0, flags: DCL
-  Incoming interface: Null, RPF nbr 0.0.0.0
-  Outgoing interface list:
-    GigabitEthernet0/2, Forward/Sparse-Dense, 00:37:18/stopped
-    GigabitEthernet0/0, Forward/Sparse-Dense, 00:37:28/stopped
+    Loopback0, Forward/Sparse, 00:18:45/00:02:19
 ```
 
 - R2:
@@ -1828,23 +1820,20 @@ Outgoing interface flags: H - Hardware switched, A - Assert winner, p - PIM Join
  Timers: Uptime/Expires
  Interface state: Interface, Next-Hop or VCD, State/Mode
 
-(*, 239.1.1.1), 00:03:54/stopped, RP 0.0.0.0, flags: D
+(*, 239.1.1.1), 00:09:14/00:03:22, RP 10.2.2.2, flags: S
   Incoming interface: Null, RPF nbr 0.0.0.0
   Outgoing interface list:
-    GigabitEthernet0/1, Forward/Sparse-Dense, 00:03:54/stopped
-    GigabitEthernet0/0, Forward/Sparse-Dense, 00:03:54/stopped
+    GigabitEthernet0/1, Forward/Sparse, 00:02:06/00:03:22
 
-(10.20.15.10, 239.1.1.1), 00:00:52/00:02:07, flags: PT
+(10.20.15.10, 239.1.1.1), 00:09:14/00:03:09, flags: T
   Incoming interface: GigabitEthernet0/0, RPF nbr 10.12.1.1
   Outgoing interface list:
-    GigabitEthernet0/1, Prune/Sparse-Dense, 00:00:48/00:02:11, A
+    GigabitEthernet0/1, Forward/Sparse, 00:02:06/00:01:23
 
-(*, 224.0.1.40), 00:39:35/00:02:23, RP 0.0.0.0, flags: DCL
+(*, 224.0.1.40), 00:16:07/00:02:52, RP 0.0.0.0, flags: DCL
   Incoming interface: Null, RPF nbr 0.0.0.0
   Outgoing interface list:
-    Loopback0, Forward/Sparse-Dense, 00:39:35/stopped
-    GigabitEthernet0/1, Forward/Sparse-Dense, 00:38:44/stopped
-    GigabitEthernet0/0, Forward/Sparse-Dense, 00:39:35/stopped
+    Loopback0, Forward/Sparse, 00:16:06/00:02:52
 ```
 
 - R4:
@@ -1868,21 +1857,20 @@ Outgoing interface flags: H - Hardware switched, A - Assert winner, p - PIM Join
  Timers: Uptime/Expires
  Interface state: Interface, Next-Hop or VCD, State/Mode
 
-(*, 239.1.1.1), 00:04:33/stopped, RP 0.0.0.0, flags: D
-  Incoming interface: Null, RPF nbr 0.0.0.0
-  Outgoing interface list:
-    GigabitEthernet0/1, Forward/Sparse-Dense, 00:04:33/stopped
-    GigabitEthernet0/0, Forward/Sparse-Dense, 00:04:33/stopped
+(*, 239.1.1.1), 00:02:36/stopped, RP 10.2.2.2, flags: SP
+  Incoming interface: GigabitEthernet0/1, RPF nbr 10.34.1.1
+  Outgoing interface list: Null
 
-(10.20.15.10, 239.1.1.1), 00:01:31/00:01:28, flags: PT
+(10.20.15.10, 239.1.1.1), 00:02:36/00:00:23, flags: T
   Incoming interface: GigabitEthernet0/0, RPF nbr 10.14.1.1
   Outgoing interface list:
-    GigabitEthernet0/1, Prune/Sparse-Dense, 00:01:31/00:01:28
+    GigabitEthernet0/1, Forward/Sparse, 00:02:36/00:02:51
 
-(*, 224.0.1.40), 00:38:54/00:02:22, RP 0.0.0.0, flags: DCL
+(*, 224.0.1.40), 00:16:35/00:02:03, RP 0.0.0.0, flags: DCL
   Incoming interface: Null, RPF nbr 0.0.0.0
   Outgoing interface list:
-    GigabitEthernet0/0, Forward/Sparse-Dense, 00:38:54/stopped
+    GigabitEthernet0/0, Forward/Sparse, 00:16:35/00:02:03
+
 
 ```
 
@@ -1907,19 +1895,17 @@ Outgoing interface flags: H - Hardware switched, A - Assert winner, p - PIM Join
  Timers: Uptime/Expires
  Interface state: Interface, Next-Hop or VCD, State/Mode
 
-(*, 239.1.1.1), 00:05:13/stopped, RP 0.0.0.0, flags: D
-  Incoming interface: Null, RPF nbr 0.0.0.0
+(*, 239.1.1.1), 00:03:34/stopped, RP 10.2.2.2, flags: SJC
+  Incoming interface: GigabitEthernet0/0, RPF nbr 10.23.1.1
   Outgoing interface list:
-    GigabitEthernet0/2, Forward/Sparse-Dense, 00:05:13/stopped
-    GigabitEthernet0/0, Forward/Sparse-Dense, 00:05:13/stopped
+    GigabitEthernet0/1, Forward/Sparse, 00:03:34/00:02:18
 
-(10.20.15.10, 239.1.1.1), 00:02:11/00:00:48, flags: PT
+(10.20.15.10, 239.1.1.1), 00:03:33/00:02:26, flags: JT
   Incoming interface: GigabitEthernet0/2, RPF nbr 10.34.1.2
   Outgoing interface list:
-    GigabitEthernet0/0, Prune/Sparse-Dense, 00:02:11/00:00:48
+    GigabitEthernet0/1, Forward/Sparse, 00:03:33/00:02:18
 
-(*, 224.0.1.40), 00:38:59/00:02:59, RP 0.0.0.0, flags: DCL
+(*, 224.0.1.40), 00:13:44/00:02:55, RP 0.0.0.0, flags: DPL
   Incoming interface: Null, RPF nbr 0.0.0.0
-  Outgoing interface list:
-    GigabitEthernet0/0, Forward/Sparse-Dense, 00:38:45/stopped
+  Outgoing interface list: Null
 ```
