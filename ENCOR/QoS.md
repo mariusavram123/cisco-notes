@@ -729,3 +729,358 @@ Bronze                  Background              1                       12 (AF11
 
 - Shaping buffers and delays traffic rather than dropping it, and this causes fewer TCP retransmissions compared to policing
 
+#### Markdown
+
+- When a desired traffic rate is exceeded, a policer can take one of the following actions:
+
+    - Drop the traffic
+
+    - Mark down the excess traffic with a lower priority
+
+- Marking down the excess traffic involves re-marking the packets with a lower priority class value; for example excess traffic marked with AFx1 should be marked down to AFx2 (or AFx3 if using two-rate policing)
+
+- After marking down the traffic, congestion-avoidance mechanisms, such as DSCP-based weithted random early detection (WRED), should be configured throughout the network to drop AFx3 more aggresively than AFx2 and drop AFx2 more agressively than AFx1
+
+#### Tocken Bucket Algorithms
+
+- Cisco IOS policers and shapers are based on tocken-bucket algorithms
+
+- Definitions used to explain how tocken bucket algorithms operate:
+
+    - **Commited Information Rate (CIR)**: The policed traffic rate, in bits per second (bps), defined in the traffic contract
+
+    - **Commited Time Interval (Tc)**: The time interval, in miliseconds (ms), over which the commited burst (Bc) is sent. Tc can be calculated with the formula Tc = (Bc [bits] / CIR [bps]) * 1000
+
+    - **Commited Burst Size (Bc)**: The maximum size of the CIR tocken bucket, measured in bytes, and the maximum amount of traffic that can be sent within a Tc. Bc can be calculated with the formula Bc = CIR * (Tc / 1000)
+
+    - **Token**: A single token represents 1 byte or 8 bits
+
+    - **Token bucket**: A bucket that accumulates tokens until a maximum predefined number of tokens is reached (such as the Bc when using a single token bucket); these tokens are added into the bucket at a fixed rate (the CIR). Each packet is checked for conformance to the defined rate and takes tokens from the bucket equal to it's packet size; for example if the packet size is 1500 bytes, it takes 12.000 bits (1500 * 8) from the bucket
+
+    - If there are not enough tokens in the token bucket to send the packet, the traffic conditioning mechanism can take one of the following actions:
+
+        - Buffer the packets while waiting for enough tokens to accumulate in the token bucket (traffic shaping)
+
+        - Drop the packets (traffic policing)
+
+        - Mark down the packets (traffic policing)
+
+- It is recommended for the Bc value to be larger than or equal to the size of the largest possible IP packet in a traffic stream
+
+- Otherwise there will never be enough tokens in the tocken bucket for larger packets, and they will always exceed the defined rate
+
+- If the bucket fills up to the maximum capacity, newly added tokens are discarded
+
+- Discarded tokens are not available for use in future packets
+
+- Token bucket algorithms may use one or multiple token buckets
+
+- For single token bucket algorithms, the measured traffic rate can conform to or exceed the defined traffic rate
+
+- The measured traffic rate is conforming if there are enough tokens in the token bucket to transmit the traffic
+
+- The measured traffic rate is exceeding if there are not enough tokens in the token bucket to transmit the traffic
+
+- The concept of single token bucket algorithm
+
+![single-token-bucket](./single-token-bucket-algorithms.png)
+
+- To understand how the single token bucket algorithms operate in more detail, assume that a 1 Gbps interface is configured with a policer defined with a CIR of 120 Mbps and a Bc of 12 Mb
+
+- The Tc value cannot be explicitly defined in IOS, but it can be calculated as follows:
+
+    - Tc = (Bc [bits] / CIR [bps]) * 1000
+
+    - Tc = (12 Mb / 120 Mbps) * 1000
+
+    - TC = (12.000.000 bits / 120.000.000 bps) * 1000 = 100 Ms
+
+- Once the Tc value is known, the number of Tcs within a second can be calculated as follows:
+
+    - TCs per second = 1000 / Tc
+
+    - TCs per second = 1000 / 100 Ms = 10 Tcs
+
+- If a continuous stream of 1500 byte (12.000-bit) packets is processed by the token algorithm, only a Bc of 12 Mb can be taken by the packets within each Tc (100 ms)
+
+- The number of packets that conform to the traffic rate and are allowed to be transmitted can be calculated as follows:
+
+    - Number of packets that conform within each Tc = Bc / packet size in bits (rounded down)
+
+    - Number of packets that conform within each TC = 12.000.000 bits / 12.000 bits = 1000 packets
+
+- Any aditional packets beyond 1000 will either be dropped or marked down
+
+- To figure out how many packets will be sent in one second, the following formula can be used:
+
+    - Packets per second = Number of packets that conform within each Tc * Tcs per second
+
+    - Packets per second = 1.000 packets * 10 intervals = 10.000 packets
+
+- To calculate the CIR for the 10.000 packets the following formula can be used:
+
+    - CIR = Packets per second * Packet size in bits
+
+    - CIR = 10000 * 12.000 bits = 120.000.000 bps = 120 Mbps
+
+- To calculate the time interval it would take for the 1000 packets to be sent at interface line rate the following formula can be used:
+
+    - Time interval at line rate = (Bc [bits] / Interface speed [bps]) * 1000
+
+    - Time interval at line rate = (12 Mb / 1Gb) * 1000
+
+    - Time interval at line rate = (12.000.000 bits / 1.000.000.000 bps) * 1000 = 12 ms
+
+- Below we can see how the Bc (1000 packets at 1500 bytes each, or 12 Mb) is sent every Tc interval
+
+- After the Bc is sent, there is an interpret delay of 113 ms (125 ms - 12 ms) within the Tc where there is no data transmitted
+
+![token-bucket-operation](./tocken-bucket-operation.png)
+
+- The recommended values for Tc range from 8 ms to 125 ms
+
+- Shorter Tcs, such as 8 ms to 10 ms, are necessary to reduce interpacket delay for real-time traffic such as voice
+
+- Tcs longer than 125 ms are not recommended for most networks because the interpacket delay becomes too large
+
+#### Types of Policers
+
+- There are different policing algorithms including the following:
+
+    - Single-rate two-color marker/policer
+
+    - Single-rate three-color marker/policer (srTCM)
+
+    - Two-rate three-color marker/policer (trTCM)
+
+##### Single-rate Two-color Markers/Policers
+
+- The first policers implemented use a single-rate two-color model based on the single token bucket algorithm
+
+- For this type of policer, traffic can be either conforming to or exceeding the CIR
+
+- Marking down or dropping actions can be performed for each of the two states
+
+- Below we can see different actions that the single-rate two-color policer can take
+
+- The part above the dotted line on the left side's figure represent traffic that exceeded the CIR and was marked down
+
+- The section above the dotted line on the right side of the figure represents traffic that exceeded the CIR and was dropped
+
+![single-rate-two-color](./single-rate-two-color-policer.png)
+
+##### Single-rate Three-color Markers/Policers (srTCM)
+
+- Single-rate three-color policer algorithms are based on RFC 2697
+
+- This type of policer uses two token buckets, and the traffic can be classified as either conforming to, exceeding or violating the CIR
+
+- Marking down or dropping actions are performed for each of the three states of the traffic
+
+- The first token bucket operates very similarly to the single-rate two-color system; the difference is that if there are any tokens left over in the bucket after each time period due to low or no activity, instead of discarding the access tokens (overflow), the algorithm places them in a second bucket to be used later for temporary bursts that may exceed the CIR
+
+- Tokens placed in this second bucket are referred to as the exceed burst (Be), and Be is the maximum number of bits that can exceed the Bc burst size
+
+- With the two token bucket mechanism, traffic can be classified in three colors or states, as follows:
+
+    - **Conform**: Traffic under Bc is classified as conforming and green. Conforming traffic is usually transmitted and can optionally be re-marked
+
+    - **Excess**: Traffic under Bc but Be is classified as exceeding and yellow. Exceeding traffic can be dropped or marked down and transmitted
+
+    - **Violate**: Traffic over Be is classified as violating and red. This type of traffic is usually dropped but can be optionalled marked down and transmitted
+
+- Below we can see different actions that single-rate three-rate policer can take
+
+- The section below the dotted line of the left side of the figure represents the traffic that conformed to the CIR, the section right above the straight dotted line represents the exceeding traffic that was marked down, and the top section represents the violating traffic that was also marked down
+
+- The exceeding and violating traffic rates vary because they rely on random tokens splitting over from the Bc bucket into the Be
+
+- The section right above the straight dotted line on the right side of the figure represents traffic that exceeded the CIR and was marked down, and the top section represents traffic that violated the CIR and was dropped
+
+![single-rate-three-color](./singe-rate-three-color.png)
+
+- The single-rate three-color marker/policer uses the following parameters to meter the traffic stream:
+
+    - **Commited Information Rate (CIR)**: The policed rate
+
+    - **Commited Burst Size (Bc)**: The maximum size of CIR token bucket, measured in bytes. Referred to as Commited Burst Size (CBS) in RFC 2697 
+
+    - **Excess Burst Size (Be)**: The maximum size of the excess token bucket, measured in bytes. Referred to as Excess Burst Size (EBS) in RFC 2697
+
+    - **Bc Bucket Token Count (Tc)**: The number of tokens in the Bc bucket. Not to be confuses with the commited time interval (Tc)
+
+    - **Be Bucket Token Count (Te)**: The number of tokens in the Be bucket
+
+    - **Incoming packet length**: The packet length of the incoming packet in bits
+
+- Below we can see the logical flow of the single-rate three-color marker/policer two-bucket algorithm
+
+- The single-rate three-color policer's two-bucket algorithm causes fewer TCP retransmissions and is more efficient for bandwidth utilization
+
+- It is the perfect policer to be used with AF classes (AFx1, AFx2 and AFx3)
+
+- Using a three-color policer makes sense only if the actions taken for each color differ
+
+- If the actions for two or more colors are the same, for example, conform and exceed both transmit without re-marking, the single-rate two-policer policer is recommended to keep things simple
+
+![single-rate-three-color](./single-rate-three-color-policer.png)
+
+##### Two-Rate Three-Color markers/policers
+
+- The two-rate three-color marker/policer is based on RFC 2698 and is similar to the single-rate three-color policer
+
+- The difference is that single-rate three-policers rely on excess tokens from the Bc bucket, which introduces a certain level of variability and unpredictability in traffic flows; the two-rate three-color markers/policers address this issue by using two distinct rates, the CIR and the Peek Information Rate (PIR)
+
+- The two-rate three-color marker/policer allows for a sustained excess rate based on the PIR that allows for different actions for traffic exceeding the different burst values; for example violating traffic can be dropped at a defined rate, and this is something that is not possible with the single-rate three-color policer
+
+- The image below illustrates how violating traffic that exceeds the PIR can either be marked down (on the left side of the figure) or dropped (on the right side of the figure)
+
+- Comparing the next figure with the above one to see the difference between the two-rate three-color policer and the one-rate three-color policer
+
+![two-rate-three-color](./two-rate-three-color-policer.png)
+
+- The two-rate three-color marker/policer uses the following parameters to meter the traffic stream:
+
+    - **Commited Information Rate (CIR)**: The policed rate
+
+    - **Peak Information Rate (PIR)**: The maximum rate of traffic allowed. PIR should be equal to or greater than the CIR
+
+    - **Commited Burst Size (Bc)**: The maximum size of the second token bucket, measured in bytes. Referred to as Commited Burst Size (CBS) in RFC 2698
+
+    - **Peak Burst Size (Be)**: The maximum size of the PIR token bucket measured in bytes. Referred to as Peak Burst Size (PBS) in RFC 2698. Be should be equal or greater than Bc
+
+    - **Bc Bucket Token Count (Tc)**: The number of tokens in the Bc bucket. Not to be confused with the commited time interval (Tc)
+
+    - **Bp Bucket Token Count (Tp)**: The number of tokens in the Bp bucket
+
+    - **Incoming Packet Length (B)**: The packet length of the incoming packet in bits
+
+- The two-rate three-color policer also use two token buckets, but the logic varies from that of the single-rate three-color policer
+
+- Instead of thransferring unused tokens from the Bc bucket to the Be bucket, this policer has two separate buckets that are filled with two separate token rates
+
+- The Be bucket is filled with the PIR tokens and the Bc bucket is filled with the CIR tokens
+
+- Be represents the peak limit of traffic that can be sent during a subsecond interval
+
+- The logic varies further in that the initial check is to see whether the traffic is within the PIR
+
+- Only then the traffic is compared against the CIR
+
+- In other words, a violate condition is checked first, then an exceed condition, and finally a conform condition, which is the reverse of the logic of the single-rate three-color policer
+
+- The above figure illustrates the token bucket algorithm for the two-rate three-color marker/policer
+
+- Compare it with the figure from above to see the differences between the two
+
+![2rate-three-color-policer](./two-rate-three-color-policer2.png)
+
+### Congestion Management and Avoidance
+
+- Queuing algorithms used for congestion management as well as packet-drop techniques that can be used for congestion avoidance
+
+- These tools provide a way for managing excessive traffic during periods of congestion
+
+#### Congestion Management
+
+- Congestion management involves a combination of queuing and scheduling
+
+- Queuing (also known as buffering) is the temporary storage of excess packets
+
+- Queuing is activated when an output interface is experiencing congestion and deactivated when congestion clears
+
+- Congestion is detected by the queuing algorithm when a Layer 1 hardware queue present on physical interface, known as the transmit ring (Tx-Ring or TxQ), is full
+
+- When the Tx-ring is not full anymore, this indicates that there is no congestion on the interface, and queuing is deactivated
+
+- Congestion can occur for one of these two reasons:
+
+    - The input interface is faster than the output interface
+
+    - The output interface is receiving packets from multiple input interfaces
+
+- When congestion is taking place, the queues fill up, and packets can be reordered by some of the queuing algorithms so that higher-priority packets exit the output interface sooner than lower-priority ones
+
+- At this point, a scheduling algoritm decides which packet to transmit next
+
+- Scheduling is always active, regardless of whether the interface is experiencing congestion
+
+- There are many queuing algorithms available, but most of them are not adequate for modern rich-media networks carrying voice and high-definition video traffic because they were designed before these traffic types came to be
+
+- The legacy queuing algorithms in the MQC architecture include the following:
+
+    - **First-in, first-out queuing (FIFO)**: FIFO involves a single queue where the first packet to be placed on the output interface queue is the first packet to leave the interface (first come, first served). In FIFO queuing, all traffic belong to the same class
+
+    - **Round robin**: With round-robin, queues are serviced in sequence one after the other, and each queue processes one packet only. No queues starve with round robin because every queue gets an opportunity to send one packet every round. No queue has priority over the others, and if packet sizes from all queues are about the same, the interface bandwidth is shared equally across the round robin queues. A limitation of round robin is that it does not include a mechanism to prioritize traffic
+
+    - **Weighted round robin (WRR)**: WRR was developed to provide prioritization capabilities for round robin. It allows a weight to be assigned to each queue, and based on that weight, each queue effectively receives a portion of the interface bandwidth that is not necessarily equal to the other queue's portions
+
+    - **Custon queuing (CQ)**: CQ is a Cisco implementation of WRR that involves a set of 16 queues with a round-robin scheduler and FIFO queuing within each queue. Each queue can be customized with a portion of link bandwidth for each selected traffic type. If a particular type of traffic is not using the bandwidth reserved for it, other traffic types may use the unused bandwidth. CQ causes long delays and also suffers from all the same problems as FIFO within each of the 16 queues that it uses for traffic classification
+
+    - **Priority queuing (PQ)**: With PQ, a set of four queues (high, medium, normal and low) are served in strict-priority order, with FIFO queuing within each queue. The high-priority queue is always serviced first, and lower-priority queues are serviced only when all higher-priority queues are empty. For example, the medium queue is serviced only when the high-priority queue is empty. The normal queue is serviced only when the high and medium queues are empty; finally the low queue is serviced only when all other queues are empty. At any point in time, if a packet arrives for a higher queue, the packet from the higher queue is processed before any packets in lower-level queues. For this reason, if the higher priority queues are continuously being serviced, the lower-priority queues are starved
+
+    - **Weighted fair queuing (WFQ)**: The WFQ algorithm automatically divides the interface bandwidth by the number of flows (weighted by IP Precedence) to allocate bandwidth fairly among all flows. This method provides better service for high-priority real-time flows but can't provide a fixed-bandwidth guarantee for any particular flow
+
+- The current queuing algorithms recommended for rich-media networks (and supported by MQC) combines the best features of the legacy algorithms
+
+- These algorithms provide real-time, delay-sensitive traffic bandwidth and delay guarantees while not starving other types of traffic
+
+- The recommended queuing algorithms include the following:
+
+    - **Class-based weithted fair queuing (CBWFQ)**: CBWFQ enables the creation of up to 256 queues, serving up to 256 traffic classes. Each queue is serviced based on the bandwidth assigned to that class. It extends WFQ functionality to provide support for user-defined traffic classes. With CBWFQ, packet classification is done based on traffic descriptors such as QoS markings, protocols, ACLs and input interfaces. After a packet is classified as belonging to a specific class, it is possible to assign bandwidth, weight, queue limit and maximum packet limit to it. The bandwidth assigned to a class is the minimum bandwidth delivered to the class during congestion. The queue limit for that class is the maximum number of packes allowed to be buffered in the class queue. After a queue has reached the configured queue limit, excess packets are dropped. CBWFQ by itself does not provide a latency guarantee and is only suitable for non-real time data traffic
+
+    - **Low-latency queuing (LLQ)**: LLQ is CBWFQ combined with priority queuing (PQ) and it was developed to meet the requirements of real-time traffic, such as voice. Traffic assigned to the strict-priority queue is serviced up to it's assigned bandwidth before other CBWFQ queues are serviced. All real-time traffic should be configured to be serviced by the priority queue. Multiple classes of real-time traffic can be defined, and separate bandwidth guarantees can be given to each, but a single priority queue schedules all the combined traffic. If a traffic class is not using the bandwidth assigned to it, it is shared among the other classes. This algorithm is suitable for combinations of real-time and non-real-time traffic. It provides both latency and bandwidth guarantees to high-priority real-time traffic. In the event of congestion, real-time traffic that goes beyond the assigned bandwidth guarantee is policed by a congestion-aware policer to ensure that non-priority traffic is not starved
+
+- Below we can see the architecture of CBWFQ in combination with LLQ
+
+- CBWFQ in combination with LLQ create queues into which traffic classes are classified
+
+- The CBWFQ queues are scheduled with a CBWFQ scheduler that guarantees bandwidth to each class
+
+- LLQ creates a high-priority queue that is always serviced first
+
+- During times of congestion, LLQ priority classes are policed to prevent the PQ from starving the CBWFQ non-priority classes (as legacy PQ does)
+
+- When LLQ is configured, the policing rate must be specified as either a fixed amount of bandwidth or as a percentage of the interface bandwidth
+
+- LLQ allows for two different traffic classes to be assigned to it so that different policing rates can be applied to different types of high-priority traffic
+
+- For example, voice traffic could be policed during times of congestion to 10 Mbps, while video could be policed to 100 Mbps
+
+- This would not be possible with only one traffic class and a single policer
+
+![cbwfq-llq](./cbwfq-with-llq.png)
+
+#### Congestion-Avoidance Tools
+
+- Congestion-avoidance techniques monitor network traffic loads to anticipate and avoid congestion by dropping packets
+
+- The default packet dropping mechanism is tail drop
+
+- Tail drop treats all traffic equally and does not differentiate between classes of service
+
+- With tail drop, when the output queue buffers are full, all packets trying to enter the queue are dropped, regardless of their priority, until congestion clears up and the queue is no longer full
+
+- Tail drop should be avoided for TCP traffic because it can cause TCP global synchronization, which result in significant link underutilization
+
+- A better approach is to use a mechanism known as random early detect (RED)
+
+- RED provies congestion avoidance by randomly dropping packets before the queue buffers are full
+
+- Randomly dropping packets instead as dropping them all at once, as with tail drop, avoids global synchronization of TCP streams
+
+- RED monitors the buffer depth and performs early drops on random packets when the minimum defined queue threshold is exceeded
+
+- The Cisco implementation of RED is known as weighted RED (WRED)
+
+- The difference between RED and WRED is that the randomness of packet drops can be manipulated by traffic weithts denoted by either IP Precedence (IPP) or DSCP
+
+- Packets with a lower IPP value are dropped more aggresively than are higher IPP values; for example IPP 3 would be dropped more aggressively than IPP 5 or DSCP, AFx3 would be dropped more aggresively than AFx2 and AFx2 would be dropped more aggresively than AFx1
+
+- WRED can also be used to set the IP Explicit Congestion Notification (ECN) bits to indicate that congestion was experienced in transit
+
+- ECN is an extension to WRED that allows for signalling to be sent to ECN-enabled endopints, instructing them to reduce their packet transmission rates
+
+### QoS configuration - wired networks
+
+![qos-config](../qos-configuration.md)
