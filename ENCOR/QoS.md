@@ -176,7 +176,7 @@
 
     - Increase link speed
 
-    - Implement QoS congestion-avoidance and congestion-management mechanism
+    - Implement QoS congestion-avoidance and congestion-management mechanisms
 
     - Implement traffic policing to drop low-priority packets and allow high-priority traffic through
 
@@ -739,7 +739,7 @@ Bronze                  Background              1                       12 (AF11
 
 - Marking down the excess traffic involves re-marking the packets with a lower priority class value; for example excess traffic marked with AFx1 should be marked down to AFx2 (or AFx3 if using two-rate policing)
 
-- After marking down the traffic, congestion-avoidance mechanisms, such as DSCP-based weithted random early detection (WRED), should be configured throughout the network to drop AFx3 more aggresively than AFx2 and drop AFx2 more agressively than AFx1
+- After marking down the traffic, congestion-avoidance mechanisms, such as DSCP-based weighted random early detection (WRED), should be configured throughout the network to drop AFx3 more aggresively than AFx2 and drop AFx2 more agressively than AFx1
 
 #### Tocken Bucket Algorithms
 
@@ -957,7 +957,7 @@ Bronze                  Background              1                       12 (AF11
 
 - The two-rate three-color policer also use two token buckets, but the logic varies from that of the single-rate three-color policer
 
-- Instead of thransferring unused tokens from the Bc bucket to the Be bucket, this policer has two separate buckets that are filled with two separate token rates
+- Instead of transferring unused tokens from the Bc bucket to the Be bucket, this policer has two separate buckets that are filled with two separate token rates
 
 - The Be bucket is filled with the PIR tokens and the Bc bucket is filled with the CIR tokens
 
