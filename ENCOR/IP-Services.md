@@ -381,6 +381,114 @@ R3#show ntp associations
 
 ### NTP Authentication
 
+- NTP server (R1)
 
+```
+conf t
+ ntp authentication-key 1 sha1 Cisco123#
+ ntp trusted-key 1
+ ntp authenticate
+```
 
+- Clients - R2 and R3:
+
+- R2:
+
+```
+conf t
+ no ntp server 10.12.1.1
+ ntp authentication-key 1 sha1 Cisco123#
+ ntp authenticate
+ ntp trusted-key 1
+ ntp server 10.12.1.1 key 1
+```
+
+- R3:
+
+```
+conf t
+ no ntp server 10.13.1.1
+ ntp authenticate
+ ntp authentication-key 1 sha1 Cisco123#
+ ntp trusted-key 1
+ ntp server 10.13.1.1 key 1
+ ntp peer 10.224.1.1 key 1
+```
+
+- SW1:
+
+```
+conf t
+ ntp authenticate
+ ntp authentication-key 1 sha1 Cisco123#
+ ntp trusted-key 1
+ ntp server 10.23.1.1 key 1
+```
+
+- PC1:
+
+```
+conf t
+ ntp authenticate
+ ntp authentication-key 1 sha1 Cisco123#
+ ntp trusted-key 1
+ ntp server 10.12.1.1 key 1
+```
+
+- NTP associations:
+
+R1:
+
+```
+R1(config)#do sh ntp assoc
+
+  address         ref clock       st   when   poll reach  delay  offset   disp
+ ~127.127.1.1     .LOCL.           2      5     16   377  0.000   0.000  1.204
+*~193.226.12.21   193.226.12.5     2     28   1024   377 11.976  -0.207  4.955
+ * sys.peer, # selected, + candidate, - outlyer, x falseticker, ~ configured
+```
+
+- R2:
+
+```
+R2(config)#do sh ntp assoc
+
+  address         ref clock       st   when   poll reach  delay  offset   disp
+ ~127.127.1.1     .LOCL.           4      4     16   377  0.000   0.000  1.204
+*~10.12.1.1       193.226.12.21    3    321   1024     3  1.000   0.499 189.46
+ ~10.224.1.2      .INIT.          16     58     64     0  0.000   0.000 15937.
+ * sys.peer, # selected, + candidate, - outlyer, x falseticker, ~ configured
+```
+
+- R3:
+
+```
+R3(config)#do sh ntp assoc
+
+  address         ref clock       st   when   poll reach  delay  offset   disp
+*~10.13.1.1       193.226.12.21    3     84     64    37  1.000  -0.548 190.61
++~10.224.1.1      10.12.1.1        4     37     64    17  0.997   0.610 65.665
+ * sys.peer, # selected, + candidate, - outlyer, x falseticker, ~ configured
+```
+
+- SW1:
+
+```
+SW1(config)#do sh ntp assoc
+
+  address         ref clock       st   when   poll reach  delay  offset   disp
+*~10.23.1.1       10.12.1.1        4     50     64    37  1.000   0.612  2.866
+ * sys.peer, # selected, + candidate, - outlyer, x falseticker, ~ configured
+```
+
+- PC
+
+```
+PC(config)#do sh ntp assoc
+
+  address         ref clock       st   when   poll reach  delay  offset   disp
+ ~10.12.1.1       193.226.12.21    3     65    128     7  2.000  -0.175  2.665
+*~193.226.12.21   193.226.12.5     2     51    128     3 13.975  -0.055 65.368
+ * sys.peer, # selected, + candidate, - outlyer, x falseticker, ~ configured
+```
 
