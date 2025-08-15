@@ -513,3 +513,729 @@ Track 1
     HSRP Vlan10 10
 ```
 
+### Virtual Router Redundancy Protocol
+
+- Virtual Router Redundancy Protocol (VRRP) is an industry standard and operates similarly to HSRP
+
+- The behavior of VRRP is so close to that of HSRP that the following differences should be noted:
+
+    - The preferred active router controlling the VIP gateway is called the master router. All other VRRP routers are known as backup routers
+
+    - VRRP enables preemption by default
+
+    - The MAC address of the VIP gateway uses the structure 0000.5E00.01xx - where xx reflects the group ID in hex
+
+    - VRRP uses the multicast address 224.0.0.18 for communication
+
+- There are currently 2 versions of VRRP:
+
+    - VRRPv2: Supports IPv4
+
+    - VRRPv3: Supports IPv4 and IPv6
+
+#### Legacy VRRP configuration
+
+- Early VRRP configuration supported only VRRPv2 and was not hierarchical in it's configurations
+
+- Configuration steps or VRRP for older hardware versions (interface config mode):
+
+    1. Define the VRRP instance:
+
+    ```
+    conf t
+     interface <name>
+      vrrp <instance-id> ip <vip-address>
+    ```
+
+    2. (Optional) Define VRRP priority. Priority is a value between 0 and 255
+
+    ```
+    conf t
+     interface <name>
+      vrrp <instance-id> priority <priority>
+    ```
+
+    3. (Optional) Enable object tracking so that the priority is decremented when the object is false
+
+    ```
+    conf t
+     interface <name>
+      vrrp <instance-id> track <object-id> decrement <decrement-value>
+    ```
+
+    - The decrement value should be high enough so that when it is removed from the priority, the value is lower than the other VRRP router
+
+    4. Establish VRRP authentication by using the following command: 
+
+    ```
+    conf t
+     interface <name>
+      vrrp <instance-id> authentication [<text-password> | text <text-password> | md5 {key-chain <key-chain>} {key-string <key-string>}]
+    ```
+
+- R2 and R3 are two routers that share a connection to a Layer 2 switch with their G0/0 interfaces, which both are on the 172.16.20.0/24 network
+
+- R2 and R3 use VRRP to create the VIP gateway 172.16.20.1
+
+- VRRP configuration:
+
+- Notice that after the VIP is assigned on R3, R2 preempts R3 (because of the priority) and becomes the master
+
+![vrrp-setup](./vrrp-setup.png)
+
+- R2:
+
+```
+conf t
+ interface g0/0
+  ip address 172.16.20.2 255.255.255.0
+  vrrp 20 ip 172.16.20.1
+  vrrp 20 priority 110
+  vrrp 20 track 1 decrement 20
+
+ vrrp 20 track 1 decrement 20
+```
+
+- R3:
+
+```
+conf t
+ interface g0/0
+  ip address 172.16.20.3 255.255.255.0
+  vrrp 20 ip 172.16.20.1
+  vrrp 20 priority 95
+```
+
+- Verifying:
+
+- R2:
+
+```
+R2#show vrrp 
+GigabitEthernet0/0 - Group 20 
+  State is Master  
+  Virtual IP address is 172.16.20.1
+  Virtual MAC address is 0000.5e00.0114
+  Advertisement interval is 1.000 sec
+  Preemption enabled
+  Priority is 110 
+    Track object 1 state Up decrement 20
+  Master Router is 172.16.20.2 (local), priority is 110 
+  Master Advertisement interval is 1.000 sec
+  Master Down interval is 3.570 sec
+
+R2#show vrrp br
+R2#show vrrp brief 
+Interface          Grp Pri Time  Own Pre State   Master addr     Group addr
+Gi0/0              20  110 3570       Y  Master  172.16.20.2     172.16.20.1    
+
+R2#show track 1
+Track 1
+  Interface Loopback0 line-protocol
+  Line protocol is Up
+    5 changes, last change 00:07:22
+  Tracked by:
+    VRRP GigabitEthernet0/0 20
+```
+
+- R3:
+
+```
+R3#sh vrrp
+GigabitEthernet0/0 - Group 20 
+  State is Backup  
+  Virtual IP address is 172.16.20.1
+  Virtual MAC address is 0000.5e00.0114
+  Advertisement interval is 1.000 sec
+  Preemption enabled
+  Priority is 95  
+  Master Router is 172.16.20.2, priority is 110 
+  Master Advertisement interval is 1.000 sec
+  Master Down interval is 3.628 sec (expires in 2.901 sec)
+
+R3#sh
+R3#show vrr
+R3#show vrrp br
+R3#show vrrp brief 
+Interface          Grp Pri Time  Own Pre State   Master addr     Group addr
+Gi0/0              20  95  3628       Y  Backup  172.16.20.2     172.16.20.1    
+```
+
+- The command `show vrrp [brief]` provide an update on the VRRP group, along with other relevant information for troubleshooting
+
+- All the output is very similar with the output for HSRP
+
+#### Hierarchical VRRP configuration
+
+- Used for VRRP v3
+
+- The newer versions of IOS-XE provides configuration of VRRP in a multi-address format that is hierarchical
+
+- The following are the steps to configure hierarchical VRRP:
+
+    1. Enable VRRP V3 on the router:
+
+    ```
+    conf t
+     fhrp version vrrp v3
+    ```
+
+    2. Define the VRRP instance. This places the configuration prompt into the VRRP group for additional configuration
+
+    ```
+    conf t
+     fhrp version vrrp v3
+     interface g0/0
+      vrrp <instance-id> address-family [ipv4|ipv6]
+    ``` 
+
+    3. (Optional) Change VRRP to version 2 (VRRPv2 and VRRPv3 are not compatible)
+
+    4. Define the gateway VIP(vrrp address-family config mode):
+
+    ```
+    conf t
+     interface g0/0
+     vrrp 20 address-family ipv4
+     address <ip-address>
+    ```
+
+    5. (Optional) Define the VRRP priority:
+
+    ```
+    priority <priority>
+    ```
+
+    6. (Optional) Enable object tracking so that the priority is decremented when the object is false:
+
+    ```
+    track <object-id> decrement <decrement-value>
+    ```
+
+    - The decrement value should be high enough so that when it is removed from the priority, the value is lower than the other VRRP router
+
+- My lab config (lab from above):
+
+- R2:
+
+```
+conf t
+fhrp version vrrp v3
+ interface g0/0
+  vrrp 20 address-family ipv4
+   priority 110
+   track 1 decrement 20
+   address 172.16.20.1 primary
+   exit-vrrp
+```
+
+- R3:
+
+```
+fhrp version vrrp v3
+ interface g0/0
+  vrrp 20 address-family ipv4
+   priority 95
+   address 172.16.20.1 primary
+   exit-vrrp
+```
+
+- Showing vrrp state:
+
+- R2:
+
+```
+R2#show vrrp
+
+GigabitEthernet0/0 - Group 20 - Address-Family IPv4
+  State is MASTER
+  State duration 9 mins 47.148 secs
+  Virtual IP address is 172.16.20.1
+  Virtual MAC address is 0000.5E00.0114
+  Advertisement interval is 1000 msec
+  Preemption enabled
+  Priority is 110
+    Track object 1 state UP decrement 20
+  Master Router is 172.16.20.2 (local), priority is 110
+  Master Advertisement interval is 1000 msec (expires in 592 msec)
+  Master Down interval is unknown
+
+R2#sh
+R2#show vrrp br
+R2#show vrrp brief 
+  Interface          Grp  A-F Pri  Time Own Pre State   Master addr/Group addr
+  Gi0/0               20 IPv4 110     0  N   Y  MASTER  172.16.20.2(local) 172.16.20.1
+```
+
+- R3:
+
+```
+R3#show vrrp
+
+GigabitEthernet0/0 - Group 20 - Address-Family IPv4
+  State is BACKUP
+  State duration 10 mins 41.348 secs
+  Virtual IP address is 172.16.20.1
+  Virtual MAC address is 0000.5E00.0114
+  Advertisement interval is 1000 msec
+  Preemption enabled
+  Priority is 95
+  Master Router is 172.16.20.2, priority is 110
+  Master Advertisement interval is 1000 msec (learned)
+  Master Down interval is 3628 msec (expires in 2783 msec)
+
+R3#sh
+R3#show vrrp br
+R3#show vrrp brief 
+R3#show vrrp brief 
+  Interface          Grp  A-F Pri  Time Own Pre State   Master addr/Group addr
+  Gi0/0               20 IPv4  95  3628  N   Y  BACKUP  172.16.20.2 172.16.20.1
+```
+
+- Below we can see the configuration for a pair of switches running IOS-XE 16.9.2 for VLAN 22 (172.16.22.0/24)
+
+- The configuration looks similar to the previous VRRP configuration except that it is hierarchical
+
+- Associating parameters like priority and tracking are nested under the VRRP instance
+
+- SW2:
+
+```
+conf t
+ fhrp version vrrp v3
+ interface vlan 22
+  ip address 172.16.22.2 255.255.255.0
+   vrrp 22 address-family ipv4
+    address 172.16.22.1
+    track 1 decrement 20
+    priority 110
+```
+
+- SW3:
+
+```
+conf t
+ fhrp version vrrp v3
+ interface vlan 22
+  ip address 172.16.22.3 255.255.255.0
+   vrrp 22 address-family ipv4
+    address 172.16.22.1
+    priority 95
+```
+
+- The status of the VRRP routers can be viewed as follows:
+
+```
+show vrrp <brief>
+```
+
+- The output is identical with that of the legacy VRRP configuration
+
+- VRRP can use one of the physical IP addresses as the virtual IP address (HSRP cannot do it)
+
+### Gateway Load-Balancing Protocol (GLBP)
+
+- As the name suggests, Gateway Load Balancing Protocol (GLBP) provides gateway redundancy and load-balancing capability to a network segment
+
+- It provides redundancy with an active/standby gateway, and it provides load-balancing capability by ensuring that each member of the GLBP group takes care if forwarding the traffic to the appropriate gateway
+
+- The GLBP contains 2 roles:
+
+    - **Active Virtual Gateway (AVG)**: The participating routers elect one AVG per GLBP group to respond to the initial ARP requests for the VIP
+
+    - For example when a local PC sends an ARP request for the VIP, the AVG is responsible for replying to the ARP request with the virtual MAC address of the AVF
+
+    - **Active Virtual Forwarder (AVF)**: The AVF routes traffic received from assigned hosts. A unique virtual MAC address is created and assigned by the AVG to the AVFs
+
+    - The AVF is assigned to a host when the AVG replies to the ARP request to the assigned AVFs virtual MAC address
+
+    - ARP replies are unicast and are not heard by other hosts on that broadcast segment
+
+    - When a host sends traffic to the virtual AVF MAC, the current router is responsible for routing it to the appropriate network
+
+    - The AVFs are also recognized as Fwd instances on the routers
+
+- GLBP supports four active AVFs and one AVG per GLBP group. A router can be an AVG and an AVF at the same time
+
+- In the event of a failure of the AVG, there is not a disruption of traffic due to the AVG role trasferring to a standby AVG device
+
+- In the event of a failure of an AVF, another router takes over the forwarding responsabilities for that AVF, which includes the virtual MAC address for that instance
+
+- The following steps detail how to configure GLBP:
+
+    1. Define the GLBP instance:
+
+    ```
+    conf t
+     interface <name>
+      glbp <instance-id> ip <ip-address>
+    ```
+
+    2. (Optional) Configure GLBP preemption to allow for a more preferred router to take the active virtual gateway status from an inferior active GLBP router
+
+    ```
+    glbp <instance-id> preempt
+    ```
+
+    3. (Optional) Define the GLBP priority to a value between 0 and 255
+
+    ```
+    glbp <instance-id> priority <priority>
+    ```
+
+    4. (Optional) Define the GLBP timers
+
+    ```
+    glbp <instance-id> timers {<hello-seconds> | msec <hello-miliseconds>} {<hold-seconds> | msec <hold-miliseconds>}
+    ```
+
+    5. (Optional) Establish GLBP authentication:
+
+    ```
+    glbp <instance-id> authentication <text text-password | md5 {key-chain <key-chain> | key-string <key-string>}>
+    ```
+
+- SW2 and SW3 configure GLBP for VLAN 30 (172.16.30.0/24) with 172.16.30.1 as the VIP gateway
+
+- Notice that the first syslog message is for the AVG, and the second syslog message is for the first AVF (Fwd 1) for the GLBP pair
+
+- The first syslog message on SW3 is the second AVF (Fwd 2) for the GLBP pair
+
+![glbp-lab](./glbp-lab-vlan30.png)
+
+- Configuration for both switches:
+
+- SW2:
+
+```
+conf t
+ interface Vlan30
+  ip address 172.16.30.2 255.255.255.0
+  ip ospf 1 area 0
+  glbp 30 ip 172.16.30.1
+  glbp 30 priority 110
+  glbp 30 preempt
+ end
+```
+
+- SW3:
+
+```
+conf t
+ interface Vlan30
+  ip address 172.16.30.3 255.255.255.0
+  ip ospf 1 area 0
+  glbp 30 ip 172.16.30.1
+  glbp 30 priority 95
+ end
+```
+
+- Verifying:
+
+- SW2:
+
+```
+SW2#show glbp brief 
+Interface   Grp  Fwd Pri State    Address         Active router   Standby router
+Vl30        30   -   110 Active   172.16.30.1     local           172.16.30.3
+Vl30        30   1   -   Active   0007.b400.1e01  local           -
+Vl30        30   2   -   Listen   0007.b400.1e02  172.16.30.3     -
+
+SW2#show glbp 
+Vlan30 - Group 30
+  State is Active
+    1 state change, last state change 00:31:52
+  Virtual IP address is 172.16.30.1
+  Hello time 3 sec, hold time 10 sec
+    Next hello sent in 2.144 secs
+  Redirect time 600 sec, forwarder timeout 14400 sec
+  Preemption enabled, min delay 0 sec
+  Active is local
+  Standby is 172.16.30.3, priority 95 (expires in 8.928 sec)
+  Priority 110 (configured)
+  Weighting 100 (default 100), thresholds: lower 1, upper 100
+  Load balancing: round-robin
+  Group members:
+    5254.001a.801e (172.16.30.3)
+    5254.00ec.801e (172.16.30.2) local
+  There are 2 forwarders (1 active)
+  Forwarder 1
+    State is Active
+      1 state change, last state change 00:31:41
+    MAC address is 0007.b400.1e01 (default)
+    Owner ID is 5254.00ec.801e
+    Redirection enabled
+    Preemption enabled, min delay 30 sec
+    Active is local, weighting 100
+    Client selection count: 2
+  Forwarder 2
+    State is Listen
+    MAC address is 0007.b400.1e02 (learnt)
+    Owner ID is 5254.001a.801e
+    Redirection enabled, 598.944 sec remaining (maximum 600 sec)
+    Time to live: 14398.944 sec (maximum 14400 sec)
+    Preemption enabled, min delay 30 sec
+    Active is 172.16.30.3 (primary), weighting 100 (expires in 10.848 sec)
+    Client selection count: 1
+```
+
+- SW3:
+
+```
+SW3#show glbp br
+Interface   Grp  Fwd Pri State    Address         Active router   Standby router
+Vl30        30   -   95  Standby  172.16.30.1     172.16.30.2     local
+Vl30        30   1   -   Listen   0007.b400.1e01  172.16.30.2     -
+Vl30        30   2   -   Active   0007.b400.1e02  local           -
+
+SW3#show glbp 
+Vlan30 - Group 30
+  State is Standby
+    1 state change, last state change 00:30:11
+  Virtual IP address is 172.16.30.1
+  Hello time 3 sec, hold time 10 sec
+    Next hello sent in 2.240 secs
+  Redirect time 600 sec, forwarder timeout 14400 sec
+  Preemption disabled
+  Active is 172.16.30.2, priority 110 (expires in 11.328 sec)
+  Standby is local
+  Priority 95 (configured)
+  Weighting 100 (default 100), thresholds: lower 1, upper 100
+  Load balancing: round-robin
+  Group members:
+    5254.001a.801e (172.16.30.3) local
+    5254.00ec.801e (172.16.30.2)
+  There are 2 forwarders (1 active)
+  Forwarder 1
+    State is Listen
+    MAC address is 0007.b400.1e01 (learnt)
+    Owner ID is 5254.00ec.801e
+    Time to live: 14399.872 sec (maximum 14400 sec)
+    Preemption enabled, min delay 30 sec
+    Active is 172.16.30.2 (primary), weighting 100 (expires in 9.952 sec)
+  Forwarder 2
+    State is Active
+      1 state change, last state change 00:30:16
+    MAC address is 0007.b400.1e02 (default)
+    Owner ID is 5254.001a.801e
+    Preemption enabled, min delay 30 sec
+    Active is local, weighting 100
+
+```
+
+- The command `show glbp brief` shows high-level details of the GLBP group, including the interface, group, active AVG, standby AVG and the statusses of the AVFs
+
+- The first entry contains a - for the Fwd state, which means that is the entry for the AVG
+
+- The following two entries are for the AVF instances; they identify which device is active for each AVF
+
+- The command `show glbp` displays additional information, including the timers, preemption settings, and statusses for the AVG and the AVFs for the GLBP group 
+
+- Notice that the MAC addresses and interface IP addresses are listed under the group members, which can be used to correlate MAC address identities in other portions of the output
+
+- By default GLBP balances the load of traffic in a round-robin fashion, as highlighted above
+
+- GLBP supports three methods of load-balancing traffic
+
+    - **Round robin**: Uses each virtual forwarder MAC address to sequencially reply for the virtual IP address
+
+    - **Weighted**: Defines weights to each device in the GLBP group to define the ratio of load balancing between the devices. This allows for a larger weight to be assigned to bigger routers that can handle more traffic
+
+    - **Host dependent**: Uses the host MAC address to decide to which virtual forwarder MAC to redirect the packet. This method ensures that the host uses the same virtual MAC address as long as the number of virtual forwarders do not change within the group
+
+- Changing the load-balancing method:
+
+```
+conf t
+ interface <name>
+  glbp <instance-id> load-balancing [host-dependent | weighted | round-robin]
+```
+
+- The weighted load-balancing method has the AVG direct traffic to the AVFs based on the percentage of weight a router has over the total weight of all GLBP routers
+
+- Increasing the weight on more capable, bigger routers, allows them to take more traffic than smaller devices
+
+- Setting weight for a router:
+
+```
+conf t
+ interface <name>
+  glbp <instance-id> weighting <weight>
+```
+
+- Changing the load-balancing to weighted and setting the weight to 40 on SW2 and 60 on SW3 so that SW2 receives 40% of the traffic and SW3 receives 60% of the traffic:
+
+- SW2:
+
+```
+conf t
+ interface Vlan30
+  ip address 172.16.30.2 255.255.255.0
+  ip ospf 1 area 0
+  glbp 30 ip 172.16.30.1
+  glbp 30 preempt
+  glbp 30 weighting 40
+  glbp 30 load-balancing weighted
+ end
+```
+
+- SW3:
+
+```
+conf t
+ interface Vlan30
+  ip address 172.16.30.3 255.255.255.0
+  ip ospf 1 area 0
+  glbp 30 ip 172.16.30.1
+  glbp 30 preempt
+  glbp 30 weighting 60
+  glbp 30 load-balancing weighted
+ end
+```
+
+- Viewing the GLBP state:
+
+- SW2:
+
+```
+SW2#show glbp 
+Vlan30 - Group 30
+  State is Active
+    1 state change, last state change 01:07:39
+  Virtual IP address is 172.16.30.1
+  Hello time 3 sec, hold time 10 sec
+    Next hello sent in 0.832 secs
+  Redirect time 600 sec, forwarder timeout 14400 sec
+  Preemption enabled, min delay 0 sec
+  Active is local
+  Standby is 172.16.30.3, priority 100 (expires in 8.736 sec)
+  Priority 100 (default)
+  Weighting 40 (configured 40), thresholds: lower 1, upper 40
+  Load balancing: weighted
+  Group members:
+    5254.001a.801e (172.16.30.3)
+    5254.00ec.801e (172.16.30.2) local
+  There are 2 forwarders (1 active)
+  Forwarder 1
+    State is Active
+      1 state change, last state change 01:07:27
+    MAC address is 0007.b400.1e01 (default)
+    Owner ID is 5254.00ec.801e
+    Redirection enabled
+ --More-- 
+*Aug 15 08:41:48.869: %SYS-5-CONFIG_I: Configured from console by console
+    Preemption enabled, min delay 30 sec
+    Active is local, weighting 40
+    Client selection count: 1
+  Forwarder 2
+    State is Listen
+    MAC address is 0007.b400.1e02 (learnt)
+    Owner ID is 5254.001a.801e
+    Redirection enabled, 598.752 sec remaining (maximum 600 sec)
+    Time to live: 14398.752 sec (maximum 14400 sec)
+    Preemption enabled, min delay 30 sec
+    Active is 172.16.30.3 (primary), weighting 60 (expires in 9.280 sec)
+    Client selection count: 1
+
+SW2#show glbp b
+Interface   Grp  Fwd Pri State    Address         Active router   Standby router
+Vl30        30   -   100 Active   172.16.30.1     local           172.16.30.3
+Vl30        30   1   -   Active   0007.b400.1e01  local           -
+Vl30        30   2   -   Listen   0007.b400.1e02  172.16.30.3     -
+```
+
+- SW3:
+
+```
+SW3#show glbp 
+Vlan30 - Group 30
+  State is Standby
+    1 state change, last state change 01:07:52
+  Virtual IP address is 172.16.30.1
+  Hello time 3 sec, hold time 10 sec
+    Next hello sent in 0.160 secs
+  Redirect time 600 sec, forwarder timeout 14400 sec
+  Preemption enabled, min delay 0 sec
+  Active is 172.16.30.2, priority 100 (expires in 9.536 sec)
+  Standby is local
+  Priority 100 (default)
+  Weighting 60 (configured 60), thresholds: lower 1, upper 60
+  Load balancing: weighted
+  Group members:
+    5254.001a.801e (172.16.30.3) local
+    5254.00ec.801e (172.16.30.2)
+  There are 2 forwarders (1 active)
+  Forwarder 1
+    State is Listen
+    MAC address is 0007.b400.1e01 (learnt)
+    Owner ID is 5254.00ec.801e
+    Time to live: 14397.728 sec (maximum 14400 sec)
+    Preemption enabled, min delay 30 sec
+    Active is 172.16.30.2 (primary), weighting 40 (expires in 8.320 sec)
+  Forwarder 2
+    State is Active
+      1 state change, last state change 01:07:59
+    MAC address is 0007.b400.1e02 (default)
+    Owner ID is 5254.001a.801e
+    Preemption enabled, min delay 30 sec
+    Active is local, weighting 60
+
+SW3#show glbp brief 
+Interface   Grp  Fwd Pri State    Address         Active router   Standby router
+Vl30        30   -   100 Standby  172.16.30.1     172.16.30.2     local
+Vl30        30   1   -   Listen   0007.b400.1e01  172.16.30.2     -
+Vl30        30   2   -   Active   0007.b400.1e02  local           -
+```
+
+- Configure object tracking with GLBP can be made for weighted load-balancing method (only the weighting is decreased):
+
+- SW2:
+
+```
+conf t
+ track 1 interface Loopback0 line-protocol
+ interface vlan 30
+  glbp 30 weighting track 1 decrement 20
+```
+
+- SW2 - after turning interface l0 down:
+
+```
+SW2(config-if)#do show glbp
+Vlan30 - Group 30
+  State is Active
+    1 state change, last state change 01:16:55
+  Virtual IP address is 172.16.30.1
+  Hello time 3 sec, hold time 10 sec
+    Next hello sent in 1.056 secs
+  Redirect time 600 sec, forwarder timeout 14400 sec
+  Preemption enabled, min delay 0 sec
+  Active is local
+  Standby is 172.16.30.3, priority 100 (expires in 9.824 sec)
+  Priority 100 (default)
+  Weighting 20 (configured 40), thresholds: lower 1, upper 40
+    Track object 1 state Down decrement 20
+  Load balancing: weighted
+  Group members:
+    5254.001a.801e (172.16.30.3)
+    5254.00ec.801e (172.16.30.2) local
+  There are 2 forwarders (1 active)
+  Forwarder 1
+    State is Active
+      1 state change, last state change 01:16:43
+    MAC address is 0007.b400.1e01 (default)
+    Owner ID is 5254.00ec.801e
+    Redirection enabled
+    Preemption enabled, min delay 30 sec
+    Active is local, weighting 20
+    Client selection count: 5
+  Forwarder 2
+    State is Listen
+    MAC address is 0007.b400.1e02 (learnt)
+    Owner ID is 5254.001a.801e
+    Redirection enabled, 599.840 sec remaining (maximum 600 sec)
+    Time to live: 14399.840 sec (maximum 14400 sec)
+    Preemption enabled, min delay 30 sec
+    Active is 172.16.30.3 (primary), weighting 60 (expires in 11.008 sec)
+    Client selection count: 6
+```
