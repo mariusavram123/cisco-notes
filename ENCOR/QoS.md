@@ -1083,4 +1083,4 @@ Bronze                  Background              1                       12 (AF11
 
 ### QoS configuration - wired networks
 
-![qos-config](../qos-configuration.md)
+[QOS-config](../qos-configuration.md)

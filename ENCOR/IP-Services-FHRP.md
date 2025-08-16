@@ -1239,3 +1239,48 @@ Vlan30 - Group 30
     Active is 172.16.30.3 (primary), weighting 60 (expires in 11.008 sec)
     Client selection count: 6
 ```
+
+- GLBP sends hello packets every 3 seconds, using the multicast group 224.0.0.102, using UDP port 3222 as source and destination
+
+- GLBP uses for each AVF a MAC address in the format 0007.B400.01xx <xx> is the AVF ID.
+
+- The AVG is responsible to answer to the ARP (Address Resolution Protocol) requests for the virtual IP address
+
+- Load-sharing is achieved by the AVG replying to ARP requests with different virtual MAC addresses
+
+- A GLBP group allows for up to 4 MAC addresses per group
+
+- AVG is responsible for assigning the virtual MAC addresses for each member in the group
+
+- Other group members request a virtual MAC address after they discover the AVG through hello messages
+
+- A virtual forwarder that is assigned a virtual MAC address by the AVG is known as a primary virtual forwarder
+
+- A virtual forwarder that has learned the virtual MAC address is referred to as secondary virtual forwarder
+
+- Basically the AVF that is on the same entity as the AVG is the primary virtual forwarder, any other AVFs are secondary virtual forwarders
+
+- For redundancy GLBP uses two timers which are communicated through the hello messages (when the AVG fail):
+
+    - The redirect time is the interval during which the AVG continues to redirect hosts to the old virtual MAC address. 
+
+    - The secondary holdtime is the interval during which the virtual forwarder is valid. When the secondary holdtime expires, the virtual forwarder is removed from all gateways in the GLBP group. The expired virtual forwarder number is eligible for reassignment by the AVG
+
+- When the primary AVG fails, an election process is held for which router to become the new AVG.
+
+- The router with the highest priority becomes the new AVG
+
+- If the priority is the same for multiple routers, then the highest IP address is considered as a tie breaker for the election
+
+- GLBP uses a weighting scheme to determine the forwarding capability for each router in the GLBP group
+
+- The GLBP group weithting can be automatically adjusted by tracking the state of an interface within the router
+
+- If the tracking interface goes down, the GLBP group weighting is reduced by the specified value
+
+- Different interfaces can be tracked to decrement the GLBP weighting by varying amounts
+
+- Cisco documentation:
+
+[Documentation-GLBP](https://www.cisco.com/en/US/docs/ios/12_2t/12_2t15/feature/guide/ft_glbp.html#wp1027129)
+
