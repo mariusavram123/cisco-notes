@@ -821,4 +821,516 @@ IPv6 Crypto ISAKMP SA
       tunnel-protection ipsec profile <profile-name>
     ```
 
-    
+- R2 - remove the crypto map and set an IPsec policy:
+
+```
+conf t
+ interface g0/0
+  no crypto map
+```
+
+- Configuring the IPsec profile and apply it to the tunnel interface:
+
+```
+conf t
+ crypto ipsec profile IPSEC-GRE
+  set transform-set IPSEC-TUNNEL
+
+ interface tunnel 1
+  tunnel protection ipsec profile IPSEC-GRE
+```
+
+- Site-to-site IPsec tunnel using GRE over IPsec with Pre-Shared key
+
+- R1 is configured for IPsec over GRE using crypto maps, and R2 is configured for IPsec over GRE using IPsec profiles
+
+- NOTE: IPSEC TUNNELS ON WHICH ONE SIDE USES CRYPTO MAPS AND OTHER SIDE USES IPSEC PROFILE DOES NOT WORK WITH TUNNEL MODE
+
+- NEXT TO TRY WITH TRANSPORT MODE - WORKS IF I DISABLE GRE KEEPALIVES
+
+- R1 ipsec config for transport mode - GRE keepalives off and crypto map on physical interface:
+
+```
+crypto isakmp policy 10
+ encryption aes 256
+ hash sha256
+ authentication pre-share
+ group 16
+crypto isakmp key S3creT124 address 0.0.0.0        
+crypto ipsec transform-set IPSEC-TRANSPORT esp-aes esp-sha256-hmac 
+ mode transport
+crypto ipsec profile IPSEC-PROFILE
+ set transform-set IPSEC-TRANSPORT 
+crypto map IPSEC-MAP 10 ipsec-isakmp 
+ set peer 100.64.2.2
+ set transform-set IPSEC-TRANSPORT 
+ match address GRE-IN-IPSEC
+
+ interface Tunnel1
+  andwidth 4000
+  ip address 172.16.1.1 255.255.255.252
+  ip mtu 1360
+  tunnel source Ethernet0/1
+  tunnel destination 100.64.2.2
+
+ interface g0/1
+  
+  interface Ethernet0/1
+ ip address 100.64.1.2 255.255.255.252
+ crypto map IPSEC-MAP
+```
+
+- R2 - GRE keepalives off and ipsec profile on the tunnel interface:
+
+```
+crypto isakmp policy 10
+ encryption aes 256
+ hash sha256
+ authentication pre-share
+ group 16
+crypto isakmp key S3creT124 address 0.0.0.0        
+crypto ipsec transform-set IPSEC-TRANSPORT esp-aes esp-sha256-hmac 
+ mode transport
+crypto ipsec profile IPSEC-PROFILE
+ set transform-set IPSEC-TRANSPORT 
+
+interface Tunnel1
+ bandwidth 4000
+ ip address 172.16.1.2 255.255.255.252
+ ip mtu 1360
+ tunnel source Ethernet0/0
+ tunnel destination 100.64.1.2
+ tunnel protection ipsec profile IPSEC-PROFILE
+```
+
+- Commands to verify that GRE IPsec tunnel between R1 and R2 is operational and demonstration that crypto maps and IPsec profiles are compatible with each other - except if you enable keepalives on the tunnel interfaces
+
+- R1:
+
+```
+R1#show int tunn 1 | i Tunnel protocol
+  Tunnel protocol/transport GRE/IP
+
+R1#show ip ospf neighbor 
+
+Neighbor ID     Pri   State           Dead Time   Address         Interface
+172.16.1.2        0   FULL/  -        00:00:38    172.16.1.2      Tunnel1
+
+R1#show ip route ospf | b Gate
+Gateway of last resort is 100.64.1.1 to network 0.0.0.0
+
+      10.0.0.0/8 is variably subnetted, 3 subnets, 2 masks
+O IA     10.2.2.0/24 [110/35] via 172.16.1.2, 00:17:49, Tunnel1
+
+R1#show crypto isakmp sa 
+IPv4 Crypto ISAKMP SA
+dst             src             state          conn-id status
+100.64.1.2      100.64.2.2      QM_IDLE           1004 ACTIVE
+
+IPv6 Crypto ISAKMP SA
+
+
+R1#show crypto ipsec sa 
+
+interface: Ethernet0/1
+    Crypto map tag: IPSEC-MAP, local addr 100.64.1.2
+
+   protected vrf: (none)
+   local  ident (addr/mask/prot/port): (0.0.0.0/0.0.0.0/47/0)
+   remote ident (addr/mask/prot/port): (0.0.0.0/0.0.0.0/47/0)
+   current_peer 100.64.2.2 port 500
+     PERMIT, flags={origin_is_acl,}
+    #pkts encaps: 0, #pkts encrypt: 0, #pkts digest: 0
+    #pkts decaps: 0, #pkts decrypt: 0, #pkts verify: 0
+    #pkts compressed: 0, #pkts decompressed: 0
+    #pkts not compressed: 0, #pkts compr. failed: 0
+    #pkts not decompressed: 0, #pkts decompress failed: 0
+    #send errors 0, #recv errors 0
+
+     local crypto endpt.: 100.64.1.2, remote crypto endpt.: 100.64.2.2
+     plaintext mtu 1500, path mtu 1500, ip mtu 1500, ip mtu idb Ethernet0/1
+     current outbound spi: 0x0(0)
+     PFS (Y/N): N, DH group: none
+
+     inbound esp sas:
+
+     inbound ah sas:
+
+     inbound pcp sas:
+
+     outbound esp sas:
+
+     outbound ah sas:
+
+     outbound pcp sas:
+
+   protected vrf: (none)
+   local  ident (addr/mask/prot/port): (100.64.1.2/255.255.255.255/47/0)
+   remote ident (addr/mask/prot/port): (100.64.2.2/255.255.255.255/47/0)
+   current_peer 100.64.2.2 port 500
+     PERMIT, flags={}
+    #pkts encaps: 131, #pkts encrypt: 131, #pkts digest: 131
+    #pkts decaps: 131, #pkts decrypt: 131, #pkts verify: 131
+    #pkts compressed: 0, #pkts decompressed: 0
+    #pkts not compressed: 0, #pkts compr. failed: 0
+    #pkts not decompressed: 0, #pkts decompress failed: 0
+    #send errors 0, #recv errors 0
+
+     local crypto endpt.: 100.64.1.2, remote crypto endpt.: 100.64.2.2
+     plaintext mtu 1458, path mtu 1500, ip mtu 1500, ip mtu idb Ethernet0/1
+     current outbound spi: 0xFC5FFD23(4234149155)
+     PFS (Y/N): N, DH group: none
+
+     inbound esp sas:
+      spi: 0xF56BEF55(4117491541)
+        transform: esp-aes esp-sha256-hmac ,
+        in use settings ={Transport, }
+        conn id: 7, flow_id: 7, sibling_flags FFFFFFFF80000000, crypto map: IPSEC-MAP, initiator : False
+         sa timing: remaining key lifetime (k/sec): (4348196/2466)
+        IV size: 16 bytes
+        replay detection support: Y
+        Status: ACTIVE(ACTIVE)
+
+     inbound ah sas:
+
+     inbound pcp sas:
+
+     outbound esp sas:
+      spi: 0xFC5FFD23(4234149155)
+        transform: esp-aes esp-sha256-hmac ,
+        in use settings ={Transport, }
+        conn id: 8, flow_id: 8, sibling_flags FFFFFFFF80000000, crypto map: IPSEC-MAP, initiator : False
+         sa timing: remaining key lifetime (k/sec): (4348196/2466)
+        IV size: 16 bytes
+        replay detection support: Y
+        Status: ACTIVE(ACTIVE)
+
+     outbound ah sas:
+
+     outbound pcp sas:
+```
+
+- R2:
+
+```
+R2#show int tunnel 1 | i Tunnel proto
+  Tunnel protocol/transport GRE/IP
+
+R2#show ip ospf neighbor 
+
+Neighbor ID     Pri   State           Dead Time   Address         Interface
+172.16.1.1        0   FULL/  -        00:00:34    172.16.1.1      Tunnel1
+
+R2#show ip route ospf | b Gate
+Gateway of last resort is 100.64.2.1 to network 0.0.0.0
+
+      10.0.0.0/8 is variably subnetted, 3 subnets, 2 masks
+O        10.1.1.0/24 [110/35] via 172.16.1.1, 00:21:48, Tunnel1
+
+
+R2#sh crypto isakmp sa 
+IPv4 Crypto ISAKMP SA
+dst             src             state          conn-id status
+100.64.1.2      100.64.2.2      QM_IDLE           1010 ACTIVE
+
+IPv6 Crypto ISAKMP SA
+
+R2#show crypto ipsec sa 
+
+interface: Tunnel1
+    Crypto map tag: Tunnel1-head-0, local addr 100.64.2.2
+
+   protected vrf: (none)
+   local  ident (addr/mask/prot/port): (100.64.2.2/255.255.255.255/47/0)
+   remote ident (addr/mask/prot/port): (100.64.1.2/255.255.255.255/47/0)
+   current_peer 100.64.1.2 port 500
+     PERMIT, flags={origin_is_acl,}
+    #pkts encaps: 208, #pkts encrypt: 208, #pkts digest: 208
+    #pkts decaps: 211, #pkts decrypt: 211, #pkts verify: 211
+    #pkts compressed: 0, #pkts decompressed: 0
+    #pkts not compressed: 0, #pkts compr. failed: 0
+    #pkts not decompressed: 0, #pkts decompress failed: 0
+    #send errors 0, #recv errors 0
+
+     local crypto endpt.: 100.64.2.2, remote crypto endpt.: 100.64.1.2
+     plaintext mtu 1458, path mtu 1500, ip mtu 1500, ip mtu idb Ethernet0/0
+     current outbound spi: 0xF56BEF55(4117491541)
+     PFS (Y/N): N, DH group: none
+
+     inbound esp sas:
+      spi: 0xFC5FFD23(4234149155)
+        transform: esp-aes esp-sha256-hmac ,
+        in use settings ={Transport, }
+        conn id: 19, flow_id: 19, sibling_flags FFFFFFFF80004000, crypto map: Tunnel1-head-0, initiator : True
+         sa timing: remaining key lifetime (k/sec): (4275145/2236)
+        IV size: 16 bytes
+        replay detection support: Y
+        Status: ACTIVE(ACTIVE)
+
+     inbound ah sas:
+
+     inbound pcp sas:
+
+     outbound esp sas:
+      spi: 0xF56BEF55(4117491541)
+        transform: esp-aes esp-sha256-hmac ,
+        in use settings ={Transport, }
+        conn id: 20, flow_id: 20, sibling_flags FFFFFFFF80004000, crypto map: Tunnel1-head-0, initiator : True
+         sa timing: remaining key lifetime (k/sec): (4275145/2236)
+        IV size: 16 bytes
+        replay detection support: Y
+        Status: ACTIVE(ACTIVE)
+          
+     outbound ah sas:
+
+     outbound pcp sas:
+```
+
+#### Site-to-Site VTI over IPsec
+
+- The steps to enable a VTI over IPsec are very similar to those for GRE over IPsec configuration using IPsec profiles
+
+- The only differences are the addition of the following command in the tunnel interface configuration mode to enable VTI on it\
+
+```
+conf t
+ interface tunnel 1
+  tunnel mode ipsec {ipv4 | ipv6}
+```
+
+- To revert to GRE over IPsec, the following command can be used:
+
+```
+conf t
+ interface tunnel 1
+  tunnel mode gre {ip | ipv6}
+```
+
+- The changes needed to be done:
+
+- Remove the crypto map from the interface:
+
+- R1:
+
+```
+conf t
+ interface g0/1
+  no crypto-map IPSEC-MAP
+```
+
+- Configure the IPsec transport-set:
+
+```
+conf t
+ crypto ipsec transform-set IPSEC-TUNNEL esp-aes esp-sha256-hmak
+  mode tunnel
+```
+
+- Configure IPsec profile:
+
+```
+conf t
+ crypto ipsec profile IPSEC-PROFILE
+  set transform-set IPSEC-TUNNEL
+```
+
+- Enable VTI on the tunnel interface and apply the IPsec profile:
+
+```
+conf t
+ interface tunnel 1
+  tunnel mode ipsec-ipv4
+  tunnel protection ipsec profile IPSEC-PROFILE
+```
+
+- R1:
+
+```
+conf t
+ int e0/1
+  no crypto map IPSEC-MAP
+ interface tunnel 1
+  tunnel protection ipsec profile IPSEC-PROFILE
+  tunnel mode ipsec ipv4
+```
+
+- R2:
+
+```
+conf t
+ interface tunnel 1
+  tunnel mode ipsec ipv4
+```
+
+- It is recommended to shutdown and no shutdown the tunnel interface when changing the tunnel mode from GRE to IPsec
+
+```
+%WARNING: The tunnel mode has been modified while the tunnel protection is already active. It is recommended to run "shutdown" and "no shutdown" on Tunnel1 interface to refresh the config.
+```
+
+- Verifying the configuration:
+
+```
+R1#show int tunn 1 | i Tunnel protocol
+  Tunnel protocol/transport IPSEC/IP
+```
+
+```
+R1#sh ip ospf neighbor 
+
+Neighbor ID     Pri   State           Dead Time   Address         Interface
+172.16.1.2        0   FULL/  -        00:00:37    172.16.1.2      Tunnel1
+```
+
+```
+R1#show ip route ospf | b Gate 
+Gateway of last resort is 100.64.1.1 to network 0.0.0.0
+
+      10.0.0.0/8 is variably subnetted, 3 subnets, 2 masks
+O IA     10.2.2.0/24 [110/35] via 172.16.1.2, 00:02:31, Tunnel1
+```
+
+```
+R1#show crypto isakmp sa 
+IPv4 Crypto ISAKMP SA
+dst             src             state          conn-id status
+100.64.1.2      100.64.2.2      QM_IDLE           1001 ACTIVE
+
+IPv6 Crypto ISAKMP SA
+
+```
+
+```
+R1#show crypto ipsec sa
+
+interface: Tunnel1
+    Crypto map tag: Tunnel1-head-0, local addr 100.64.1.2
+
+   protected vrf: (none)
+   local  ident (addr/mask/prot/port): (0.0.0.0/0.0.0.0/0/0)
+   remote ident (addr/mask/prot/port): (0.0.0.0/0.0.0.0/0/0)
+   current_peer 100.64.2.2 port 500
+     PERMIT, flags={origin_is_acl,}
+    #pkts encaps: 31, #pkts encrypt: 31, #pkts digest: 31
+    #pkts decaps: 29, #pkts decrypt: 29, #pkts verify: 29
+    #pkts compressed: 0, #pkts decompressed: 0
+    #pkts not compressed: 0, #pkts compr. failed: 0
+    #pkts not decompressed: 0, #pkts decompress failed: 0
+    #send errors 0, #recv errors 0
+
+     local crypto endpt.: 100.64.1.2, remote crypto endpt.: 100.64.2.2
+     plaintext mtu 1438, path mtu 1500, ip mtu 1500, ip mtu idb Ethernet0/1
+     current outbound spi: 0xFB32DCB6(4214414518)
+     PFS (Y/N): N, DH group: none
+
+     inbound esp sas:
+      spi: 0xA26443AD(2724479917)
+        transform: esp-aes esp-sha256-hmac ,
+        in use settings ={Tunnel, }
+        conn id: 3, flow_id: 3, sibling_flags FFFFFFFF80000040, crypto map: Tunnel1-head-0, initiator : False
+         sa timing: remaining key lifetime (k/sec): (4172984/3389)
+        IV size: 16 bytes
+        replay detection support: Y
+        Status: ACTIVE(ACTIVE)
+
+     inbound ah sas:
+
+     inbound pcp sas:
+
+     outbound esp sas:
+      spi: 0xFB32DCB6(4214414518)
+        transform: esp-aes esp-sha256-hmac ,
+        in use settings ={Tunnel, }
+        conn id: 4, flow_id: 4, sibling_flags FFFFFFFF80000040, crypto map: Tunnel1-head-0, initiator : False
+         sa timing: remaining key lifetime (k/sec): (4172984/3389)
+        IV size: 16 bytes
+        replay detection support: Y
+        Status: ACTIVE(ACTIVE)
+          
+     outbound ah sas:
+
+     outbound pcp sas:
+```
+
+- R2:
+
+```
+R2#show interfaces tunnel 1 | i Tunnel proto
+  Tunnel protocol/transport IPSEC/IP
+```
+
+```
+R2#show ip ospf neighbor 
+
+Neighbor ID     Pri   State           Dead Time   Address         Interface
+172.16.1.1        0   FULL/  -        00:00:37    172.16.1.1      Tunnel1
+```
+
+```
+R2#show ip route ospf | b Gate
+Gateway of last resort is 100.64.2.1 to network 0.0.0.0
+
+      10.0.0.0/8 is variably subnetted, 3 subnets, 2 masks
+O        10.1.1.0/24 [110/35] via 172.16.1.1, 00:05:19, Tunnel1
+```
+
+```
+R2#show crypto isakmp sa 
+IPv4 Crypto ISAKMP SA
+dst             src             state          conn-id status
+100.64.1.2      100.64.2.2      QM_IDLE           1001 ACTIVE
+
+IPv6 Crypto ISAKMP SA
+```
+
+```
+R2#show crypto ipsec sa 
+
+interface: Tunnel1
+    Crypto map tag: Tunnel1-head-0, local addr 100.64.2.2
+
+   protected vrf: (none)
+   local  ident (addr/mask/prot/port): (0.0.0.0/0.0.0.0/0/0)
+   remote ident (addr/mask/prot/port): (0.0.0.0/0.0.0.0/0/0)
+   current_peer 100.64.1.2 port 500
+     PERMIT, flags={origin_is_acl,}
+    #pkts encaps: 45, #pkts encrypt: 45, #pkts digest: 45
+    #pkts decaps: 46, #pkts decrypt: 46, #pkts verify: 46
+    #pkts compressed: 0, #pkts decompressed: 0
+    #pkts not compressed: 0, #pkts compr. failed: 0
+    #pkts not decompressed: 0, #pkts decompress failed: 0
+    #send errors 0, #recv errors 0
+
+     local crypto endpt.: 100.64.2.2, remote crypto endpt.: 100.64.1.2
+     plaintext mtu 1438, path mtu 1500, ip mtu 1500, ip mtu idb Ethernet0/0
+     current outbound spi: 0xA26443AD(2724479917)
+     PFS (Y/N): N, DH group: none
+
+     inbound esp sas:
+      spi: 0xFB32DCB6(4214414518)
+        transform: esp-aes esp-sha256-hmac ,
+        in use settings ={Tunnel, }
+        conn id: 3, flow_id: 3, sibling_flags FFFFFFFF80004040, crypto map: Tunnel1-head-0, initiator : True
+         sa timing: remaining key lifetime (k/sec): (4275778/3242)
+        IV size: 16 bytes
+        replay detection support: Y
+        Status: ACTIVE(ACTIVE)
+
+     inbound ah sas:
+
+     inbound pcp sas:
+
+     outbound esp sas:
+      spi: 0xA26443AD(2724479917)
+        transform: esp-aes esp-sha256-hmac ,
+        in use settings ={Tunnel, }
+        conn id: 4, flow_id: 4, sibling_flags FFFFFFFF80004040, crypto map: Tunnel1-head-0, initiator : True
+         sa timing: remaining key lifetime (k/sec): (4275778/3242)
+        IV size: 16 bytes
+        replay detection support: Y
+        Status: ACTIVE(ACTIVE)
+          
+     outbound ah sas:
+
+     outbound pcp sas:
+```
