@@ -307,5 +307,229 @@
 
 ### VXLAN - Encapsulation, Headers and Packet Transmission Process
 
-- 
+- VXLAN overcomes the limitations of the more traditional Ethernet VLANs defined by IEEE 802.1Q standard
 
+- VXLAN header and the encapsulation process that takes place when layer 2 segments are spanned across a VXLAN infrastructure
+
+![vxlan-header](./vxlan-header.png)
+
+- This header is appended to the conventional ethernet header before it is encapsulated into an UDP datagram
+
+- It contains the VNI to which the frame belongs
+
+- To be able to send the VXLAN frame to the destination VTEP, it must be encapsulated into an UDP datagram, with an IP header with the IP addresses belonging to the underlay network, then continued with the layer 2 technology used for that transport (Ethernet, etc.)
+
+![vxlan-header-udp-encapsulation](./vxlan-header-with-udp-encapsulation.png)
+
+- The communication process between two hosts that are communicating over a vxlan network
+
+![vxlan-communication](./vxlan-communication.png)
+
+- The underlay network can be anything - the Internet, an MPLS network, etc. As long as the layer 3 connectivity between the VTEPs can be made
+
+![vxlan-step1](./vxlan-step1.png)
+
+- PC1, sending the frame is completely unaware of the vxlan infrastructure
+
+![vxlan-step2](./vxlan-step2.png)
+
+- Once the frame reaches the switch, it is encapsulated with a VXLAN header and send across the layer 3 network until it reaches it's destination
+
+- VXLAN haves a mapping process on which the destination VTEP is mapped with the destination IP address, which then is added to the packet
+
+- The contents of the packet is unknown to the underlay network and it essentially doesn't care because it just tunnels that packet to the appropriate destination VTEP
+
+- Once the packet reaches the destination VTEP, the outer IP and UDP headers are removed
+
+![vxlan-step3](./vxlan-step3.png)
+
+- The VXLAN header and the VTEP is read, in order to place the frame on the correct VNI
+
+- The frame then is placed into the appropriate layer 2 segment
+
+- The process of how the source VTEP looks up the destination VTEPs IP address based on the destination MAC address
+
+- There are several technologies that allow us to achieve this mapping
+
+- First, you can statically configure unicast VXLAN tunnels
+
+- Using a Multicast Underlay network
+
+- Multi-protocol BGP (MP-BGP) with Ethernet VPN (EXPN)
+
+- Location/ID Separation Protocol (LISP)
+
+### VXLAN - Control Plane Operations
+
+- When PC1 sends a frame to PC2, when the source VTEP receives the frame, it does two things:
+
+    - It knows to which VNI this frame belongs, because the switch has been configured so that the specific local VLAN corresponds with the VNI 6501. So in the VXLAN header that the VTEP adds to the frame, it populates it with the appropriate VNI
+
+    - It encapsulates the whole frame with the VXLAN header within an UDP datagram. This datagram is then encapsulated into an IP packet
+
+- The source IP address is that of the local VTEP
+
+- Challenge: How does this VTEP know what destination IP address to put in the IP header?
+
+- How does it know which other VTEP to connect to get to the intended destination?
+
+- It must use a mapping process to map the destination MAC of the original frame with the destination VTEP IP
+
+- Hosts on a traditional layer 2 network use the ARP protocol to map the IP address of a device with a MAC address
+
+- Once PC1 wants to communicate to PC2, it knows the IP address of PC2 but it does not know the MAC address associated with PC2
+
+- It (PC1) sends out an ARP request 
+
+- That ARP request reaches local VTEP
+
+- That VTEP will add an VXLAN header with the associated VNI and will encapsulate that ARP request into an UDP datagram
+
+- That encapsulated ARP request is then forwarded to all other VTEPs that share the same VNI
+
+- The source VTEP sends the encapsulated ARP request to the remote VTEP and all othef VTEPs on VNI 6501
+
+- The destination VTEP will send the ARP request on the network segment that this VNI is part of
+
+- PC2 sees that ARP request and responds
+
+- The ARP reply is encapsulated using the same mechanism and send back to the originating VTEP, and then is decapsulated and sent to PC1
+
+- Now PC1 can populate the destination MAC address of the ethernet frame, and it sends it along it's way
+
+- Now the switch goes to the dataplane process of adding the VXLAN header, and being tunneled through the VXLAN topology to the appropriate remote VTEP into it's intended destination
+
+- All this process is also used by VTEPs to populate their VXLAN mappings, so they know where to find both PC1 and PC2
+
+![vxlan-mappings](./vxlan-mappings.png)
+
+- The mapping process can be achieved using manually configured mappings, it can be achieved with a multicast underlay, it can be achieved using Multiprotocol BGP with EVPN (Ethernet VPN), or can be achieved using LISP
+
+### VXLAN - Basic Configuration on Cisco Nexus Switches
+
+![vxlan-config](./vxlan-config-topology.png)
+
+- VXLAN is supported on Nexus switches and on some other Cisco switches as 9K series Catalyst switches, and some 3K Catalyst switches with appropriate IOS-XE versions
+
+- We assume that VTEP1 is able to reach VTEP2 using their IP addresses in the underlay network (20.20.20.1 to 30.30.30.1)
+
+- **Static Ingress Replication**: Any broadcast or multicast traffic received by a VTEP will be forwarded to a manually configured static list of VXLAN peers
+
+- Configure the interfaces connected to underlay network for VXLAN:
+
+- VTEP1:
+
+```
+conf t
+ interface e0/1
+  no switchport
+  ip address 20.20.20.1/24
+```
+
+- VTEP2:
+
+```
+conf t
+ interface e0/1
+  no switchport
+  ip address 30.30.30.1/24
+```
+
+- VXLAN requires configuring a loopback interface. Will be used to terminate the VXLAN tunnels itself:
+
+- VTEP1:
+
+```
+conf t
+ interface l0
+  ip address 1.1.1.1/32
+```
+
+- VTEP2:
+
+```
+conf t
+ interface l0
+  ip address 2.2.2.2/32
+```
+
+- We should make sure that 1.1.1.1 is able to ping 2.2.2.2 on the underlay network
+
+- Create the VNIs:
+
+- VTEP1:
+
+```
+conf t
+ vlan 10
+  vn-segment 6501
+  exit
+ 
+ interface e0/2
+  switchport access vlan 10
+```
+
+- VTEP2:
+
+```
+conf t
+ vlan 10
+  vn-segment 6501
+
+ interface e0/2
+  switchport access vlan 10
+```
+
+- Now we must create the VXLAN interface. In nexus terminology this is called Network Virtual Interface (NVE)
+
+- NVE = Network Virtualization Edge
+
+- VTEP 1 - Configure NVE interface:
+
+```
+conf t
+ interface nve 1
+  no shutdown
+  source interface loopback 0
+  member vni 6501
+  ingress-replication protocol static
+   peer-ip 2.2.2.2
+```
+
+- VTEP 2 - configure NVE interface:
+
+```
+conf t
+ interface nve 1
+  no shutdown
+   source interface loopback 0
+   member vni 6501
+   ingress-replication protocol static
+    peer-ip 1.1.1.1
+```
+
+### VXLAN - Spine and Leaf Architecture
+
+- VXLAN in datacenters or cloud deployments:
+
+![vxlan-datacenter-topology](./vxlan-datacenter-topology.png)
+
+- VXLAN topology as seen from inside:
+
+![vxlan-topology-inside](./vxlan-topology-inside.png)
+
+- We call the switches on the underlay network spine switches
+
+- Our VTEPs, which are on the edge of the network, are leaf switches
+
+![datacenter-spine-leaf-design](./datacenter-spine-leaf-design.png)
+
+- Prerequisite: Each leaf is connected to ALL spine switches
+
+- This optimizes East-West traffic: Communication between devices connected to leaf switches
+
+- In the VXLAN topology the term spine and leaf are used more loosly to refer to the role devices play in the topology
+
+- We ca view the VXLAN topology as a giant access switch, which countless of ports, each connected to a VNI
+
+![vxlan-topology-physical-view](./vxlan-topology-logical-view.png)
