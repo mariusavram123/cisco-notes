@@ -890,3 +890,296 @@ where d is the distance in kilometers, and f is the frequency in megahertz
 
 - The IEEE 802.11 standard defines these mechanisms in a standardized fashion
 
+- Through 802.11, RF signals, modulation, coding, bands, channels, and data rates all come together to provide a robust communication medium
+
+- Since the original IEEE 802.11 standard was published in 1997, many amendments have been added to it
+
+- The amendments cover almost every receivable aspect of wireless LAN communication, including quality of service (QoS), security, RF measurements, wireless management, more efficient mobility, and ever-increasing throughput
+
+- By now, most of the amendments have been rolled out into the overall 802.11 standard and no longer stand alone
+
+- Even so, the amendments may live and be reorganized in the industry by their original task group names
+
+- For example, the 802.11b amendment was approved in 1999, was rolled out into 802.11 in 2007, but it is still recognized by it's name today
+
+- When you shop for wireless LAN devices, you will often find the 802.11 a, b, g and n amendments listed in the specifications
+
+- You might also see terms like Wi-Fi followed by a number, which indicates the generation number of the Wi-Fi Alliance's endorsement
+
+- The original 802.11 standard was termed as Wi-Fi 0 because it was the root generation
+
+- Each step in the 802.11 evolution involves an amendment to the standard, defining things like modulation and coding scheme that are used to carry data over the air
+
+- For example, even the lowly (and legacy) 802.11b defined several types of modulation that each offered a specific data rate
+
+- Below is a summary of common ammendments to the 802.11 standard, along with the Wi-Fi generation, permitted bands, supported data rates and channel width
+
+- In the 2.4 GHz band, 802.11 has evolved through the progression of 802.11b and 802.11g with a maximum data rate of 11 Mbps and 54 Mbps, respectively
+
+- Each of these amendments brought more complex modulation methods, resulting in increasing data rates
+
+- Notice that the maximum data rates for 802.11b and 802.11g are 11 Mbps and 54 Mbps respectively, and both use a 22 MHz channel width 
+
+- The 802.11a amendment brought similar capabilities to the 5 GHz band using a 20 MHz channel
+
+```
+Standard        2.4 GHz         5 GHz           Data Rates Supported                Channel Widths Supported
+
+802.11b         Yes             No              1, 2, 5.5 and 11 Mbps               22 MHz
+Wi-FI 1
+
+802.11a         No              Yes             6, 9, 12, 18, 24, 36, 48            20 MHz
+Wi-Fi 2                                         and 54 Mbps
+
+802.11g         Yes             No              6, 9, 12, 18, 24, 36, 48            22 MHz
+Wi-Fi 3                                         and 54 Mbps
+
+802.11n         Yes             Yes             Up to 150 Mbps per spatial          20 or 40 MHz
+Wi-Fi 4                                         stream. Up to 4 spatial streams
+
+802.11ac        No              Yes             Up to 866 Mbps per spatial          20, 40, 80 or 160 MHz
+Wi-Fi 5                                         stream. Up to 4 spatial streams
+
+802.11ax        Yes             Yes             Up to 1.2 Gbps per spatial stream   20, 40, 80 or 160 MHz
+Wi-Fi 6                                         Up to 8 spatial streams
+```
+
+- 802.11n amendment was published in 2009 in an effort to scale wireless LAN performance to a theoretical maximum of 600 Mbps
+
+- The amendment was unique because it defined a number of additional techniques known as high throughput (HT) that can be applied to either 2.4 or 5 GHz band
+
+- The 802.1ac amendment was introduced in 2013 and brought even higher data rates through more advanced modulation and coding schemes, wider channel widths, greater data aggregation during a transmission and so on
+
+- 802.11ac is known as very high throughput (VHT) wireless and can be used only on the 5 GHz band
+
+- On the above table maximum data rate is 866 Mbps - but that can be reached only if every possible feature can be leveraged and RF conditions are favorable
+
+- Because there are so many combinations of modulation and efficiency parameters, 802.11ac offers around 320 different data rates
+
+- The Wi-Fi standards up through 802.11ac have operated on the principle that only one device can claim air time to transmit to another device
+
+- Typically that involves one AP transmitting a frame to one client device, or one client transmitting to one AP
+
+- Some exceptions are frames that an AP can broadcast to all clients in it's basic service set (BSS) and frames that can be transmitted to multiple clients over multiple transmitters and antennas
+
+- Regardless, the focus is usually on very high throughput for one device that can claim and use the air time
+
+- The 802.11ax amendment, also known as Wi-Fi 6 and high-efficiency (HE) wireless, changes the focus by permitting multiple devices to transmit during the same window of air time
+
+- This becomes important in areas that have high density of wireless devices, all competing for air time and throughput
+
+- 802.11ax leverages modulation and coding schemes that are even more complex and sensitive than 802.11ac, resulting in data rates that are roughly four times faster
+
+- Interference between neighboring BSSs can be avoided through better transmit power control and BSS marking or 'coloring' methods
+
+- 802.11ax also uses OFDM Access (OFDMA) to schedule and control access to the wireless medium, with air time allocated as resource units that can be used for transmission by multiple devices simultaneously 
+
+- 802.11ax is used in both Wi-Fi 6 (2.4 and 5 GHz bands only) and Wi-Fi 6e (6 GHz band only)
+
+- The main concept to remember is that an AP must support the same 802.11 amendments that is supported by the clients that will connect to it
+
+- For example, if some wireless clients support only 802.11n, whereas others support 802.11ac, you would be wise make sure the AP can support both standards and configure it to do so
+
+- Fortunately, most 802.11 amendments are backward compatible with previous ones that operate in the same band
+
+#### Using Multiple Radios to Scale Performance
+
+- Before 802.11n, wireless devices used a single transmitter and a single receiver
+
+- In other words, the components formed one radio, resulting in a single radio chain
+
+- This is also known as a single-in, single-out (SISO) system
+
+- One secret to the better performance of 802.11n, 802.11ac and 802.11ax is the use of multiple radio components, forming multiple radio chains
+
+- For example, a device can have multiple antennas, multiple transmitters and multiple receivers at it's disposal
+
+- This is known as multiple-input, multiple-output (MIMO) system
+
+##### Spatial Multiplexing
+
+- 802.11n, 802.11ac, and 802.11ax devices are characterized according with the number of radio chains available
+
+- This is described in the form TXR, where T is the number of transmitters and R is the number of receivers
+
+- A 2X2 MIMO device has 2 transmitters and two receivers, and a 2X3 device has 2 transmitters and 3 receivers
+
+- Comparing the traditional 1X1 SISO device with 2X2 and 2X3 MIMO devices
+
+![siso-and-mimo-device](./siso-and-mimo-devices.png)
+
+- The multiple radio chains can be leveraged in a variety of ways
+
+- For example, extra radios can be used to improve transmission to specific client locations, and to carry data to and from multiple clients simultaneously
+
+- To increase data throughput, data can be multiplexed or distributed across two or more radio chains - all operating on the same channel but separated through spatial diversity
+
+- This is known as spatial multiplexing
+
+- How can several radios transmit on the same channel without interfering with each other?
+
+- The key is to try to keep each signal isolated or easily destinguished from the others
+
+- Each radio chain has it's own antenna; if the antennas are spaced some distance apart, the signals arriving at the receiver's antennas (also apropriately spaced) will likely be out of phase with each other or a different amplitudes
+
+- This is especially true if the signals bounce off some objects along the way, making each antenna's signal travel over a slightly different path to reach the receiver
+
+- In addition, data can be distributed across the transmitter's radio chains in a known fashion
+
+- In fact, several independent streams of data can be processed as spatial streams that are multiplexed over the radio chains
+
+- The receiver must be able to interpret the receiving signal and and rebuild the original data streams by reversing the transmitter's multiplexing function
+
+- Spatial multiplexing requires a good deal of digital signal processing on both the transmitting and receiving ends
+
+- This pays off by increasing the throughput over the channel; the more spatial streams that are available, the more data can be sent over the channel
+
+- The number of spatial streams that a device can support is usually designed by adding a colon and a number to the MIMO radio specification
+
+- For example a 3X3:2 MIMO device would have 3 transmitters and 3 receivers, and it would support two unique spatial streams
+
+- Below is shown the spatial multiplexing between 2 3X3:2 MIMO devices
+
+- A 3X3:3 device would be similar but would support 3 spatial streams
+
+- Notice that a MIMO device can support a number of unique spatial streams that differs from the number of it's transmitters and receivers
+
+- It might seem logical that each spatial stream is assigned to a transmitter/receiver but that is not true
+
+- Spatial streams are processed so that they are distributed across multiple radio chains
+
+- The number of possible spatial streams depends on the transmitter capacity and the transmitter feature set of the device - not on the number of it's radios
+
+- Ideally two devices should support an identical number of spatial streams to multiplex and demultiplex the data streams correctly
+
+- That is not even possible or even likely because having more spatial streams usually translates to a greater cost
+
+- What happens when two devices have mismatched spatial stream support? 
+
+- They negotiate the wireless connection by informing each other of their capabilities
+
+- Then they can use the lowest number of spatial streams they have in common, but a transmitting device can leverage an additional spatial stream to repeat some information for increased redundancy
+
+#### Transmit Beamforming
+
+- Multiple radios provide a means to selectively improve transmissions
+
+- When a transmitter with a single radio chain sends an RF signal, any receivers that are present have an equal opportunity to receive and interpret the signal
+
+- In other words, the transmitter does nothing to prefer one receiver over another; each is at the mercy of it's environment and surrounding conditions to receive a decent SNR
+
+![spatial-multiplexing](./spatial-multiplexing-two-3x3:2-devices.png)
+
+- The 802.11n, 802.11ac, and 802.11ax offer a method to customize the transmitted signal to prefer one receiver over others
+
+- By leveraging MIMO, the same signal can be transmitted over multiple antennas to reach specific client locations more efficiently
+
+- Usually multiple signals travel over slightly different paths to reach a receiver, so they can arrive delayed and out of phase with each other
+
+- This behavior is normally destructive, resulting in a lower SNR and a corrupted signal
+
+- With transmit beamforming (TBF), the phase of the signal is altered as it is fed into each transmitting antenna so that the resulting signals will all arrive in phase at a specific receiver
+
+- This technique has a constructive effect improving the signal quality and SNR
+
+- Below the device on the left is using transmit beamforming to target device B on the right
+
+- The phase of each copy of the transmitted signal is adjusted so that all three signals arrive at device B more or less in phase with each other
+
+- The same three signal copies also arrive at device A, which is not targeted by TBF
+
+- As a result the signals arrive as is and are out of phase
+
+![transmit-beamforming](./transmit-beamforming.png)
+
+- The location and RF conditions can be unique for each receiver in an area
+
+- Therefore, transmit beamforming can use explicit feedback from the device at the far end, enabling the transmitter to make the appropriate adjustments to the transmitted signal phase
+
+- As TBF information is collected about each far-end device, a transmitter can keep a table of the devices and phase adjustments so that it can send focused transmissions to each one dynamically
+
+##### Maximal-Ratio Combining
+
+- When an RF signal is received on a device, it may look very little like the original transmitted signal
+
+- The signal may be degraded or distorted due to a variety of conditions
+
+- If that same signal can be transmitted over multiple antennas, as in the case of a MIMO device, then the receiving device can attempt to restore it to it's original state
+
+- The receiving device can use multiple antennas and radio chains to receive the multiple transmitted copies of the signal
+
+- One copy might be better than the others, or one copy might be better at a time, and then become worse than the others
+
+- In any event, maximal-ratio combining (MRC) can combine the copies to produce one signal that represents the best version at any given time
+
+- The end result is a reconstructed signal with an improved SNR and receiver sensitivity
+
+#### Maximizing the Ap-Client Throughput
+
+- To pass data over an RF signal successfully, both a transmitter and receiver have to use the same modulation method
+
+- In addition, the pair should use the best data rate possible, given their current environment
+
+- If they are located in a noisy environment, where a low SNR or a low RSSI might result, a lower data rate might be preferable
+
+- If not, a higher data rate is better
+
+- When wireless standards like 802.1n, 802.1ac and 802.1ax offer many possible modulation methods and a vast number of different data rates, how do the transmitter and receiver select a common method to use?
+
+- To complicate things, the transmitter, the receiver or both might be mobile
+
+- As they move around, the SNR and RSSI conditions will likely change from one moment to the next
+
+- The most effective approach is to have the transmitter and the receiver negotiate a modulation method (and the resulting data rate dynamically), based on current RF conditions
+
+- One simple solution to overcome free space path loss is to increase the transmitter's output power
+
+- Increasing the antenna gain can also boost the EIRP
+
+- Having a greater signal strength before the free space path loss occurs translates to a greater RSSI value at a distant receiver after the loss
+
+- This approach might work fine for an isolated transmitter but can cause interference problems when several transmitters are located in an area
+
+- A more robust solution is to just cope with the effects of free space path loss and other detrimental conditions
+
+- Wireless devices are usually mobile and can move closer to or farther away from a transmitter at will
+
+- As a receiver gets closer to a transmitter, the RSSI increases
+
+- This, in turn translates to an increased SNR
+
+- Remember that more complex modulation and coding schemes can be used to transport more date when the SNR is high
+
+- As a receiver gets farther away from a transmitter, the RSSI (and SNR) decreases
+
+- More basic modulation and coding schemes are needed there because of the increase in noise and the need to transmit more data
+
+- 802.11 devices have a clever way to adjust their modulation and coding schemes based on the current RSSI and SNR conditions
+
+- If the conditions are favorable for good signal quality, and higher data rates, a complex modulation and coding scheme (and a high data rate) is used
+
+- As the conditions deteriorate, less-complex schemes can be selected, resulting in a greater range but lower data rates
+
+- The scheme selection is commonly known as dynamic rate shifting (DRS)
+
+- As the name implies, it can be performed dynamically with no manual intervention
+
+- Although DRS is inherently used in 802.11 devices, it is not defined in the 802.11 standard
+
+- Each manufacturer can have it's own approach to DRS, so all devices don't necessarily select the same scheme at the same location
+
+- DRS is also known by many alternative names, such as link adaptation, adaptive modulation and coding (AMC), and rate adaptation
+
+- As a simple example, below is illustrated DRS operation on the 2.4 GHz band
+
+- Each concentric cycle represents the range supported by a particular modulation and coding scheme (ignore the crypic names)
+
+- The figure is somewhat simplistic because it assumes a consistent power level across all modulation types
+
+- Notice that the white cycles denote OFDM modulation (802.11g), and the shared cycles contain DSSS modulation (802.11b)
+
+- None of the 802.11n, 802.11ac/ax modulation schemes are shown, for simplicity
+
+- The data rates are arranged in order of increasing cycle size or range from the transmitter
+
+![dynamic-rate-shifting](./dynamic-rate-shifting.png)
