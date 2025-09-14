@@ -1183,3 +1183,17 @@ Wi-Fi 6                                         Up to 8 spatial streams
 - The data rates are arranged in order of increasing cycle size or range from the transmitter
 
 ![dynamic-rate-shifting](./dynamic-rate-shifting.png)
+
+- Suppose that a mobile user starts out near the transmitter, within the innermost cycle, where the received sygnal is strong and SNR is high
+
+- Most likely, wireless transmissions will use the OFDM 64QAM 3/4 modulation and coding scheme to achieve a data rate of 54 Mbps
+
+- As the user walks away from the transmitter, the RSSI and SNR fall by some amount
+
+- The new RF conditions will likely trigger a shift to a different and less complex modulation and coding scheme, resulting in a lower data rate
+
+- In a nutshell, each move outward, into a larger concentric cycle, causes a dynamic shift to a reduced data rate, in an effort to maintain the data integrity to the outer reaches of the transmitter's range
+
+- As the mobile user moves back toward the AP again, the data rates will likely shift higher and higher again
+
+- The same scenario in the 5 GHz band would look very similar, except that every cycle would use an OFDM modulation scheme and data rate corresponding to 802.11a, 802.11n, 802.11ac, and 802.11ax 
