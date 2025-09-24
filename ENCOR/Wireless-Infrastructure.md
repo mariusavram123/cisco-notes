@@ -767,3 +767,161 @@
 - The electrical portion of the wave will always leave the antenna in a certain orientation
 
 - For example, a simple length of wire that was pointing vertically will produce a wave that oscilates up and down in a vertical direction as it travels through free space
+
+- This is true of most Cisco antennas when they are mounted according to Cisco recommendations
+
+- Other types of antennas might be designed to produce waves that oscilate back and forth orizontally
+
+- Still others might produce waves that actually twist in a three-dimensional spiral motion through space
+
+- The electrical field's wave's orientation, with respect to the horizon, is called the antenna polarization
+
+- Antennas that produce vertical oscilation are vertically polarized; those that produce horizontal oscillation are horizontally polarized
+
+- (Keep in mind that there is always a magnetic field wave too, which is oriented at 90 degrees from the electrical field wave)
+
+- By itself, the antenna polarization is not of critical importance
+
+- However, the antenna polarization at the transmitter must be matched to the polarization at the receiver
+
+- If the polarization is mismatched, the received signal can be severely degraded
+
+- Below is illustrated the antenna polarization
+
+- The transmitter and receiver along the top both use vertical polarization, so the received signal is optimized
+
+- The pair along the bottom is mismatched, causing the signal to be poorly received
+
+![antenna-polarization](./antenna-polarization.png)
+
+- Even though Cisco antennas use vertical polarization, someone might mount an antenna in an unexpected orientation
+
+- For example, suppose you mount a transmitter with antennas pointing upward
+
+- After you leave someone knocks the antennas so that they are turned sideways
+
+- Not only does this change the radiation pattern you were expecting, it also changes the polarization
+
+#### Omnidirectional Antennas
+
+- There are two basic types of antennas, omnidirectional and directional
+
+- An omnidirectional antenna is usually made in the shape of a thin cylinder 
+
+- It tends to propagate a signal equally in all directions away from the cylinder but not along the cylinder's length
+
+- The result is a donut-shaped pattern that extends further in the H plane than in the E plane
+
+- This type of antenna is well suited for broad coverage of a large room or floor area, with the antenna located in the center
+
+- Because an omnidirectional antenna, distributes the RF energy throughout a broad area, it has a relatively low gain
+
+- A common type of omnidirectional antenna is the dipole, shown in the left side of the picture from below
+
+- Some dipole models are articulated such that they can be folded up or down, depending on the mounting orientation, whereas others are rigid and fixed
+
+- As it's name implies, the dipole has two separate wires that radiate an RF signal when an alternating current is applied across them, as shown in the right portion of the figure
+
+- Dipoles usually have a gain of around +2 to +5 dBi
+
+![dipole-antenna](./dipole-antenna.png)
+
+- The E and H plane radiation pattern for a typical dipole antenna are shown below
+
+- In the E plane think of the dipole lying on it's side in the center of the plot; the H plane is looking down on the top of the dipole
+
+- The following scheme takes the patterns a step further, showing how the two planes are supperimposed and merged to reveal the three-dimensional radiation pattern
+
+![radiation-pattern-dipole-antenna](./radiation-pattern-dipole-antenna.png)
+
+![dipole-radiation-pattern-3d](./dipole-radiation-pattern-3-dimensions.png)
+
+- To reduce the size of an omnidirectional antenna, many Cisco Wireless Access Points (APs) have integrated antennas that are hidden inside the device's smooth case
+
+- For example, the AP shown below has 6 tiny antennas hidden inside it
+
+- Integrated omnidirectional antennas typically have a gain of 2 dBi in the 2,4 GHz band, and 5 dBi in the 5 GHz band
+
+- The E and H radiation patterns are shown below
+
+- When the two planes are merged, the three-dimensional pattern still rather resembles a sphere
+
+![wireless-ap-integrated-antennas](./wireless-ap-integrated-antennas.png)
+
+![e-and-h-radiation-patterns](./e-and-h-radiation-patterns.png)
+
+- What about wireless LAN adapters that are used in mobile devices like laptops and smartphones?
+
+- Because the adapters are so small, their antennas must also be tiny
+
+- As a result, USB wireless adapters often have a gain of 0 dBi, while some smartphones even have a negative gain!
+
+- This does not mean that the antennas do not radiate or receive signals
+
+- Instead, the antennas just have a lower performance compared with other, larger devices
+
+#### Directional Antennas
+
+- Directional antennas have a higher gain than omnidirectional antennas because they focus the RF energy in one general direction
+
+- Typical applications include elongated indoor areas, such as the rooms along a long hallway in a warehouse
+
+- They can also be used to cover outdoor areas out away from a building or long distances between buildings
+
+- If they are mounted against a ceiling, pointed downward, they can cover a small floor area to reduce the APs cell size
+
+- Patch antennas have a flat rectangular shape, so that they can be mounted on a wall or ceiling
+
+![patch-antenna](./cisco-patch-antenna.png)
+
+- Patch antennas produce a broad egg-shaped pattern that extends out away from the flat patch surface
+
+- The E and H radiation patterns are shown below 
+
+- When the planes are merged, as shown in the next picture, you can see the somewhat broad directional pattern that results
+
+- Patch antennas have a typical gain of about 6 to 8 dBi in the 2.4 GHz and 7 to 10 dBi at 5 GHz
+
+![radiation-patch-antenna](./radiation-pattern-patch-antenna.png)
+
+![radiation-pattern-3d](./patch-antenna-radiation-pattern-3d.png)
+
+- Below is shown the Yagi-Uda antenna, named after it's inventors, and more commonly known as Yagi
+
+- Although it's outer case is shaped like a thick cilinder, the antenna is actually made up of several parallel elements of increasing length
+
+![yaggi-antenna](./yaggi-antenna.png)
+
+- Bellow is shown the E and H radiation pattern plots 
+
+- A Yaggy produces a more focused egg-shaped pattern that extends out along the antenna's length
+
+- Yaggi antennas have a gain of about 10 to 14 dBi
+
+![radiation-pattern-yaggi-antenna](./radiation-patterns-yaggi-antenna.png)
+
+![radiation-pattern-3d-yaggi](./radiation-pattern-3d-yaggi.png)
+
+- In a line-of-sight wireless path, an RF signal must be propagated a long distance using a narrow beam
+
+- Highly directional antennas, such as a parabolic dish, are tailored for that use but focus the RF energy along one narrow elliptical pattern
+
+- Because the target is only one receiver location, the antenna does not have to cover any area outside of the one of sight
+
+- Dish antennas, such as the one shown below, use a parabolic dish to focus received signals onto one antenna mounted at the center
+
+- The parabolic shape is important because any waves arriving from the line of sight will be reflected onto the center antenna element that faces the dish
+
+- Transmitted waves are just the reverse: They are aimed at the dish and reflected such that they are propagated away from the dish along the line of sight
+
+![parabolic-dish-antenna](./parabolic-dish-antenna.png)
+
+- Below are shown the radiation patterns in the H and E planes, which are merged in three dimensions below
+
+- Notice that antenna's coverage pattern is long and narrow, extending out away from the dish
+
+- The focused pattern gives the antenna a gain of between 20 and 30 dBi - the highest gain of all wireless LAN antennas
+
+![parabolic-dish-antenna](./radiation-pattern-parabolic-dish-antenna.png)
+
+![parabolic-dish-antenna-3d](./parabolic-dish-antenna-3d.png)
