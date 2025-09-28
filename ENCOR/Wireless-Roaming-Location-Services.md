@@ -364,4 +364,62 @@
 
 - The simple location example shown below is intuitive, but it is based on the assumption that the APs and client devices are located in open free space, with nothing but free space path loss to attenuate the client's RF signal
 
-- In a normal environment, 
+- In a normal environment, the APs and clients exist in buildings where physical objects such as walls, doors, windows, furniture, cubicles, and shelving also exist and get in the way of the RF signals
+
+- Usually the signals can pass through various materials but get attenuated along the way
+
+- That further complicates determining device location accurately
+
+- The Cisco approach is to leverage RF fingerprinting, where each mapped area is influenced by an RF calibration template that more closely resembles the actual signal attenuation experienced by the APs and clients
+
+- The calibration applied to a map can be manually determined by walking through the area with a device and taking actual RF measurements
+
+- It can also be applied through a set of models that represents how the construction of a mapped area might affect signal propagation
+
+- Sample models include cubs and walled offices, drywalled offices, indoor high ceilings and outdoor open spaces
+
+- The most intuitive way to interpret location data is to view devices on a map that represents the building and floor where they are located
+
+- Below is shown a sample map of one floor of a building from Cisco Spaces
+
+- The square icons represent AP locations, which were manually entered on the map
+
+- Cisco spaces indicates device locations with small colored dots that are dynamically placed on the map at regular time intervals
+
+- Green dots represent wireless devices that have sucessfully associated with APs, and red dots represent devices that are not associated but are actually sending probe requests to find nearby APs
+
+![sample-map-location-data](./sample-map-location-data.png)
+
+- One device has been selected, causing lines to be drawn to some of the APs that overheard the device
+
+- In this example, 7 APs have recorded a current received signal strength measurement for the client, which is then used to derive an accurate location
+
+- It might seem odd that so many different APs would be able to know about a device because it can associate and use only one AP at a time
+
+- In addition, the device and the AP where it is associated would communicate on only a single channel, while other APs would likely be using different channels
+
+- The secret is that wireless devices normally use 802.11 Probe Requests to discover any potential APs that might be nearby, either as a prelude to associating with an AP or in preparation for roaming to a different AP
+
+- A client will send Probe Requests on every possible channel and band that it is configured to support
+
+- Neighboring APs will receive the requests on their respective channels, all sourced by the same client MAC address
+
+- The same real-time location service also supports wireless devices that might never actually associate with an AP
+
+- For example, you might be interested in locating or tracking a potential customer's smartphone as that person walks through a store
+
+- As long as Wi-Fi is enabled on the device, it will probably probe for available APs
+
+- RFID tags are another type of device that can be attached to objects so that they can be tracked and located
+
+- Some RFID tags can actively join a wireless network to exchange data, while others are meant to simply "wake up" periodically and send 802.11 probe requests or multicast frames to announce their presence
+
+- Another interesting use case is locating rogue devices and sources of Wi-Fi interference
+
+- Rogue devices will likely probe the network and can be discovered and located
+
+- Interference sources, such as cordless phones, wireless video cameras and other transmitters, might not be compatible with the 802.11 standard at all
+
+- Cisco APs can still detect the presence of interference with dedicated spectrum analysis and the Clean Air feature, and can determine the received signal strength on a channel
+
+- The location server can use this information to compute a probable location of the interference source and display it on a map
