@@ -1,0 +1,12 @@
+Logging display requested on 2025/10/02 23:04:15 (UTC) for Hostname: [WLC], Model: [C9800-CL-K9], Version: [17.12.05], SN: [9XFNOFAQVMD], MD_SN: [9XFNOFAQVMD]
+2025/10/02 22:58:39.326715394 {wncd_x_R0-0}{1}: [dot11] [14499]: (debug): MAC: 7e53.1d58.c022  Search client dot11 record. Record exists for given MAC address
+2025/10/02 22:58:39.326719975 {wncd_x_R0-0}{1}: [rrm-client-chd] [14499]: (debug): 3890.a511.0570 (Radio: 802.11a) CHD: process_client_stats: Chd Status 1 Wifi to LTE Status 0 for client 7E:53:1D:58:C0:22 for slot id: 1
+2025/10/02 22:58:39.326720962 {wncd_x_R0-0}{1}: [rrm-client-chd] [14499]: (debug): 3890.a511.0570 Checking WIFI to Cellular for client 7E:53:1D:58:C0:22 on slot 1, WiFi-to-Cellular enabled 0, WiFi to cellular capable 0
+2025/10/02 22:58:39.326721301 {wncd_x_R0-0}{1}: [rrm-client-chd] [14499]: (debug): 3890.a511.0570 process_client_stats: Station: 7E53.1D58.C022  for slot 1 smart roam not triggered for AP
+2025/10/02 22:58:39.326722796 {wncd_x_R0-0}{1}: [rrm-client-chd] [14499]: (debug): 3890.a511.0570 (Radio: 802.11a) xorRoam: Station: 7E:53:1D:58:C0:22 has WLAN stats with RSSI 231 Checking for XOR roam conditions on AP for slot id: 1
+2025/10/02 22:58:39.326730155 {wncd_x_R0-0}{1}: [apmgr-db] [14499]: (debug): Radio of 5ghz is not a slave radio
+2025/10/02 22:58:39.326730861 {wncd_x_R0-0}{1}: [apmgr-db] [14499]: (debug): Radio of 5ghz is not a slave radio
+2025/10/02 22:58:39.326731291 {wncd_x_R0-0}{1}: [apmgr-db] [14499]: (debug): MAC: 3890.a511.0570  Radio client serving mode, radio_count_for_5ghz: 1
+2025/10/02 22:58:39.326732292 {wncd_x_R0-0}{1}: [rrm-client-chd] [14499]: (debug): 3890.a511.0570 (Radio: 802.11a) Station: 7e53.1d58.c022 is associated to AP  which is not XOR roam capable for slot id: 1
+2025/10/02 23:00:43.678532256 {wncd_x_R0-0}{1}: [client-keymgmt] [14499]: (ERR): MAC: 7e53.1d58.c022  Keymgmt: Failed to validate eapol key m6. Received wrong replay counter. stop processing
+2025/10/02 23:00:43.678536965 {wncd_x_R0-0}{1}: [client-keymgmt] [14499]: (ERR): MAC: 7e53.1d58.c022  EAP key M6 processing failed. Reason: 0
