@@ -275,3 +275,29 @@
 - You can quickly verify what policy tag, site tag, and RF tag is the AP using
 
 - You can also see the individual profiles referenced by each tag and some basic operational information to be used by each profile
+
+- Configure authentication with Local EAP
+
+- Configuration -> Security -> Local EAP -> Local EAP profiles -> Add
+
+![activate-local-eap](./activate-local-eap.png)
+
+- Viewing the local EAP profiles
+
+![local-eap-profiles](./local-eap-profiles.png)
+
+- Apply a local EAP auth method to the WLAN
+
+- Configuration -> Tags and Profiles -> Edit/Add -> Security -> AAA -> Local EAP and then select the Local EAP profile
+
+![local-eap-auth-to-wlan](./local-eap-authentication-to-wlan.png)
+
+- Define the local user database
+
+- Configuration -> Security -> Guest User
+
+![guest-user-add](./guest-user-add.png)
+
+- Get a Clean Air quality report from Monitoring -> Wireless -> CleanAir Statistics
+
+![clean-air-report](./clean-air-quality-report.png)
