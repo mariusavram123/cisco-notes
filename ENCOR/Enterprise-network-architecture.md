@@ -380,3 +380,40 @@
 
 - Using this design offers the following advantages:
 
+    - **Simplified Design**: There are fewer boxes to manage, which reduces the amount of time spent on ongoing provisioning and maintenance
+
+    - **No first hop redundancy protocol required**: It eliminates the need for first-hop redundancy protocols such as HSRP and VRRP because the default IP gateway is on a single logical interface
+
+    - **Reduced STP dependence**: Because EtherChannel is used, it eliminates the need for STP for a Layer 2 access design; however STP is still required as a failsave in case multiple access switches are interconnected
+
+    - **Increased uplink utilization**: With EtherChannel, all uplinks from access to distribution can be used, increasing the effective bandwidth available to the end users and endpoints connected to the access layer switches
+
+    - **Easier troubleshooting**: The topology of the network from the distribution layer to the access layer is logically an hub-and-spoke topology, which reduces the complexity of the design and troubleshooting
+
+    - **Faster convergence**: With EtherChannel all links are in a forwarding state, and this significantly optimizes the convergence time following a node or link failure event because EtherChannel provides fast sub-second failover between links in an uplink bundle
+
+    - **Distributed VLANs**: With this design, VLANs can span multiple access switches without the need to block any links
+
+    - **High Availability**: There is seamless traffic failover when one of the switches in the cluster fails by using interchassis SSO/NSF
+
+- The simplified campus design is loop free, highly available, flexible, resilient and easy to manage
+
+- Below we can see how the network can be simplified by introducing VSS and SWV into the design
+
+![campus-design-switch-stacking](./campus-design-switch-stacking.png)
+
+- In addition, using this design approach across all the campus blocks (when possible) can provide an optimized architecture that is easy to manage, resilient, and more flexible, with higher aggregated uplink bandwidth capacity
+
+- Below is illustrated what the end-to-end campus design would look like with VSS and SWV used across the different building blocks and layers
+
+![full-campus-design-switch-stacking](./campus-design-using-switch-stacking.png)
+
+#### Software-Defined Access (SD-Access) Design
+
+- SD-Access, the industry's first intent-based networking solution for the enterprise, is built on the principles of the Cisco Digital Network Architecture (DNA)
+
+- It is a combination of the campus fabric design and the Digital Network Architecture Center (Cisco DNA or DNAC)
+
+- SD-Access adds fabric capabilities to the enterprise network through automation using SD-Access technology, and it provides automated end-to-end segmentation to separate user, device, and application traffic without requiring a network redesign
+
+- With it's fabric capabilities, SD-Access provides services such as host mobility and enhanced security in addition to the normal switching and routing capabilities
