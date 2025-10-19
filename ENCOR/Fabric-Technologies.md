@@ -440,3 +440,98 @@
 
 - Cisco ISE and the DNA Center (NCP and NDP) integrate with each other to share contextual information through APIs between themselves, and this contextual information is then provided to the user management layer:
 
+    - The NDP subsystem shares contextual analytics information with Cisco ISE and NCP subsystems and provides this information to the user (management layer)
+
+    - The NCP subsystem integrates directly with Cisco NSE and NDP subsystems to provide contextual automation information between them
+
+    - Cisco ISE integrates directly with Cisco NCP and NDP subsystems (Cisco DNA Center) to provide contextual identity and policy information
+
+#### Management Layer
+
+- The Cisco DNA Center management layer is the user interface/user experience (UI/UX) layer, where all the information from the other layers is presented to the user in the form of a centralized management dashboard
+
+- It is the intent-based aspect of the Cisco DNA
+
+- A full understanding of the network layer (LISP, VXLAN, and Cisco TrustSec) or controller layer (Cisco NCP, NDP, and ISE) is not required to deploy the fabric in SD-Access
+
+- Nor is there a requirement to know how to configure each individual network device and feature to create the consistent end-to-end behaviour offered by SD-Access
+
+- The management layer abstracts all the complexities and dependencies of the other layers and provides the user with a simple set of GUI tools to easily manage and operate the entire Cisco DNA network (hence the name Cisco DNA Center)
+
+- Cisco DNA Center applications are designed for simplicity and are based on the primary workflows defined by Cisco DNA Center: design, policy, provision, and assurance
+
+#### Cisco DNA Design Workflow
+
+- The Cisco DNA design workflow provides all the tools needed to logically define the SD-Access fabric
+
+- The following are some of the Cisco DNA design tools:
+
+    - **Network Hierarchy**: Used to set up geolocation, building and floorplan details and associate them with a unique site ID
+
+    - **Network Settings**: Used to set up network servers (such as DNS, DHCP, and AAA), device credentials, IP management and wireless settings
+
+    - **Image Repository**: Used to manage the software images and/or maintenance updates, set version compliance, and download and deploy images
+
+    - **Network Profiles**: Used to define LAN, WAN, and WLAN connection profiles (such as SSID) and apply them to one or more sites
+
+- Web interface -> Design -> Network Hierarchy -> Add site/Add building
+
+- Network settings -> Define the network servers (AAA, DNS, DHCP servers)
+
+- Network settings -> Device Credentials - edit login information for sites/etc.
+
+- Network settings -> Wireless - define the wireless SSIDs, then associate them with wireless profiles
+
+#### Cisco DNA Policy Workflow
+
+- The Cisco DNA policy workflow provides all the tools to logically define Cisco DNA policies
+
+- The following are some of the Cisco DNA Policy Tools:
+
+    - **Dashboard**: Used to monitor all the VNs, scalable groups, policies, and recent changes
+
+    - **Group-Based Access Control**: Used to create group-based access control policies, which are the same as SGACLs
+
+    - Cisco DNA Center integrates with Cisco ISE to simplify the process of creating and maintaining SGACLs
+
+    - **IP-Based Access Control**: Used to create IP-based access control policy to control the traffic going into and coming out of a Cisco device in the same way that an ACL does
+
+    - **Application**: Used to configure QoS in the network through application policies
+
+    - **Traffic copy**: Used to configure Encapsulated Remote Switched Port Analyzer (ERSPAN) to copy the IP traffic flow between two entities to a specified remote destination for monitoring and troubleshooting purposes
+
+    - **Virtual Network**: Used to set up the virtual networks (or use the default VN) and associate various scalable groups
+
+- Policy workflow: Web interface -> Policy -> and look at specific options depending on the needs
+
+#### Cisco DNA Provision Workflow
+
+- The Cisco DNA provision workflow provides all the tools to deploy the Cisco SD-Access fabric
+
+- The following are some of the Cisco DNA provisioning tools:
+
+    - **Devices**: Used to assign devices to a site ID, confirm or update the software version, and provision the network underlay configurations
+
+    - **Fabrics**: Used to set up the fabric domains (or use the default LAN fabric)
+
+    - **Fabric Devices**: Used to add devices to the fabric domain and specify device roles (such as control plane, border, edge, and WLC)
+
+    - **Host Onboarding**: Used to define the host authentication type (static or dynamic) and assign host pools (wired and wireless) to various VNs
+
+- Provision workflow: Provision -> Devices or Fabric tabs
+
+#### Cisco DNA Assurance Workflow
+
+- The Cisco DNA assurance workflow provides all the tools to manage SD-Access fabric
+
+- The following are some of the Cisco DNA assurance tools:
+
+    - **Dashboard**: Used to monitor the global health of all (fabric and non-fabric) devices and clients, with scores based on the status of various sites
+
+    - **Client 360**: Used to monitor and resolve client-specific status and issues (such as onboarding and app experience), with links to connected devices
+
+    - **Devices 360**: Used to monitor and resolve device-specific status and issues (such as resource usage and loss and latency), with links to connected clients
+
+    - **Issues**: Used to minitor and resolve open issues (reactive) and/or developing trends (proactive) with clients and devices at specific sites
+
+- Assurance workflow: Web interface -> Assurance -> Health, Dashboards, Issues, Manage
