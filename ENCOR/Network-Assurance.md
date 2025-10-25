@@ -488,3 +488,135 @@ VRF info: (vrf in name/id, vrf out name/id)
 ```
 
 - Another great benefit of `traceroute` is that is has options available, much like the `ping` command
+
+- These options can also be discovered by leveraging the context-sensitive help (?) from the command line interface
+
+- Below is shown the list of available options to the `traceroute` command
+
+- Examples: `port`, `source`, `timeout`, and `probe` options
+
+```
+R1#traceroute 22.22.22.23 ?
+  dscp     Specify DSCP value in ASCII/Numeric for Ingress
+  ingress  LAN source interface for Ingress
+  numeric  display numeric address
+  port     specify port number
+  probe    specify number of probes per hop
+  source   specify source address or name
+  timeout  specify time out
+  ttl      specify minimum and maximum ttl
+  <cr>     <cr>
+```
+
+- There are times when using some of the options available with `traceroute` may be useful (for example, if a network operator wants to change the port that the first probe is sent out on or source the traceroute from a different interface, such as the loopback interface)
+
+- There are also times where there might be a reason to send a different number of probes per hop with different timeout timers rather than the default of three probes
+
+- As with the `ping` command, multiple traceroute options can be used on the same time
+
+- Below is shown the `traceroute` command being used on R1 to R2's Loopback 123 interface with the `port`, `probe`, `source` and `timeout` options all set
+
+```
+R1#traceroute 22.22.22.23 port 500 source l0 probe 5 timeout 10
+Type escape sequence to abort.
+Tracing the route to 22.22.22.23
+VRF info: (vrf in name/id, vrf out name/id)
+  1 10.1.12.2 4 msec 3 msec *  4 msec * 
+```
+
+- Much like the extended `ping` command, there is an extended `traceroute` command, and it has a number of detailed options available
+
+- These options are listed in the table below
+
+```
+Option                                                      Description
+
+Protocol                                                    IP, Novell, AppleTalk, CLNS, IPv6, and so on; the default is IP
+
+Target IP Address                                           Destination IP address of traceroute packets
+
+Numeric display                                             Shows only the numeric display rather than numeric and symbolic display
+
+Timeout in Seconds                                          Time that is waited for a reply to a probe; the default is 3 seconds
+
+Probe count                                                 Number of probes sent at each hop. The default is 3
+
+Source Address                                              IP address of the source interface
+
+Minimum Time-to-live                                        TTL values of the first set of probes; can be used to hide topology information or known hops
+
+Maximum Time-to-live                                        Maximum number of hops; the default is 30
+
+Port number                                                 Destination port number of probes; the default is 33434
+
+Loose, Strict, Record,                                      The options set for traceroute probes
+Timestamp, Verbose
+                                                            Loose: Specifies the hops that packets should traverse
+
+                                                            Strict: Same as Loose with the exception that packets can traverse only specified hops
+
+                                                            Record: Display IP addresses of the first nine hops that the traceroute packets traverse
+
+                                                            Timestamp: Displays the round-trip time to the destination for each packet
+
+                                                            Verbose: Default option that is selected  with any and all other options
+```
+
+- Using the same topology from earlier, an extended traceroute will be sent from R1's L0 interface to R2's L123 interface
+
+- The following extended options will be used:
+
+    - IP
+
+    - Source Interface of L0
+
+    - Timeout of 2 seconds
+
+    - Probe count of 1
+
+    - Port number 12345
+
+    - Timestamp and default of Verbose
+
+```
+R1#traceroute 
+Protocol [ip]: 
+Target IP address: 22.22.22.23
+Ingress traceroute [n]: 
+Source address or interface: 11.11.11.11
+DSCP Value [0]: 
+Numeric display [n]: 
+Timeout in seconds [3]: 2
+Probe count [3]: 1
+Minimum Time to Live [1]: 
+Maximum Time to Live [30]: 
+Port Number [33434]: 12345
+Loose, Strict, Record, Timestamp, Verbose[none]: Timestamp
+Number of timestamps [ 9 ]: 
+Loose, Strict, Record, Timestamp, Verbose[TV]: 
+Type escape sequence to abort.
+Tracing the route to 22.22.22.23
+VRF info: (vrf in name/id, vrf out name/id)
+  1 10.1.12.2 1 msec
+Received packet has options
+Total option bytes= 40, padded length=40
+ Timestamp: Type 0.  Overflows: 0 length 40, ptr 17
+  Time=*17:40:38.017 UTC (83CB0A01)
+  Time=*17:40:38.017 UTC (83CB0A01)
+  Time=*17:40:38.017 UTC (83CB0A01)
+  >>Current pointer<<
+  Time= 00:00:00.000 UTC (00000000)
+  Time= 00:00:00.000 UTC (00000000)
+  Time= 00:00:00.000 UTC (00000000)
+  Time= 00:00:00.000 UTC (00000000)
+  Time= 00:00:00.000 UTC (00000000)
+  Time= 00:00:00.000 UTC (00000000)
+```
+
+- Above is shown an extended `traceroute` using all these options and the output received from the tool on the command line
+
+- A probe count of 1 is used in this example to make the output more legible
+
+- Usually, this is 3 by default, and it can be increased depending on what is being diagnosed
+
+- 
