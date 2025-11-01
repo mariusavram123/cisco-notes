@@ -359,3 +359,173 @@ Log Buffer (1000000 bytes):
 - Many options are available, such as multiple logging destinations and ways to systematically set up different levels of logging
 
 - It all depends on what the network operations team feel is appropriate for their environment
+
+- Syslog server on debian 13 with syslog-ng:
+
+```
+sudo apt install syslog-ng
+```
+
+- Create custom file to store the logs from remote clients on (/etc/syslog-ng/conf.d/custom.conf):
+
+```
+cat /etc/syslog-ng/conf.d/custom.conf 
+# =========================
+# === SYSLOG-NG CONFIG ===
+# =========================
+
+# ======= OPTIONS =======
+options {
+   keep-hostname(yes);
+   use-dns(no);
+   create-dirs(yes);
+   owner("splunk");
+   dir-owner("splunk");
+   group("splunk");
+   dir-group("splunk");
+   perm(0750);
+   dir-perm(0755);
+};
+
+# ======= SOURCES =======
+source s_udp_514 {
+   network(transport("udp") port(514));
+};
+
+source s_tcp_514 {
+   network(transport("tcp") port(514));
+};
+
+# ======= FILTERS =======
+filter f_cisco_iosv {
+   host(172.16.29.16) or host(172.16.29.16);
+};
+
+# ======= DESTINATIONS =======
+# Write Cisco IOSv logs to disk
+destination d_cisco_iosv {
+   file("/syslog-data/cisco-iosv/$HOST/$HOST-$YEAR$MONTH$DAY$HOUR.log");
+};
+
+# ======= LOG RULE =======
+log {
+   source(s_udp_514);
+   filter(f_cisco_iosv);
+   destination(d_cisco_iosv);
+   flags(final);
+};
+
+# =========================
+# === CATCH-ALL CONFIG ===
+# =========================
+
+# ======= DESTINATIONS =======
+# Catchall for TCP sources
+destination d_catchall_tcp {
+   file("/syslog-data/catchall_tcp/$HOST/$HOST-$YEAR$MONTH$DAY-$HOUR.log");
+};
+
+# Catchall for UDP sources
+destination d_catchall_udp {
+   file("/syslog-data/catchall_udp/$HOST/$HOST-$YEAR$MONTH$DAY-$HOUR.log");
+};
+
+# ======= LOG CATCH-ALL RULES =======
+log {
+   source(s_tcp_514);
+   destination(d_catchall_tcp);
+   flags(final);
+};
+
+log {
+   source(s_udp_514);
+   destination(d_catchall_udp);
+   flags(final);
+};
+
+```
+
+- Create splunk user:
+
+```
+adduser splunk
+```
+
+- Start the syslog-ng service:
+
+```
+systemctl restart syslog-ng.service
+```
+
+- Viewing the logs from the devices (on router: `debug ip bgp events` and `debug ip bgp updates`):
+
+```
+less /syslog-data/cisco-iosv/172.16.29.16/172.16.29.16-2025110109.log
+
+Nov  1 09:13:47 172.16.29.16 %SYS-5-CONFIG_I: Configured from console by console
+Nov  1 09:14:26 172.16.29.16 BGP: Regular scanner timer event
+Nov  1 09:14:26 172.16.29.16 BGP: Performing BGP general scanning
+Nov  1 09:14:26 172.16.29.16 BGP: tbl IPv4 Unicast:base Performing BGP Nexthop scanning for general scan
+Nov  1 09:14:26 172.16.29.16 BGP(0): Future scanner version: 25, current scanner version: 24
+Nov  1 09:14:26 172.16.29.16 BGP: tbl IPv4 Multicast:base Performing BGP Nexthop scanning for general scan
+Nov  1 09:14:26 172.16.29.16 BGP(6): Future scanner version: 26, current scanner version: 25
+Nov  1 09:14:26 172.16.29.16 BGP: tbl L2VPN E-VPN:base Performing BGP Nexthop scanning for general scan
+Nov  1 09:14:26 172.16.29.16 BGP(10): Future scanner version: 26, current scanner version: 25
+Nov  1 09:14:26 172.16.29.16 BGP: tbl MVPNv4 Unicast:base Performing BGP Nexthop scanning for general scan
+Nov  1 09:14:26 172.16.29.16 BGP(15): Future scanner version: 26, current scanner version: 25
+Nov  1 09:14:59 172.16.29.16 BGP: aggregate timer expired
+Nov  1 09:15:07 172.16.29.16 BGP: aggregate timer expired
+Nov  1 09:15:26 172.16.29.16 BGP: Regular scanner timer event
+Nov  1 09:15:26 172.16.29.16 BGP: Performing BGP general scanning
+Nov  1 09:15:26 172.16.29.16 BGP: tbl IPv4 Unicast:base Performing BGP Nexthop scanning for general scan
+Nov  1 09:15:26 172.16.29.16 BGP(0): Future scanner version: 26, current scanner version: 25
+Nov  1 09:15:26 172.16.29.16 BGP: tbl IPv4 Multicast:base Performing BGP Nexthop scanning for general scan
+Nov  1 09:15:26 172.16.29.16 BGP(6): Future scanner version: 27, current scanner version: 26
+Nov  1 09:15:26 172.16.29.16 BGP: tbl L2VPN E-VPN:base Performing BGP Nexthop scanning for general scan
+Nov  1 09:15:26 172.16.29.16 BGP(10): Future scanner version: 27, current scanner version: 26
+Nov  1 09:15:26 172.16.29.16 BGP: tbl MVPNv4 Unicast:base Performing BGP Nexthop scanning for general scan
+Nov  1 09:15:26 172.16.29.16 BGP(15): Future scanner version: 27, current scanner version: 26
+Nov  1 09:15:35 172.16.29.16 BGP: aggregate timer expired
+Nov  1 09:15:44 172.16.29.16 BGP: aggregate timer expired
+Nov  1 09:16:26 172.16.29.16 BGP: Regular scanner timer event
+Nov  1 09:16:26 172.16.29.16 BGP: Performing BGP general scanning
+Nov  1 09:16:26 172.16.29.16 BGP: tbl IPv4 Unicast:base Performing BGP Nexthop scanning for general scan
+Nov  1 09:16:26 172.16.29.16 BGP(0): Future scanner version: 27, current scanner version: 26
+Nov  1 09:16:26 172.16.29.16 BGP: tbl IPv4 Multicast:base Performing BGP Nexthop scanning for general scan
+Nov  1 09:16:26 172.16.29.16 BGP(6): Future scanner version: 28, current scanner version: 27
+Nov  1 09:16:26 172.16.29.16 BGP: tbl L2VPN E-VPN:base Performing BGP Nexthop scanning for general scan
+Nov  1 09:16:26 172.16.29.16 BGP(10): Future scanner version: 28, current scanner version: 27
+Nov  1 09:16:26 172.16.29.16 BGP: tbl MVPNv4 Unicast:base Performing BGP Nexthop scanning for general scan
+Nov  1 09:16:26 172.16.29.16 BGP(15): Future scanner version: 28, current scanner version: 27
+Nov  1 09:17:28 172.16.29.16 %SYS-5-CONFIG_I: Configured from console by console
+Nov  1 09:18:13 172.16.29.16 BGP(0): 10.12.1.2 rcv UPDATE about 10.3.3.3/32 -- withdrawn
+Nov  1 09:18:13 172.16.29.16 BGP(0): no valid path for 10.3.3.3/32
+Nov  1 09:18:13 172.16.29.16 BGP(0): 10.12.1.2 rcv UPDATE about 10.4.4.4/32 -- withdrawn
+Nov  1 09:18:13 172.16.29.16 BGP(0): no valid path for 10.4.4.4/32
+Nov  1 09:18:13 172.16.29.16 BGP: topo global:IPv4 Unicast:base Remove_fwdroute for 10.3.3.3/32
+Nov  1 09:18:13 172.16.29.16 BGP(0): no valid path for 10.3.3.3/32
+Nov  1 09:18:13 172.16.29.16 BGP(0): 10.12.1.2 rcv UPDATE about 10.4.4.4/32 -- withdrawn
+Nov  1 09:18:13 172.16.29.16 BGP(0): no valid path for 10.4.4.4/32
+Nov  1 09:18:13 172.16.29.16 BGP: topo global:IPv4 Unicast:base Remove_fwdroute for 10.3.3.3/32
+Nov  1 09:18:13 172.16.29.16 BGP: topo global:IPv4 Unicast:base Remove_fwdroute for 10.4.4.4/32
+Nov  1 09:18:13 172.16.29.16 BGP(0): 10.12.1.2 rcv UPDATE about 10.23.1.0/24 -- withdrawn
+Nov  1 09:18:13 172.16.29.16 BGP(0): no valid path for 10.23.1.0/24
+Nov  1 09:18:13 172.16.29.16 BGP(0): 10.12.1.2 rcv UPDATE about 10.24.1.0/24 -- withdrawn
+Nov  1 09:18:13 172.16.29.16 BGP(0): no valid path for 10.24.1.0/24
+Nov  1 09:18:13 172.16.29.16 BGP: topo global:IPv4 Unicast:base Remove_fwdroute for 10.23.1.0/24
+Nov  1 09:18:13 172.16.29.16 BGP: topo global:IPv4 Unicast:base Remove_fwdroute for 10.24.1.0/24
+Nov  1 09:19:11 172.16.29.16 BGP(0): 10.12.1.2 rcvd UPDATE w/ attr: nexthop 10.12.1.2, origin i, localpref 100, metric 0
+Nov  1 09:19:11 172.16.29.16 BGP(0): 10.12.1.2 rcvd 10.23.1.0/24
+Nov  1 09:19:11 172.16.29.16 BGP(0): Revise route installing 1 of 1 routes for 10.23.1.0/24 -> 10.12.1.2(global) to main IP table
+Nov  1 09:19:12 172.16.29.16 BGP(0): 10.12.1.2 rcvd UPDATE w/ attr: nexthop 10.12.1.2, origin i, localpref 100, metric 0
+Nov  1 09:19:12 172.16.29.16 BGP(0): 10.12.1.2 rcvd 10.24.1.0/24
+Nov  1 09:19:12 172.16.29.16 BGP(0): Revise route installing 1 of 1 routes for 10.24.1.0/24 -> 10.12.1.2(global) to main IP table
+Nov  1 09:19:22 172.16.29.16 BGP(0): 10.12.1.2 rcvd UPDATE w/ attr: nexthop 10.12.1.2, origin i, localpref 100, metric 0, merged path 65004, AS_PATH 
+Nov  1 09:19:22 172.16.29.16 BGP(0): 10.12.1.2 rcvd 10.4.4.4/32
+Nov  1 09:19:22 172.16.29.16 BGP(0): Revise route installing 1 of 1 routes for 10.4.4.4/32 -> 10.12.1.2(global) to main IP table
+Nov  1 09:19:34 172.16.29.16 BGP(0): 10.12.1.2 rcvd UPDATE w/ attr: nexthop 10.12.1.2, origin i, localpref 100, metric 0, merged path 65003, AS_PATH 
+Nov  1 09:19:34 172.16.29.16 BGP(0): 10.12.1.2 rcvd 10.3.3.3/32
+Nov  1 09:19:34 172.16.29.16 BGP(0): Revise route installing 1 of 1 routes for 10.3.3.3/32 -> 10.12.1.2(global) to main IP table
+Nov  1 09:20:40 172.16.29.16 %GRUB-5-CONFIG_WRITING: GRUB configuration is being updated on disk. Please wait...
+Nov  1 09:20:41 172.16.29.16 %GRUB-5-CONFIG_WRITTEN: GRUB configuration was written to disk successfully.
+```
