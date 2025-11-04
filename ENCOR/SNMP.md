@@ -249,3 +249,73 @@ snmp-server enable traps config
 
 snmp-server host 172.16.29.16 traps READONLY
 ```
+
+### SNMPv3 configuration
+
+- Step 1:
+
+- Create a SNMP pollers ACL
+
+```
+conf t
+ ip access-list standard snmp-service
+  remark SNMP POLLER1
+  permit 172.16.29.17
+  remark SNMP POLLER2
+  permit 172.16.29.20
+```
+
+- Step 2: 
+
+- Create SNMP views
+
+```
+conf t
+ snmp-server view snmpv3-read-only iso included
+ snmp-server view snmpv3-read-write iso included
+```
+
+- Step 3:
+
+- Create SNMP groups
+
+```
+conf t
+ snmp-server group snmpv3-readonly v3 priv read snmpv3-read-only access snmp-service
+ snmp-server group snmpv3-readwrite v3 priv write snmpv3-read-write access snmp-service
+```
+
+- Step 4:
+
+- Create SNMPv3 readonly users
+
+```
+conf t
+ snmp-server user marius snmpv3-readonly v3 auth sha MARIUS priv aes 256 MARIUS access snmp-
+ snmp-server user marius2 snmpv3-readwrite v3 auth sha MARIUS2 priv aes 256 MARIUS2 access snmp-service
+```
+
+- Verifying the users:
+
+```
+R1(config)#do sh snmp user 
+
+User name: marius
+Engine ID: 800000090300525400CE2EB0
+storage-type: nonvolatile        active access-list: snmp-service
+Authentication Protocol: SHA
+Privacy Protocol: AES256
+Group-name: snmpv3-readonly
+
+User name: marius2
+Engine ID: 800000090300525400CE2EB0
+storage-type: nonvolatile        active access-list: snmp-service
+Authentication Protocol: SHA
+Privacy Protocol: AES256
+Group-name: snmpv3-readwrite
+```
+
+```
+snmpwalk -v 3 -u marius -l authPriv -a SHA -A MARIUS12345 -x AES256 -X MARIUS12345 172.16.29.16 ....
+```
+

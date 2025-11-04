@@ -481,11 +481,40 @@ conf t
    erspan-id 2
    origin ip address 10.34.1.11
    exit
- erspan ttl 
+ erspan ttl 32
 ```
 
 - Verifying the session
 
 ```
-show monitor session erspan-source session
+CSR1(config)#do sh monitor session erspan-source 
+Session 1
+---------
+Type                     : ERSPAN Source Session
+Status                   : Admin Enabled
+Description              : CSR1-ERSPAN-TRAFFIC
+Source Ports             : 
+    TX Only              : Gi1
+Filter VLANs             : 99
+Destination IP Address   : 10.123.1.11
+MTU                      : 1464
+Destination ERSPAN ID    : 2
+Origin IP Address        : 192.168.99.11
+IPv6 DSCP                : 0
+IPV6 TTL                 : 0
+```
+
+```
+CSR1(config)#do sh run | s erspan
+monitor session 1 type erspan-source
+ description CSR1-ERSPAN-TRAFFIC
+ filter vlan 99
+ source interface Gi1 tx
+ destination
+  erspan-id 2
+  mtu 1464
+  ip address 10.123.1.11
+  ipv6 dscp 0
+  ipv6 ttl 0
+  origin ip address 192.168.99.11
 ```
