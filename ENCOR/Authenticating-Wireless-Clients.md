@@ -249,11 +249,11 @@
 
 - You can verify the WLANs and their security settings from Configuration -> Tags and Policies -> WLANs
 
-- The security column for the "devices" WLAN is shown as [WPA2][PSK][AES]
+- The security column for the "devices" WLAN is shown as `[WPA2][PSK][AES]`
 
 ![wlan-security-modes](./wlan-security-modes.png)
 
-- For the WPA2+WPA3 authentication the security is shown as [WPA2 + WPA3][PSK][SAE][AES]
+- For the WPA2+WPA3 authentication the security is shown as `[WPA2 + WPA3][PSK][SAE][AES]`
 
 - You can also verify the WLAN status is enabled and active
 
