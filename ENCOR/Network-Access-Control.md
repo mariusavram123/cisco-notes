@@ -316,4 +316,232 @@
 
 - TrustSec uses SGT tags to perform ingress tagging and egress filtering to enforce access control policy
 
-- 
+- Cisco ISE assigns the SGT tags to users or devices that are successfully authenticated and authored through 802.1x, MAB or WebAuth
+
+- The SGT tag assignment is delivered to the authenticator as an authorization option (in the same way as a dACL)
+
+- After the SGT tag is assigned, an access enforcement policy (allow or drop) based on the SGT tag can be applied at any egress point of the TrustSec network
+
+- SGT tags are referred to as *scalable group tags* in Cisco Software-defined Access (SD-Access)
+
+- SGT tags represent the context of the user, device, use case or function
+
+- This means SGT tags are often named after particular roles or business use cases
+
+- For example, a corporate user with a Mac that successfully authenticates via 802.1x using EAP chaining could be assigned an SGT by ISE named Mac_Corporate
+
+- If the MAC is not compliant with posture requirements because it is not owned by the corporation, then it can be assigned an SGT named Mac_Guest
+
+- Endpoints are not aware of the SGT tag
+
+- The SGT tag is only known and applied in the network infrastructure
+
+- Below is shown a list of default SGT tags on Cisco ISE
+
+- Notice that the SGT tags all have business-relevant names and descriptions
+
+- The SGT name is available on ISE and network devices to create security group policies; what is actually being inserted into a Layer 2 frame SGT tag is a numeric value like the ones shown on the SGT column in decimal and hexadecimal notation
+
+![default-sgt-tags-ise](./default-sgt-tags-ise.png)
+
+- TrustSec configuration occurs in three phases:
+
+    - Ingress classification
+
+    - Propagation
+
+    - Egress enforcement
+
+#### Ingress classification
+
+- Ingress classification is the process of assigning SGT tags to users, endpoints, or other resources, as they ingress the TrustSec network, and it can happen in one of two ways:
+
+    - **Dynamic Assignment**: The SGT is assigned dynamically and can be downloaded as an authorization option from ISE when authenticating using 802.1x, MAB, or WebAuth
+
+    - **Static Assignment**: In environments such as data center that do not require 802.1x, MAB, or WebAuth authentication, dynamic SGT assignment is not possible
+
+    - In these cases, SGT tags can be statically mapped on SGT-capable network devices
+
+    - Static assignment on a device can be one of the following:
+
+        - IP to SGT tag
+
+        - Subnet to SGT tag
+
+        - VLAN to SGT tag
+
+        - Layer 2 interface to SGT tag
+
+        - Layer 3 logical interface to SGT tag
+
+        - Port to SGT tag
+
+        - Port profile to SGT tag
+
+- As an alternative to assigning an SGT tag to a port, Cisco ISE added the ability to centrally configure a database of IP addresses and their corresponding SGT tags
+
+- Network devices that are SFT capable can download the list from Cisco ISE
+
+#### Propagation
+
+- Propagation is the process of communicating the mappings to the TrustSec network devices that will enforce security group policy based on SGT tags
+
+- There are two methods available for propagating the SGT tag: inline tagging (also referred to as native tagging) and the Cisco-created protocol SGT Exchange Protocol (SXP)
+
+- **Inline tagging**: With inline tagging, a switch inserts the SGT tag inside a frame to allow upstream devices to read and apply policy
+
+- Native tagging is completely independent of any Layer 3 protocol (IPv4 or IPv6), so the frame or packet can preserve the SGT tag throughout the network infrastructure (routers, switches, firewalls, and so on) until it reaches the egress point
+
+- The downside of native tagging is that it is supported only by Cisco network devices with ASIC support for TrustSec
+
+- If a tagged frame is received by a device that does not support native tagging in hardware, the frame is dropped
+
+- Below is seen a Layer 2 frame with a 16-bit SGT value
+
+![layer2-frame-with-sgt-tag](./layer2-frame-ethertype.png)
+
+- **SXP propagation**: SXP is a TCP-based peer-to-peer protocol used for network devices that do not support SGT inline tagging in hardware
+
+- Using SXP, IP-to-SGT mappings can be communicated between non-inline tagging switches and other network devices
+
+- Non-inline tagging switches also have an SGT mapping database to check packets against and enforce policy
+
+- The SXP peer that sends IP-to-SGT bindings is called a *speaker*
+
+- The IP-to-SGT binding receiver is called a *listener*
+
+- SXP connections can be single-hop or multi-hop
+
+![single-and-multi-hop-sxp](./single-and-multi-hop-sxp.png)
+
+- Below we can see an example of one access switch that supports native tagging
+
+- The packets get tagged on the uplink port and through the infrastructure
+
+- It also shows a switch that is not capable of inline tagging and that uses SXP to update the upstream switch
+
+- In both cases, the upstream switch continues to tag the traffic throughout the infrastructure
+
+![inline-tagging-sxp-propagation](./inline-tagging-sxp-propagation.png)
+
+- Below is shown an example where a user authenticates to ISE via 802.1x
+
+- The user is connected to a switch that does not support inline tagging or SXP
+
+- This means an SGT-to-IP binding cannot be assigned to the user on the switch
+
+- The solution is for ISE to assign an SGT to the user by sending a mapping through SXP to an upstream device that supports TrustSec
+
+![sxp-peering-ise-trustsec-devices](./sxp-peering-ise-sxp-devices.png)
+
+- Cisco ISE also supports assigning the SGT mapping information to an upstream device through pxGrid
+
+#### Egress Enforcement
+
+- After the SGT tags have been assigned (classification) and are being transmitted across the network (propagation), policies can be enforced at the egress point of the TrustSec network
+
+- There are multiple ways to enforce traffic based on the SGT tag, and they can be divided into two major types:
+
+    - **Security Group ACL (SGACL)**: Provides enforcement in routers and switches. Access lists provide filtering based on source and destination SGT tags
+
+    - **Security Group Firewall (SGFW)**: Provides enforcement on Cisco Secure Firewalls. It requires tag-based routes to be defined locally and on the firewall
+
+- Below we can see how SGACL is blocking access to traffic with an SGT value of 123
+
+- Below is also illustrated an SGACL egress policy production matrix from Cisco ISE that allows the defined SGACL enforcements to be visualized
+
+- The left column represents the source SGT tags, and the top row represents the destination SGT tags
+
+- The ACL enforcement is the cell within the matrix where the source and destination SGT tags meet, and the direction is always from source SGT to destination SGT
+
+- For example, the matrix shows that developers (left column) are allowed to communicate to development servers using a permit IP ACL, while all other SGT tags are denied with a deny IP ACL
+
+- Permit IP is the equivlent of permitting all, and deny IP is the equivalent of denying all
+
+![trustsec-enforcement-sgacl](./trustsec-enforcement-sgacl.png)
+
+![sgacl-production-matrix-view](./sgacl-production-matrix-view.png)
+
+- In addition to permit all and deny all SGACLs, more granular SGACLs are supported
+
+- Above is also shown that all employees trying to communicate with other employees will have a Permit_FTP ACL applied on egress
+
+- Below is shown the SGACL Permit_FTP configuration on Cisco ISE, which is only allowing FTP traffic (TCP port 21) and denying all other traffic
+
+- SGACL policies can be used to provide TrustSec software-defined segmentation capabilities to wired, wireless, and VPN networks, all centrally managed through ISE, as an alternative method to the traditional VLAN-based segmentation
+
+- Below is illustrated an example of TrustSec software-defined segmentation where only developers have access to the development servers, and any other employee trying to access them is blocked
+
+- Notice that traffic is blocked on egress and not on ingress
+
+- This example also illustrates that FTP is the only protocol allowed between employees (even within the same VLAN), while any other type of traffic is blocked
+
+- For the employees connected to the same switch, the switch is acting as the ingress and egress point
+
+![permit-ftp-sgacl-content](./permit-ftp-sgacl-content.png)
+
+![trustsec-software-defined-segmentation](./trustsec-software-defined-segmentation.png)
+
+### MACSec
+
+**MACSec** is an IEEE802.1AE standards-based Layer 2 encryption method; this means the traffic is encrypted only on the wire between two MACSec peers and is unencrypted as it is processed internally within the switch
+
+- This allows the switch to look into the inner packets for things like SGT tags to perform packet enforcement or QoS prioritization
+
+- MACSec also leverages onboard ASICs to perform the encryption and decryption rather than having to offload to a crypto engine (as with IPsec)
+
+- MACSec is based on the Ethernet frame format; however, an additional 16-byte MACSec Security Tag field (802.1AE header) and a 16-byte Integrity Check Value (ICV) field are added
+
+- This means that all the devices in the flow of the MACSec communications must support MACSec for these fields to be used and to secure the traffic
+
+- MACSec provides authentication using Galois Message Authentication Code (GMAC) or authenticated encryption using Galois/Counter Mode Advanced Encryption Standard (AES-GCM)
+
+- Below is illustrated the MACSec frame format and how it encrypts the TrustSec SGT tag
+
+![macsec-frame-format-with-sgt](./macsec-frame-format-with-sgt.png)
+
+- The MACSec Security Tag fields are as follows:
+
+    - **MACSec EtherType (first two octets)**: Set to 0x88e5, designating the frame as a MACSec frame
+
+    - **TCI/AN (third octet)**: Tag Control Information/Association Number field, designating the version number if confidentiality or integrity is used on it's own
+
+    - **SL (fourth octet)**: Short Length Field, designating the length of the encrypted data
+
+    - **Packet Number (octets 5-8)**: The packet number for replay protection and building of the initialization vector
+
+    - **SCI (octets 9-16)**: Secure Channel Identifier, for clasifying the connection to the virtual port
+
+- Two MACSec keying mechanisms are available:
+
+    - **Security Association Protocol (SAP)**: This is a proprietary Cisco keying protocol used between Cisco switches
+
+    - **MACSec Key Agreement (MKA) protocol**: MKA provides the required session keys and manages the required encryption keys
+
+    - The 802.1AE encryption with MKA is supported between endpoints and the switch as well as between switches
+
+#### Downlink MACSec
+
+- Is the term used to describe the encrypted link between an endpoint and a switch
+
+- The encryption between the endpoint and the switch is handled by the MKA keying protocol
+
+- This requires a MACSec-capable switch and a MACSec-capable supplicant on the endpoint (such as Cisco Secure Client)
+
+- The encryption on the endpoint can may be handled in hardware (if the endpoint possesses the correct hardware) or in software, using the main CPU for encryption and decryption
+
+- The Cisco switch has the ability to force encryption, make encryption optional, or force non-encryption; this setting may be configured manually per port (which is not very common) or dynamically as an authorization option from Cisco ISE (which is much more common)
+
+- If ISE returns an encryption policy with the authorization result, the policy issued by ISE overrides everything set using the switch CLI
+
+#### Uplink MACSec
+
+- *Uplink MACSec* is the term of encrypting a link between switches with 802.1AE
+
+- By default, uplink MACSec uses Cisco proprietary SAP encryption
+
+- The encryption is the same AES-GCM-128 encryption used with both uplink and downlink MACSec
+
+- Uplink MACSec may be achieved manually or dynamically
+
+- Dynamic MACSec requires 802.1x authentication between the switches
