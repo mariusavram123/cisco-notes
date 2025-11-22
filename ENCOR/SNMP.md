@@ -291,7 +291,7 @@ conf t
 
 ```
 conf t
- snmp-server user marius snmpv3-readonly v3 auth sha MARIUS priv aes 256 MARIUS access snmp-
+ snmp-server user marius snmpv3-readonly v3 auth sha MARIUS priv aes 256 MARIUS access snmp-service
  snmp-server user marius2 snmpv3-readwrite v3 auth sha MARIUS2 priv aes 256 MARIUS2 access snmp-service
 ```
 
