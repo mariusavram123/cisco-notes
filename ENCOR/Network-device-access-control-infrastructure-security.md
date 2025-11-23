@@ -543,3 +543,672 @@ line vty 5 1023
 
 - Password configured prior to configure the command `service password-encryption` are not encrypted and must be reentered into the configuration
 
+- Password encryption is applied to all type 0 passwords, including authentication key passwords; cty, aux, and vty line passwords; and BGP neighbor passwords
+
+- The command `service password-encryption` is primarily useful for keeping unauthorized individuals from viewing a password in a configuration file
+
+- Unfortunately, the command `service password-encryption` encrypts passwords with type 7 encryption, which is easily reversible
+
+- Using plaintext password authentication should be avoided if a more secure option exists, such as username-based authentication instead of passwords.
+
+#### Username and Password Authentication
+
+- Now we know how to create encrypted or hashed passwords that can be used to authenticate a user; however, user identification can best be achieved with a combination of a username and a password
+
+- Username accounts can be used for several applications, such as console, aux and vty lines
+
+- To establish a username and password login authentication system, you can create usernames on a device for all device users or groups
+
+- Usernames configured from global configuration mode are stored in the device's configuration
+
+- The login accounts created can be assigned different `privilege levels` and passwords
+
+- There are three different ways to configure a username on IOS XE:
+
+    1. WIth a plain text password:
+
+    ```
+    conf t
+     username [username] password [password]
+    ```
+
+    2. With type 5 hashing password:
+
+    ```
+    conf t
+     username [username] secret [password]
+    ```
+
+    3. Using type 5, type 8 or type 9 encryption:
+
+    ```
+    conf t
+     username [username] algorithm-type <md5 | sha256 | scrypt> secret [password]
+    ```
+
+- Of the three username commands, the command from point 3 (above) is the recommended one because it allows for the highest level of password hashing (type 8 and type 9)
+
+- If type 8 or type 9 passwords are not supported, a software upgrade is recommended
+
+#### Configuring Line Local Password Authentication
+
+- To enable password authentication on a line, the following two commands are required under line configuration mode:
+
+    ```
+    conf t
+     line vty/con/aux <num>
+      password <password>
+      login
+    ```
+
+- Below a password is configured for all users attempting to connect to the cty, vty and aux lines:
+
+```
+conf t
+ line con 0
+  password My.C0n5ole.P@s5
+  login
+
+ line aux 0
+  password My.AuX.P@s5
+  login
+
+ line vty 0 97
+  password My.vTy.P@s5
+```
+
+- Notice that the passwords are shown in clear text (type 0)
+
+- They can be encrypted with type 7 encryption using the command `service password-encryption`, however type 7 passwords are easy to decrypt
+
+- For this reason, it is not recommended to use line local password authentication
+
+-  Verifying Line Local Password Authentication
+
+- Below is shown an example in which the console line password is being used
+
+- All that is required to test the password is to log off the console and log back in again using the configured console password
+
+- When you are performing this test, an alternate connection into the router, such as a telnet connection, should be established just in case there is a problem logging back into the router using the console
+
+```
+CAT8k#show run | s line
+line con 0
+ password ...
+ logging synchronous
+ login
+ stopbits 1
+line aux 0
+ password ...
+ login
+line vty 0 4
+ password ...
+ logging synchronous
+ login
+ transport input ssh
+line vty 5 97
+ password ...
+ logging synchronous
+ login
+ transport input ssh
+```
+
+####  Configuring Line Local Username and Password Authentication
+
+- Configuration steps:
+
+    - The command `username` in global configuration mode:
+
+    ```
+    conf t
+     username <username> <password|secret|algorithm-type ...> <password> 
+    ```
+
+    - The command `login local` under the line configuration mode to enable username-based authentication at login
+
+    ```
+    conf t
+     line con 0
+      login local
+    ```
+
+Example:
+
+```
+conf t
+ username marius algorithm-type sha256 secret <mysecret>
+ line con 0
+  no password
+  login local
+```
+
+- Username-based authentication for the aux and cty lines is only supported in combination with AAA for some IOS XE releases
+
+- Below are shown three usernames configured with password types 0, 5 and 9
+
+- Notice that the type 0 user password is shown in plain text, while type 5 and type 9 user passwords are hashed
+
+```
+show running-config
+ username type0 password ...
+ username type5 secret 5 ...
+ username type9 secret 9 ...
+```
+
+#### Verifying Line Local Username and Password Authentication
+
+- Below is shown user type5 establishing a telnet session from PC into R1 using username-based authentication:
+
+- Topology:
+
+![user-pass-auth-topology](./user-pass-auth-topology.png)
+
+```
+PC1:~# telnet -l type5 10.1.1.1
+Connected to 10.1.1.1
+
+Entering character mode
+Escape character is '^]'.
+
+
+
+User Access Verification
+
+Username: type5
+Password: 
+CAT8k>
+```
+
+#### Privilege Levels and Role-Based Access Control (RBAC)
+
+- The Cisco IOS XE CLI by default includes 3 privilege levels, each of which defines what commands are available to a user:
+
+    - **Privilege level 0**: Includes the `disable`, `enable`, `exit`, `help`, and `logout` commands
+
+    - **Privilege level 1**: Also known as user EXEC mode. The command in this mode includes a greater-than sign (R1>)
+
+    - From this mode it is not possible to make configuration changes; in other words, the command `configure terminal` is not available
+
+    - **Privilege level 15**: Also known as Privileged EXEC mode
+
+    - This is the highest privilege level, where all CLI commands are available
+
+    - The command prompt in this mode includes a hash sign (R1#)
+
+- Additional privilege levels ranging from 2 to 14 can also be configured to provide customized access control
+
+- Assigning or changing the commands available for a privilege level:
+
+```
+conf t
+ privilege [mode] level <level> <command-string>
+```
+
+- Example:
+
+```
+conf t
+ privilege exec level 5 configure terminal
+ privilege configure level 5 interface
+```
+
+- For example, to allow a group of users to configure only specific interface configuration commands while not allowing them access to additional configuration options, a custom privilege level can be created to allow only specific interface configuration commands and share the login information for that level with the group of users
+
+- Below is shown a configuration where user noc is created along with the type 9 (scrypt) secret password cisco123
+
+- Notice that the privilege level is also configured to level 5 as part of the `username` command
+
+- In this particular case, a user logging in into the router, using the username and password noc and cisco123 would be placed into privilege level 5 and would be allowed to go into any interface of the router, and shut it down, unshut it, and configure an ip address on it, which are the only commands allowed under privilege level 5 in interface configuration mode
+
+```
+conf t
+ username noc privilege 5 algorithm-type scrypt secret cisco123
+ privilege exec level 5 configure terminal
+ privilege interface level 5 shutdown
+ privilege interface level 5 no shutdown
+ privilege interface level 5 ip address
+```
+
+#### Verifying Privilege Levels
+
+- When you set the privilege level for a command with multiple keywords, the commands starting with the first keyword also have the specified access level
+
+- For example, if you set the `no shutdown` command to level 5, the `no` command and the `no shutdown` command are automatically set to privilege level 5, unless you set them individually to different levels
+
+- This is necessary because you can't execute the `no shutdown` command unless you have access to the `no` command
+
+- Below is shows how the configuration would look like in running-config:
+
+```
+CAT8k#sh run | i privileg
+username noc privilege 5 secret 9 $9$sEmUaefTsiioPE$CIQXv4ZvC1SS8TjjQG.uklZO52mBDfMdtiQNtYbuaog
+privilege interface level 5 shutdown
+privilege interface level 5 ip address
+privilege interface level 5 ip
+privilege interface level 5 no shutdown
+privilege interface level 5 no ip address
+privilege interface level 5 no ip
+privilege interface level 5 no
+privilege exec level 5 configure terminal
+privilege exec level 5 configure
+```
+
+- Let's verify that only the commands set for privilege level 5 are those specified by the `privilege <level>` commands:
+
+```
+PC1:~# telnet -l noc 10.1.1.1
+Connected to 10.1.1.1
+
+Entering character mode
+Escape character is '^]'.
+
+
+
+User Access Verification
+
+Username: noc
+Password: 
+CAT8k#
+CAT8k#sh
+CAT8k#show pri
+CAT8k#show privilege 
+Current privilege level is 5
+CAT8k#?
+
+...
+interface g3
+ ip address 10.100.1.1 255.255.255.0
+ no shutdown
+```
+
+- While using the local authentication and privilege levels on the device provides adequate security, it can be cumbersome to manage on every device, and inconsistent configuration across the network is very likely
+
+- To simplify device access control and maintain consistency, a more scalable and consistent approach is to use the authentication, authorization and accounting (AAA) framework
+
+- This can be accomplished using an AAA server such as Cisco ISE, or a RADIUS or TACACS+ server
+
+- AAA can be used by network devices to authorize users, authorize commands, and provide accounting information
+
+- Because the configuration is centralized on the AAA servers, access control policies are applied consistently across the network, however, it is still recommended to use local authentication as a fallback mechanism in case the AAAA servers become unavailable
+
+#### Controlling Access to VTY Lines with ACLs
+
+- Access to the VTY lines of an Cisco IOS XE device can be further secured by applying inbound ACLs on them, allowing access only from a restricted set of IP addresses
+
+- Outbound vty connection from an IOS XE device can also be controlled by applying outbound ACLs to vtys
+
+- A best practice is to only allow IP addresses that are part of an internal or trusted network to access the VTY lines
+
+- Extreme care is necessary when allowing IP addresses from external or public networks such as the Internet
+
+- To apply a standard or extended ACL to a vty line, proceed as follows:
+
+```
+conf t
+ line vty 0 97
+  access-class <acl-nr|acl-name> <in|out>
+```
+
+- The `in` key applies an inbound ACL and the `out` key applies an outbound ACL
+
+#### Verify Access to VTY lines with ACLs
+
+- Below, we can see R1 using telnet to get into R2 before and after applying an ACL to the vty lines:
+
+- PC1 has IP address 10.1.1.11 and R1 has IP address 10.1.1.1
+
+- The ACL being applied to R1's VTY line is meant to block vty access into it from R1
+
+```
+PC1:~# telnet 10.1.1.1
+Connected to 10.1.1.1
+
+Entering character mode
+Escape character is '^]'.
+
+
+
+User Access Verification
+
+Username: noc
+Password: 
+CAT8k#
+CAT8k#
+```
+
+R1:
+
+```
+conf t
+ access-list 1 deny 10.1.1.11
+ access-list 1 permit any
+ line vty 0 97
+  access-class 1 in
+```
+
+```
+PC1:~# telnet 10.1.1.1
+telnet: can't connect to remote host (10.1.1.1): Connection refused
+PC1:~# 
+```
+
+```
+CAT8k#show run | s line vty
+line vty 0 4
+ access-class 1 in
+ logging synchronous
+ login local
+ transport input all
+line vty 5 97
+ access-class 1 in
+ logging synchronous
+ login local
+ transport input all
+```
+
+#### Controlling Access to vty Lines using Password Input
+
+- Another way to control what types of protocols are allowed to access the vty lines is:
+
+```
+conf t
+ line vty 0 97
+  transport input <all|none|telnet|ssh>
+```
+
+- Transport input command keywords:
+
+```
+Keyword                                                     Description
+
+all                                                         Allows telnet and SSH
+
+none                                                        Blocks telnet and SSH
+
+telnet                                                      Allows telnet only
+
+ssh                                                         Allows SSH only
+
+telnet ssh                                                  Allows telnet and ssh
+```
+
+- Below are shown the VTY lines from 0 to 4 configured with different transport input keywords
+
+- Keep in mind that vty lines are evaluated from top (vty 0) onward, and each vty line accepts only one user
+
+```
+conf t
+ line vty 0
+  transport input all
+
+ line vty 1
+  transport input none
+
+ line vty 2
+  transport input telnet
+
+ line vty 3
+  transport input ssh
+
+ line vty 4
+  transport input telnet ssh
+```
+
+- The AUX port should be provisioned with the `transport input none` command to block reverse telnet into the AUX port
+
+#### Verifying Access to vty lines Using Transport Input
+
+- Above we have saw how telnet sessions are assigned to different vty lines on R1
+
+- R1 is configured based on the configuration shown above, which only allows telnet sessions to vty 0 (input all), vty 2 (input telnet), and vty 4 (input telnet ssh)
+
+```
+CAT8k#show line 
+   Tty Line Typ     Tx/Rx    A Modem  Roty AccO AccI  Uses  Noise Overruns  Int
+*     0    0 CTY              -    -      -    -    -     0      0    0/0      -
+      1    1 AUX   9600/9600  -    -      -    -    -     0      0    0/0      -
+    434  434 VTY              -    -      -    -    1     2      0    0/0      -
+    435  435 VTY              -    -      -    -    1     0      0    0/0      -
+    436  436 VTY              -    -      -    -    1     0      0    0/0      -
+    437  437 VTY              -    -      -    -    1     0      0    0/0      -
+    438  438 VTY              -    -      -    -    1     0      0    0/0      -
+    439  439 VTY              -    -      -    -    1     0      0    0/0      -
+    440  440 VTY              -    -      -    -    1     0      0    0/0      -
+    441  441 VTY              -    -      -    -    1     0      0    0/0      -
+    442  442 VTY              -    -      -    -    1     0      0    0/0      -
+    443  443 VTY              -    -      -    -    1     0      0    0/0      -
+    444  444 VTY              -    -      -    -    1     0      0    0/0      -
+    445  445 VTY              -    -      -    -    1     0      0    0/0      -
+    446  446 VTY              -    -      -    -    1     0      0    0/0      -
+    447  447 VTY              -    -      -    -    1     0      0    0/0      -
+    448  448 VTY              -    -      -    -    1     0      0    0/0      -
+    449  449 VTY              -    -      -    -    1     0      0    0/0      -
+    450  450 VTY              -    -      -    -    1     0      0    0/0      -
+    451  451 VTY              -    -      -    -    1     0      0    0/0      -
+    452  452 VTY              -    -      -    -    1     0      0    0/0      -
+    453  453 VTY              -    -      -    -    1     0      0    0/0      -
+   Tty Line Typ     Tx/Rx    A Modem  Roty AccO AccI  Uses  Noise Overruns  Int
+
+    454  454 VTY              -    -      -    -    1     0      0    0/0      -
+    455  455 VTY              -    -      -    -    1     0      0    0/0      -
+    456  456 VTY              -    -      -    -    1     0      0    0/0      -
+    457  457 VTY              -    -      -    -    1     0      0    0/0      -
+    458  458 VTY              -    -      -    -    1     0      0    0/0      -
+    459  459 VTY              -    -      -    -    1     0      0    0/0      -
+    460  460 VTY              -    -      -    -    1     0      0    0/0      -
+    461  461 VTY              -    -      -    -    1     0      0    0/0      -
+    462  462 VTY              -    -      -    -    1     0      0    0/0      -
+    463  463 VTY              -    -      -    -    1     0      0    0/0      -
+    464  464 VTY              -    -      -    -    1     0      0    0/0      -
+    465  465 VTY              -    -      -    -    1     0      0    0/0      -
+    466  466 VTY              -    -      -    -    1     0      0    0/0      -
+    467  467 VTY              -    -      -    -    1     0      0    0/0      -
+    468  468 VTY              -    -      -    -    1     0      0    0/0      -
+    469  469 VTY              -    -      -    -    1     0      0    0/0      -
+    470  470 VTY              -    -      -    -    1     0      0    0/0      -
+    471  471 VTY              -    -      -    -    1     0      0    0/0      -
+    472  472 VTY              -    -      -    -    1     0      0    0/0      -
+    473  473 VTY              -    -      -    -    1     0      0    0/0      -
+    474  474 VTY              -    -      -    -    1     0      0    0/0      -
+    475  475 VTY              -    -      -    -    1     0      0    0/0      -
+   Tty Line Typ     Tx/Rx    A Modem  Roty AccO AccI  Uses  Noise Overruns  Int
+
+    476  476 VTY              -    -      -    -    1     0      0    0/0      -
+    477  477 VTY              -    -      -    -    1     0      0    0/0      -
+    478  478 VTY              -    -      -    -    1     0      0    0/0      -
+    479  479 VTY              -    -      -    -    1     0      0    0/0      -
+    480  480 VTY              -    -      -    -    1     0      0    0/0      -
+    481  481 VTY              -    -      -    -    1     0      0    0/0      -
+    482  482 VTY              -    -      -    -    1     0      0    0/0      -
+    483  483 VTY              -    -      -    -    1     0      0    0/0      -
+    484  484 VTY              -    -      -    -    1     0      0    0/0      -
+    485  485 VTY              -    -      -    -    1     0      0    0/0      -
+    486  486 VTY              -    -      -    -    1     0      0    0/0      -
+    487  487 VTY              -    -      -    -    1     0      0    0/0      -
+    488  488 VTY              -    -      -    -    1     0      0    0/0      -
+    489  489 VTY              -    -      -    -    1     0      0    0/0      -
+    490  490 VTY              -    -      -    -    1     0      0    0/0      -
+    491  491 VTY              -    -      -    -    1     0      0    0/0      -
+    492  492 VTY              -    -      -    -    1     0      0    0/0      -
+    493  493 VTY              -    -      -    -    1     0      0    0/0      -
+    494  494 VTY              -    -      -    -    1     0      0    0/0      -
+    495  495 VTY              -    -      -    -    1     0      0    0/0      -
+    496  496 VTY              -    -      -    -    1     0      0    0/0      -
+    497  497 VTY              -    -      -    -    1     0      0    0/0      -
+   Tty Line Typ     Tx/Rx    A Modem  Roty AccO AccI  Uses  Noise Overruns  Int
+
+    498  498 VTY              -    -      -    -    1     0      0    0/0      -
+    499  499 VTY              -    -      -    -    1     0      0    0/0      -
+    500  500 VTY              -    -      -    -    1     0      0    0/0      -
+    501  501 VTY              -    -      -    -    1     0      0    0/0      -
+    502  502 VTY              -    -      -    -    1     0      0    0/0      -
+    503  503 VTY              -    -      -    -    1     0      0    0/0      -
+    504  504 VTY              -    -      -    -    1     0      0    0/0      -
+    505  505 VTY              -    -      -    -    1     0      0    0/0      -
+    506  506 VTY              -    -      -    -    1     0      0    0/0      -
+    507  507 VTY              -    -      -    -    1     0      0    0/0      -
+    508  508 VTY              -    -      -    -    1     0      0    0/0      -
+    509  509 VTY              -    -      -    -    1     0      0    0/0      -
+    510  510 VTY              -    -      -    -    1     0      0    0/0      -
+    511  511 VTY              -    -      -    -    1     0      0    0/0      -
+    512  512 VTY              -    -      -    -    1     0      0    0/0      -
+    513  513 VTY              -    -      -    -    1     0      0    0/0      -
+    514  514 VTY              -    -      -    -    1     0      0    0/0      -
+    515  515 VTY              -    -      -    -    1     0      0    0/0      -
+    516  516 VTY              -    -      -    -    1     0      0    0/0      -
+    517  517 VTY              -    -      -    -    1     0      0    0/0      -
+    518  518 VTY              -    -      -    -    1     0      0    0/0      -
+    519  519 VTY              -    -      -    -    1     0      0    0/0      -
+   Tty Line Typ     Tx/Rx    A Modem  Roty AccO AccI  Uses  Noise Overruns  Int
+
+    520  520 VTY              -    -      -    -    1     0      0    0/0      -
+    521  521 VTY              -    -      -    -    1     0      0    0/0      -
+    522  522 VTY              -    -      -    -    1     0      0    0/0      -
+    523  523 VTY              -    -      -    -    1     0      0    0/0      -
+    524  524 VTY              -    -      -    -    1     0      0    0/0      -
+    525  525 VTY              -    -      -    -    1     0      0    0/0      -
+    526  526 VTY              -    -      -    -    1     0      0    0/0      -
+    527  527 VTY              -    -      -    -    1     0      0    0/0      -
+    528  528 VTY              -    -      -    -    1     0      0    0/0      -
+    529  529 VTY              -    -      -    -    1     0      0    0/0      -
+    530  530 VTY              -    -      -    -    1     0      0    0/0      -
+    531  531 VTY              -    -      -    -    1     0      0    0/0      -
+
+Line(s) not in async mode -or- with no hardware support: 
+2-433
+```
+
+- Telneting to R1:
+
+```
+PC1:~# telnet 10.1.1.1
+Connected to 10.1.1.1
+
+Entering character mode
+Escape character is '^]'.
+
+
+User Access Verification
+
+Username: noc
+Password: 
+CAT8k#
+```
+
+- Verifying the lines when the telnet session is active:
+
+```
+CAT8k#show line 
+   Tty Line Typ     Tx/Rx    A Modem  Roty AccO AccI  Uses  Noise Overruns  Int
+*     0    0 CTY              -    -      -    -    -     0      0    0/0      -
+      1    1 AUX   9600/9600  -    -      -    -    -     0      0    0/0      -
+*   434  434 VTY              -    -      -    -    -     3      0    0/0      -
+    435  435 VTY              -    -      -    -    -     0      0    0/0      -
+    436  436 VTY              -    -      -    -    -     0      0    0/0      -
+    437  437 VTY              -    -      -    -    -     0      0    0/0      -
+    438  438 VTY              -    -      -    -    -     0      0    0/0      -
+    439  439 VTY              -    -      -    -    -     0      0    0/0      -
+    440  440 VTY              -    -      -    -    -     0      0    0/0      -
+    441  441 VTY              -    -      -    -    -     0      0    0/0      -
+    442  442 VTY              -    -      -    -    -     0      0    0/0      -
+    443  443 VTY              -    -      -    -    -     0      0    0/0      -
+    444  444 VTY              -    -      -    -    -     0      0    0/0      -
+    445  445 VTY              -    -      -    -    -     0      0    0/0      -
+    446  446 VTY              -    -      -    -    -     0      0    0/0      -
+    447  447 VTY              -    -      -    -    -     0      0    0/0      -
+    448  448 VTY              -    -      -    -    -     0      0    0/0      -
+    449  449 VTY              -    -      -    -    -     0      0    0/0      -
+    450  450 VTY              -    -      -    -    -     0      0    0/0      -
+    451  451 VTY              -    -      -    -    -     0      0    0/0      -
+    452  452 VTY              -    -      -    -    -     0      0    0/0      -
+    453  453 VTY              -    -      -    -    -     0      0    0/0      -
+   Tty Line Typ     Tx/Rx    A Modem  Roty AccO AccI  Uses  Noise Overruns  Int
+
+    454  454 VTY              -    -      -    -    -     0      0    0/0      -
+    455  455 VTY              -    -      -    -    -     0      0    0/0      -
+    456  456 VTY              -    -      -    -    -     0      0    0/0      -
+    457  457 VTY              -    -      -    -    -     0      0    0/0      -
+    458  458 VTY              -    -      -    -    -     0      0    0/0      -
+    459  459 VTY              -    -      -    -    -     0      0    0/0      -
+    460  460 VTY              -    -      -    -    -     0      0    0/0      -
+    461  461 VTY              -    -      -    -    -     0      0    0/0      -
+    462  462 VTY              -    -      -    -    -     0      0    0/0      -
+    463  463 VTY              -    -      -    -    -     0      0    0/0      -
+    464  464 VTY              -    -      -    -    -     0      0    0/0      -
+    465  465 VTY              -    -      -    -    -     0      0    0/0      -
+    466  466 VTY              -    -      -    -    -     0      0    0/0      -
+    467  467 VTY              -    -      -    -    -     0      0    0/0      -
+    468  468 VTY              -    -      -    -    -     0      0    0/0      -
+    469  469 VTY              -    -      -    -    -     0      0    0/0      -
+    470  470 VTY              -    -      -    -    -     0      0    0/0      -
+    471  471 VTY              -    -      -    -    -     0      0    0/0      -
+    472  472 VTY              -    -      -    -    -     0      0    0/0      -
+    473  473 VTY              -    -      -    -    -     0      0    0/0      -
+    474  474 VTY              -    -      -    -    -     0      0    0/0      -
+    475  475 VTY              -    -      -    -    -     0      0    0/0      -
+   Tty Line Typ     Tx/Rx    A Modem  Roty AccO AccI  Uses  Noise Overruns  Int
+
+    476  476 VTY              -    -      -    -    -     0      0    0/0      -
+    477  477 VTY              -    -      -    -    -     0      0    0/0      -
+    478  478 VTY              -    -      -    -    -     0      0    0/0      -
+    479  479 VTY              -    -      -    -    -     0      0    0/0      -
+    480  480 VTY              -    -      -    -    -     0      0    0/0      -
+    481  481 VTY              -    -      -    -    -     0      0    0/0      -
+    482  482 VTY              -    -      -    -    -     0      0    0/0      -
+    483  483 VTY              -    -      -    -    -     0      0    0/0      -
+    484  484 VTY              -    -      -    -    -     0      0    0/0      -
+    485  485 VTY              -    -      -    -    -     0      0    0/0      -
+    486  486 VTY              -    -      -    -    -     0      0    0/0      -
+    487  487 VTY              -    -      -    -    -     0      0    0/0      -
+    488  488 VTY              -    -      -    -    -     0      0    0/0      -
+    489  489 VTY              -    -      -    -    -     0      0    0/0      -
+    490  490 VTY              -    -      -    -    -     0      0    0/0      -
+    491  491 VTY              -    -      -    -    -     0      0    0/0      -
+    492  492 VTY              -    -      -    -    -     0      0    0/0      -
+    493  493 VTY              -    -      -    -    -     0      0    0/0      -
+    494  494 VTY              -    -      -    -    -     0      0    0/0      -
+    495  495 VTY              -    -      -    -    -     0      0    0/0      -
+    496  496 VTY              -    -      -    -    -     0      0    0/0      -
+    497  497 VTY              -    -      -    -    -     0      0    0/0      -
+   Tty Line Typ     Tx/Rx    A Modem  Roty AccO AccI  Uses  Noise Overruns  Int
+
+    498  498 VTY              -    -      -    -    -     0      0    0/0      -
+    499  499 VTY              -    -      -    -    -     0      0    0/0      -
+    500  500 VTY              -    -      -    -    -     0      0    0/0      -
+    501  501 VTY              -    -      -    -    -     0      0    0/0      -
+    502  502 VTY              -    -      -    -    -     0      0    0/0      -
+    503  503 VTY              -    -      -    -    -     0      0    0/0      -
+    504  504 VTY              -    -      -    -    -     0      0    0/0      -
+    505  505 VTY              -    -      -    -    -     0      0    0/0      -
+    506  506 VTY              -    -      -    -    -     0      0    0/0      -
+    507  507 VTY              -    -      -    -    -     0      0    0/0      -
+    508  508 VTY              -    -      -    -    -     0      0    0/0      -
+    509  509 VTY              -    -      -    -    -     0      0    0/0      -
+    510  510 VTY              -    -      -    -    -     0      0    0/0      -
+    511  511 VTY              -    -      -    -    -     0      0    0/0      -
+    512  512 VTY              -    -      -    -    -     0      0    0/0      -
+    513  513 VTY              -    -      -    -    -     0      0    0/0      -
+    514  514 VTY              -    -      -    -    -     0      0    0/0      -
+    515  515 VTY              -    -      -    -    -     0      0    0/0      -
+    516  516 VTY              -    -      -    -    -     0      0    0/0      -
+    517  517 VTY              -    -      -    -    -     0      0    0/0      -
+    518  518 VTY              -    -      -    -    -     0      0    0/0      -
+    519  519 VTY              -    -      -    -    -     0      0    0/0      -
+   Tty Line Typ     Tx/Rx    A Modem  Roty AccO AccI  Uses  Noise Overruns  Int
+
+    520  520 VTY              -    -      -    -    -     0      0    0/0      -
+    521  521 VTY              -    -      -    -    -     0      0    0/0      -
+    522  522 VTY              -    -      -    -    -     0      0    0/0      -
+    523  523 VTY              -    -      -    -    -     0      0    0/0      -
+    524  524 VTY              -    -      -    -    -     0      0    0/0      -
+    525  525 VTY              -    -      -    -    -     0      0    0/0      -
+    526  526 VTY              -    -      -    -    -     0      0    0/0      -
+    527  527 VTY              -    -      -    -    -     0      0    0/0      -
+    528  528 VTY              -    -      -    -    -     0      0    0/0      -
+    529  529 VTY              -    -      -    -    -     0      0    0/0      -
+    530  530 VTY              -    -      -    -    -     0      0    0/0      -
+    531  531 VTY              -    -      -    -    -     0      0    0/0      -
+
+Line(s) not in async mode -or- with no hardware support: 
+2-433
+```
