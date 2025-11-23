@@ -1212,3 +1212,228 @@ CAT8k#show line
 Line(s) not in async mode -or- with no hardware support: 
 2-433
 ```
+
+#### Enabling SSH vty Access
+
+- Telnet is the most popular yet most insecure protocol used to access Cisco IOS XE devices for administrative purposes
+
+- Telnet session packets are sent in plain text, and this makes it very easy to sniff and capture session information
+
+- A more reliable and secure method for device administration is to use **Secure Shell (SSH)** protocol
+
+- SSH, which provides secure encryption and strong authentication, is available in two versions:
+
+    - **SSH version 1 (SSHv1)**: This is an improvement over using plaintext telnet, but some fundamental flaws exist in it's implementation, so it should be avoided in favor of SSHv2
+
+    - **SSH version 2 (SSHv2)**: This is a complete rework and stronger version of SSH that is not compatible with SSHv1
+
+    - SSHv2 has many benefits and closes a security hole that is found in SSH version 1
+
+    - SSH version 2 is certified under the National Institute of Standards and Technology (NIST) Federal Information Processing Standards (FIPS) 140-1 and 140-2 U.S. cryptographic standards and should be used where feasible
+
+- The steps needed to configure SSH on an IOS XE device is as follows:
+
+    1. Configure a hostname other than Router:
+
+    ```
+    conf t
+     hostname <hostname>
+    ```
+
+    2. Configure a domain name:
+
+    ```
+    conf t
+     ip domain-name <domain-name>
+    ```
+
+    3. Generate crypto keys as follows:
+
+    ```
+    conf t
+     crypto key generate rsa
+    ```
+
+    - When entering this command, you are prompted to enter a modulus length
+
+    - The longer the modulus, the stronger the security
+
+    - However, a longer modulus takes longer to generate
+
+    - The modulus length needs to be at least 768 bits for SSHv2
+
+```
+conf t
+ hostname CAT8k
+ ip domain name local
+ crypto key genrate rsa
+ ip ssh version 2
+ line vty 0 97
+  transport input ssh
+  login local
+```
+
+
+```
+CAT8k(config)#crypto key generate ec keysize 384 
+The name for the keys will be: CAT8k.local
+
+CAT8k(config)#
+*Nov 23 19:17:09.803: %PARSER-5-HIDDEN: Warning!!! ' crypto key generate ec keysize 384 ' is a hidden command. Use of this command is not recommended/supported and will be removed in future.
+*Nov 23 19:17:09.821: %CRYPTO_ENGINE-5-KEY_ADDITION: A key named CAT8k.local has been generated or imported by crypto-engine
+CAT8k(config)#cry
+CAT8k(config)#crypto key
+CAT8k(config)#crypto key gen
+CAT8k(config)#crypto key generate r
+CAT8k(config)#crypto key generate rsa 
+% You already have EC keys defined named CAT8k.local.
+% Do you really want to replace them? [yes/no]: 
+*Nov 23 19:17:27.386: %PARSER-5-HIDDEN: Warning!!! ' crypto key generate rsa ' is a hidden command. Use of this command is not recommended/supported and will be removed in future.
+yes
+Choose the size of the key modulus in the range of 2048 to 4096 for your
+  General Purpose Keys. Choosing a key modulus greater than 512 may take
+  a few minutes.
+
+How many bits in the modulus [2048]: 
+*Nov 23 19:17:31.454: %CRYPTO_ENGINE-5-KEY_DELETED: A key named CAT8k.local has been removed from key storage
+4096
+% Generating 4096 bit RSA keys, keys will be non-exportable...
+[OK] (elapsed time was 4 seconds)
+
+CAT8k(config)#
+*Nov 23 19:17:42.569: %CRYPTO_ENGINE-5-KEY_ADDITION: A key named CAT8k.local has been generated or imported by crypto-engine
+CAT8k(config)#
+```
+
+```
+PC1:~$ ssh marius@10.1.1.1
+The authenticity of host '10.1.1.1 (10.1.1.1)' can't be established.
+RSA key fingerprint is SHA256:kum0v6S50gkEfsRxhIgvLRkx38eg8/GyXKnGnHLYivU.
+This key is not known by any other names.
+Are you sure you want to continue connecting (yes/no/[fingerprint])? yes
+Warning: Permanently added '10.1.1.1' (RSA) to the list of known hosts.
+(marius@10.1.1.1) Password: 
+
+
+
+CAT8k>en
+CAT8k>enable 
+Password: 
+CAT8k#
+CAT8k#
+CAT8k#en
+CAT8k#enable 
+CAT8k#sh
+CAT8k#show ip int br
+Interface              IP-Address      OK? Method Status                Protocol
+GigabitEthernet1       unassigned      YES NVRAM  down                  down    
+GigabitEthernet2       10.1.1.1        YES NVRAM  up                    up      
+GigabitEthernet3       10.100.1.1      YES NVRAM  down                  down    
+GigabitEthernet4       unassigned      YES NVRAM  administratively down down    
+CAT8k#log
+CAT8k#logi
+CAT8k#logo  
+CAT8k#logout 
+Connection to 10.1.1.1 closed by remote host.
+Connection to 10.1.1.1 closed.
+```
+
+
+```
+Nov 23 19:19:12.947: %SSH-5-SSH2_SESSION: SSH2 Session request from 10.1.1.11 (tty = 0) using crypto cipher 'chacha20-poly1305@openssh.com', hmac 'hmac-sha2-256-etm@openssh.com' Succeeded
+CAT8k(config)#
+*Nov 23 19:19:17.555: %SEC_LOGIN-5-LOGIN_SUCCESS: Login Success [user: marius] [Source: 10.1.1.11] [localport: 22] at 19:19:17 UTC Sun Nov 23 2025
+*Nov 23 19:19:17.555: %SSH-5-SSH2_USERAUTH: User 'marius' authentication for SSH2 Session from 10.1.1.11 (tty = 0) using crypto cipher 'chacha20-poly1305@openssh.com', hmac 'hmac-sha2-256-etm@openssh.com' Succeeded
+CAT8k(config)#
+*Nov 23 19:19:31.715: %SYS-6-LOGOUT: User marius has exited tty session 434(10.1.1.11)
+CAT8k(config)#
+*Nov 23 19:19:31.716: %SSH-5-SSH2_CLOSE: SSH2 Session from 10.1.1.11 (tty = 0) for user 'marius' using crypto cipher 'chacha20-poly1305@openssh.com', hmac 'hmac-sha2-256-etm@openssh.com' closed
+CAT8k(config)#
+```
+
+- Starting with Cisco IOS XE release 17.11.1 and later, weak crypto algorithms such as RSA keys of less than 2048 bits are rejected by default due to their weak cryptographic properties
+
+- It is possible to disable this enforcement via configuration, but it is not recommended
+
+- SSH 1.99, shown in the log messages, indicates that SSHv1 and SSHv2 are enabled
+
+- To force the IOS XE SSH server to disable SSHv1 and accept only SSHv2 connections:
+
+```
+conf t
+ ip ssh version 2
+```
+
+#### Auxiliary Port
+
+- Some devices have an auxiliary port (aux) available for remote administration through a dial up modem connection
+
+- In most cases, the auxiliary port should be disabled:
+
+```
+conf t
+ line aux 0
+  no exec
+```
+
+```
+CAT8k(config-line)#do sh run | s line
+line con 0
+ logging synchronous
+ login local
+ stopbits 1
+line aux 0
+ login local
+ no exec
+line vty 0 4
+ logging synchronous
+ login local
+ transport input ssh
+line vty 5 97
+ logging synchronous
+ login local
+ transport input ssh
+```
+
+#### EXEC Timeout
+
+- The default timeout value for an EXEC session is 10 minutes
+
+- Changing the default idle/exec timeout value:
+
+```
+conf t
+ line con 0
+  exec-timeout <minutes> <seconds>
+```
+
+- Configure the exec timeout for the console line to time out after 5 minutes of activity and 2 minutes and 30 seconds for the vty lines:
+
+```
+conf t
+ line con 0
+  exec-timeout 5 0
+
+ line vty 0 97
+  exec-timeout 2 30
+```
+
+- The commands `exec-timeout 0 0` and `no exec-timeout` disable the EXEC timeout
+
+- Although using them is useful for lab environments, it is not recommended for production environments
+
+#### Absolute Timeout
+
+- The command `absolute timeout <minutes>` under the line configuration mode terminates an EXEC session after the specified timeout has expired, even if the connection is being used at the time of termination
+
+- It is recommended to use it in combination with the command `logout-warning <seconds>` under the line configuration mode to display a `line termination` warning to users about an impending forced timeout
+
+- Below we can see the `absolute-timeout` and `logout-warning` commands are configured on the vty lines:
+
+```
+conf t
+ line vty 4
+  exec-timeout 2 0
+  absolute-timeout 10
+  logout-warning 20
+```
