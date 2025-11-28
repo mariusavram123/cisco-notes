@@ -2,3 +2,483 @@
 
 - AAA is an architectural framework for enabling a set of three independent security functions:
 
+    - **Authentication**: Enables a user to be identified and verified prior to being granted access to a network device and/or network services
+
+    - **Authorization**: Defines the access privileges and restrictions to be enforced for an authenticated user
+
+    - **Accounting**: Provides the ability to track and log user access, including user identities, start and stop times, executed commands (that is CLI commands), and so on
+
+    - In other words, it maintains a security log of events
+
+- AAA requires a protocol designed to carry authentication requests and responses, including authorization results and accounting logs
+
+- Many AAA protocols are available, but the two most popular ones are **Remote Authentication Dial-In User Service (RADIUS)** and **Terminal Access Controler Access-Control Server Plus (TACACS+)**
+
+- AAA is commonly used in the networking industry for the following two use cases:
+
+    - **Network device access control**: Cisco IOS XE provides local features for simple device access control, such as username-based authentication and line password authentication
+
+    - However, these features do not provide the same degree of access control and scalability that is possible with AAA
+
+    - For this reason, AAA is the recommended method for access control
+
+    - TACACS+ is the protocol of choice for network device access control
+
+    - **Secure network access control**: AAA can be used to obtain the identity of a device or user before that device or user is allowed to access the network
+
+    - RADIUS is the preferred protocol for secure network access
+
+### TACACS+
+
+- Cisco developed TACACS+ and released it as an open standard in the early 1990's
+
+- Although TACACS+ is mainly used for AAA device access control, it is possible to use it for some types of AAA network access
+
+- The TACACS+ protocol uses Transmission Control Protocol (TCP) port 49 for communication between the TACACS+ clients and the TACACS+ server
+
+- Below is shown an end user that can access a Cisco switch using SSH, TELNET, or the console
+
+- The Cisco switch is acting as a TACACS+ client that communicates with the TACACS+ server 
+
+![tacacs-client-server](./tacacs-client-server.png)
+
+- One of the key differences of TACACS+ is it's capability to separate authentication, authorization, and accounting into different functions
+
+- This is why TACACS+ is so commonly used for device administration instead of RADIUS, even though RADIUS is capable of providing network device access control
+
+### RADIUS
+
+- RADIUS is an IETF standard AAA protocol
+
+- As with TACACS+ it follows a client/server model, where the client initiates the request to the server
+
+- RADIUS is the secure protocol of choice for secure network access
+
+- The reason for this is that RADIUS is the AAA transport protocol for Extensible Authentication Protocol (EAP), while TACACS+ does not support these functions
+
+- EAP is used for secure network access (wired and wireless)
+
+- Another major difference between TACACS+ and RADIUS is that RADIUS needs to return all authorization parameters in a single reply, while TACACS+ can request authorization parameters separately and multiple times throughout a session
+
+- For example, a network device, such as a Cisco switch or router, can request a TACACS+ server to individually authorize every command that a user tries to execute after logging in to the device
+
+- In contrast, RADIUS would require these commands to be sent in the initial authentication response, and because there could be thousands of CLI command combinations, a large authorization result list could trigger memory exhaustion on the network device
+
+- This is the main reason TACACS+ is preferred for network device access control
+
+- However, if all that is required is AAA authentication without authorization, then either RADIUS or TACACS+ can be used
+
+- Below is provided a summary comparison of RADIUS and TACACS+:
+
+```
+Component                               RADIUS                                          TACACS+
+
+Protocol and ports used                 Cisco's implementation:                         TCP port 49
+                                        UDP port 1645 (authentication and
+                                        authorization)
+                                        UDP port 1646 (accounting)
+
+                                        Industry standard:
+                                        UDP port 1812 (authentication and
+                                        authorization)
+                                        UDP port 1813 (accounting)
+
+Encryption                              Encrypts only the password field                Encrypts the entire payload
+                                        Supports EAP for 802.1X authentication          Does not support EAP
+
+Authentication and                      Combines authentication and authorization       Separates authentication and authorization
+authorization                           Cannot be used to authorize which CLI           Can be used for CLI command authorization
+                                        commands can be executed individually           
+
+Accounting                              Does not support network device CLI             Supports network device CLI command accounting
+                                        command accounting
+
+Primary use                             Secure network access                           Network device access control
+```
+
+- For many years, the Cisco Secure Access Control Server (ACS) was the AAA server of choice for organizations that required TACACS+ for device andministration and RADIUS for secure network access
+
+- However, starting with ISE 2.0, ISE has taken over as Cisco's AAA server for both RADIUS and TACACS+
+
+### Configuring AAA for Network Device Access Control
+
+- TACACS+ was designed for device access control by authenticating and authorizing users into network devices
+
+- There are two parts to configuring TACACS+:
+
+    - The configuration of the device itself
+
+    - The configuration of the TACACS+ AAA server
+
+- Steps for configuring an IOS XE device with TACACS+ for device access control:
+
+    1. Configure a local user with full privilege for fallback or to avoid being locked out after enabling AAA, by using the command:
+
+    ```
+    conf t
+     username <username> privilege 15 algorithm-type <md5|sha256|scrypt> secret <password>
+    ``` 
+
+    2. Enable AAA functions on the IOS XE device by using the command:
+
+    ```
+    conf t
+     aaa new-model
+    ```
+
+    3. Add a TACACS+ server using one of the methods, depending on the IOS XE version:
+
+        - To add a TACACS+ server on IOS XE versions prior to 16.12.2 use the command:
+
+        ```
+        conf t
+         tacacs-server host <hostname|ip-address> key <key-string>
+        ```
+
+        - To add a TACACS+ server on IOS XE versions 16.12.2 and later, use the following commands:
+
+        ```
+        conf t
+         tacacs server <name>
+          address ipv4 <hostname|ip-address>
+          key key-string
+        ```
+
+    4. Create an AAA group as follows:
+
+    ```
+    conf t
+     aaa group server tacacs+ <group-name>
+      server-name <server-name-as-defined-above>
+    ```
+
+    - These commands create an AAA group that includes the TACACS+ servers that are added to the group with the `server-name` command
+
+    - Multiple server names can be added, and the order in which the servers are added to the group dictates the failover order, from top to bottom (that is, the first one added is the highest priority)
+
+    5. Enable AAA login authentication by using the command:
+
+    ```
+    conf t
+     aaa authentication login <default|custom-list-name> <method1> [method2 [method3]....] 
+    ```
+
+    - Method lists enable login authentication
+
+    - The `default` keyword applies the method lists that follows `method1 ...method2...` to all lines (tty, cty, aux and so on) 
+
+    - The <custom-list-name> CLI command assigns a custom name for the method lists that follow it
+
+    - This allows different types of lines to use different authentication methods 
+
+    - You can apply a custom list name to a line as follows:
+
+    ```
+    conf t
+     line <con|aux|vty> <nr>
+      login authentication <custom-list-name>
+    ```
+
+    - Method lists are applied sequentially from left to right
+
+    - For example, if the command `aaa authentication login default group ISE-TACACS+ local enable` the ISE-TACACS+ server group is used for authentication because is used for authentication because it's the first method listed, and if the TACACS+ servers become unavailable, or are unavailable, the local username-based authentication is used because it is the second method from left to right
+
+    - If no usernames are defined in the configuration, then the `enable` password, which is the third line would be the last resort to log in; if there is no `enable` password configured, the user is effectively locked out
+
+    6. Enable AAA authorization for EXEC by using the command:
+
+    ```
+    conf t
+     aaa authorization exec <default|custom-list-name> [method1 method2 ...]
+    ```
+
+    - This command enables EXEC shell authorization for all lines except the console line
+
+    7. Enable AAA authorization for the console:
+
+    ```
+    conf t
+     aaa authorization console
+    ```
+
+    - Authorization for the console is disabled by default to prevent unexperienced users from locking themselves out
+
+    8. Enable AAA command authorization:
+
+    ```
+    conf t
+     aaa authorization commands <privilege-level> <default|custom-list-name> <method1> [method2 ...]
+    ```
+
+    - This command authorizes all commands with the AAA server before executing them
+
+    - Command authorization is applied on a per-privilege-level basis, so it is necessary to configure a command authorization method list for every privilege level that requires command authorization
+
+    - Command authorization is commonly confiugured for levels 0, 1 and 15 only
+
+    - The other levels, 2 to 14 are useful only for local authorization with the `privilege level` command
+
+    9. Enable command authorization in global configuration mode (and all global configuration submodes) by using the command:
+
+    ```
+    conf t
+     aaa authorization config-commands
+    ``` 
+
+    10. Enable login accounting:
+
+    ```
+    conf t
+     aaa accounting exec <default|custom-list-name> {start-stop|stop-only|wait-start} <method1> [method2 ...]
+    ```
+
+    - It is common to use `start-stop` for AAA accounting
+
+    - It causes accounting to start as soon as the session starts and stop as soon as the session ends
+
+    11. Enable command accounting:
+
+    ```
+    conf t
+     aaa accounting commands <privilege-level> <default|custom-list-name> {start-stop|stop-only|wait-start} <method1> [method2 ...]
+    ```
+
+    - Just as with authorization, command accounting is applied per privilege level, so it is necessary to configure a command accounting method list for every privilege level that requires command accounting
+
+- When all the AAA servers become unreachable, the AAA client falls back to one of the local methods for authentication (local, enable, or line), but AAA command authorization might still be trying to reach the AAA server to authorize the commands 
+
+- This prevents a user from being able to execute any more commands because that user isn't authorized to use other commands
+
+- For this reason, it is recommended to include the `if-authenticated` method at the end of every single authorization command to allow all commands to be authorized as long as the user has successfully authenticated locally
+
+- The `if-authenticated` method and the `none` method are mutually exclusive because the `none` method disabled authorization
+
+- Common AAA configuration for device access control:
+
+```
+conf t
+ aaa new-model
+ tacacs-server TACACS-PRIMARY
+  address ipv4 10.10.10.1
+  key my.S3cR3t.k3y
+
+ tacacs-server TACACS-SECONDARY
+  address ipv4 20.20.20.1
+  key my.S3cR3t.k3y
+
+ aaa group server tacacs+ TACACS-SERVERS
+  server name TACACS-PRIMARY
+  server name TACACS-SECONDARY
+
+ aaa authentication login default group TACACS-SERVERS local
+ aaa authentication login CONSOLE-CUSTOM-AUTHENTICATION-LIST local line enable
+ aaa authentication enable default group TACACS-SERVERS enable
+ aaa authorization exec default group TACACS-SERVERS if-authenticated
+ aaa authorization exec CONSOLE-CUSTOM-EXEC-AUTHORIZATION-LIST none
+ aaa authorization commands 0 CONSOLE-CUSTOM-COMMAND-AUTHORIZATION-LIST none
+ aaa authorization commands 1 CONSOLE-CUSTOM-COMMAND-AUTHORIZATION-LIST none
+ aaa authorization commands 15 CONSOLE-CUSTOM-COMMAND-AUTHORIZATION-LIST none
+ aaa authorization commands 0 default group TACACS-SERVERS if-authenticated
+ aaa authorization commands 1 default group TACACS-SERVERS if-authenticated
+ aaa authorization commands 15 default group TACACS-SERVERS if-authenticated
+ ! aaa authorization console (carefully when enabling this)
+ aaa authorization config-commands
+ aaa accounting exec default start-stop group TACACS-SERVERS
+ aaa accounting commands 0 start-stop group TACACS-SERVERS
+ aaa accounting commands 1 start-stop group TACACS-SERVERS
+ aaa accounting commands 15 start-stop group TACACS-SERVERS
+ line con 0
+  authorization commands 0 CONSOLE-CUSTOM-COMMAND-AUTHORIZATION-LIST
+  authorization commands 1 CONSOLE-CUSTOM-COMMAND-AUTHORIZATION-LIST
+  authorization commands 15 CONSOLE-CUSTOM-COMMAND-AUTHORIZATION-LIST
+  authorization exec CONSOLE-CUSTOM-EXEC-AUTHORIZATION-LIST
+  privilege level 15
+  login authentication CONSOLE-CUSTOM-AUTHENTICATION-LIST
+
+ line vty 0 4
+  <uses-default-method-lists-for-AAA>
+```
+
+- Apart from the IOS XE configuration, the AAA server also needs to be configured with the AAA client information (hostname, IP address and key), the login credentials for the users, and the commands the users are authorized to execute on the device
+
+### TACACS configuration linux (tac_plus) - almalinux 9 used as VM
+
+- /etc/tac_plus.conf
+
+```
+# Example tac_plus.conf for a secure modern setup
+key = "<my_key>"
+ 
+accounting file = /var/log/tacacs/acct.log
+# authorization log = /var/log/tacacs/tacacs.log
+ 
+user = example {
+    default service = permit
+    service = exec {
+        priv-lvl = 15
+    }
+}
+group = admin {
+    default service = permit
+    enable = des "MxmAAaYwYsw4g"
+    service = exec {
+        priv-lvl = 15
+    }
+    service = shell  {
+        #Permit all commands
+        #default command = permit
+        #Permit all command attributes
+        default attribute = permit
+        #Set privilege level to 15 on IOS/XE
+        priv-lvl = 15
+        #Uncomment the line below for NX-OS support
+        #set shell:roles="\"network-admin vdc-admin\""
+        #Uncomment the line below for IOS XR support
+        #set task = "#root-system"
+    }
+}
+user = test {
+    default service = permit
+    login = des "MxmAAaYwYsw4g"
+    member = admin
+    service = exec {
+        priv-lvl = 15
+    }
+}
+
+user = noc {
+    default service = permit
+    login = des "MxmAAaYwYsw4g"
+    service = exec {
+        priv-lvl = 5 
+    } 
+}
+```
+
+- Create the accounting log directory and restart tac_plus service:
+
+```
+mkdir -p /var/log/tacacs/
+touch /var/log/tacacs/acct.log
+
+systemctl restart tac_plus.service
+```
+
+- Viewing the accouting logs
+
+```
+Nov 28 14:51:56 172.16.29.11    test    tty434  10.1.1.11       start   task_id=4043    timezone=UTC    service=shell
+Nov 28 14:51:57 172.16.29.11    test    tty434  10.1.1.11       stop    task_id=4043    timezone=UTC    service=shell   priv-lvl=0      cmd=enable <cr>
+Nov 28 14:52:04 172.16.29.11    test    tty434  10.1.1.11       stop    task_id=4044    timezone=UTC    service=shell   priv-lvl=15     cmd=interface GigabitEthernet 3 <cr>
+Nov 28 14:52:38 172.16.29.11    test    tty434  10.1.1.11       stop    task_id=4045    timezone=UTC    service=shell   priv-lvl=15     cmd=ip address 10.201.1.1 255.255.255.255 secondary <cr>
+Nov 28 14:52:44 172.16.29.11    test    tty434  10.1.1.11       stop    task_id=4046    timezone=UTC    service=shell   priv-lvl=15     cmd=ip address 10.201.1.1 255.255.255.0 secondary <cr>
+Nov 28 14:52:52 172.16.29.11    test    tty434  10.1.1.11       stop    task_id=4047    timezone=UTC    service=shell   priv-lvl=15     cmd=do-exec sh ip int br <cr>
+Nov 28 14:52:53 172.16.29.11    test    tty434  10.1.1.11       stop    task_id=4048    timezone=UTC    service=shell   priv-lvl=1      cmd=show ip interface brief <cr>
+Nov 28 14:52:58 172.16.29.11    test    tty434  10.1.1.11       stop    task_id=4049    timezone=UTC    service=shell   priv-lvl=0      cmd=end <cr>
+Nov 28 14:53:04 172.16.29.11    test    tty434  10.1.1.11       stop    task_id=4050    timezone=UTC    service=shell   priv-lvl=15     cmd=write <cr>
+(END)
+```
+
+### Verifying AAA Configuration - Cisco IOS XE
+
+- Viewing commands in the configuration:
+
+```
+CAT8k#sh run | i aaa       
+aaa new-model
+aaa group server tacacs+ TEST
+aaa authentication login default group TEST local
+aaa authentication enable default group TEST enable
+aaa authorization config-commands
+aaa authorization exec default group TEST if-authenticated 
+aaa authorization commands 0 default group TEST if-authenticated 
+aaa authorization commands 1 default group TEST if-authenticated 
+aaa authorization commands 15 default group TEST if-authenticated 
+aaa accounting exec default start-stop group TEST
+aaa accounting commands 0 default start-stop group TEST
+aaa accounting commands 1 default start-stop group TEST
+aaa accounting commands 15 default start-stop group TEST
+aaa session-id common
+
+CAT8k#sh run | s tacacs
+aaa group server tacacs+ TEST
+ server name TEST
+tacacs server TEST
+ address ipv4 172.16.29.12
+ key 7 02050D4808095E731F
+```
+
+- Below we can see SSH sessions being initiated from PC1 to R1, using the test and noc accounts
+
+- The test account has been configured in the AAA with privilege 15, and the noc account was configured with privilege 5
+
+```
+PC1:~$ ssh noc@10.1.1.1
+(noc@10.1.1.1) Password: 
+
+
+CAT8k#sh
+CAT8k#show pr
+CAT8k#show pri
+CAT8k#show privilege 
+Current privilege level is 5
+
+CAT8k#show runn
+CAT8k#show runn?
+% Unrecognized command
+CAT8k#show running-config?
+% Unrecognized command
+CAT8k#show running-config
+
+CAT8k#conf t
+Enter configuration commands, one per line.  End with CNTL/Z.
+CAT8k(config)#?
+Configure commands:
+  beep               Configure BEEP (Blocks Extensible Exchange Protocol)
+  call               Configure Call parameters
+  cfg-mode           Enter configuration mode
+  cts                Cisco Trusted Security commands
+  default            Set a command to its defaults
+  end                Exit from configure mode
+  exit               Exit from configure mode
+  help               Description of the interactive help system
+  license            Configure license features
+  mac-address-table  Configure the MAC address table
+  netconf            Configure NETCONF
+  no                 Negate a command or set its defaults
+  sasl               Configure SASL
+  wsma               Configure Web Services Management Agents
+
+```
+
+```
+PC1:~$ ssh test@10.1.1.1
+(test@10.1.1.1) Password: 
+
+
+CAT8k#sj
+CAT8k#sh
+CAT8k#show pri
+CAT8k#show privilege 
+Current privilege level is 15
+CAT8k#
+
+CAT8k#show running-config 
+Building configuration...
+
+Current configuration : 7647 bytes
+!
+! Last configuration change at 12:52:58 UTC Fri Nov 28 2025 by test
+!
+version 17.16
+service timestamps debug datetime msec
+service timestamps log datetime msec
+service password-encryption
+platform qfp utilization monitor load 80
+platform sslvpn use-pd
+platform console serial
+!
+hostname CAT8k
+!
+...
+```
