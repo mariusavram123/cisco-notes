@@ -478,3 +478,139 @@
 
 ##### Management and Orchestration
 
+- Cisco DNA Center provides the MANO functionality to the Cisco Enterprise NFV solution
+
+- It includes a centralized dashboard and tools to design, provision, manage, and monitor all branch sites across the enterprise
+
+- Two of the main functions of DNA Center are to roll out new branch locations and deploy new VNFs and virtualized services
+
+- Cisco DNA center provides centralized policies, which enables consistent network policies across the enterprise branch offices
+
+- Centralized policies are created by building network profiles
+
+- Multiple network profiles can be created, each with specific design requirements and virtual services
+
+- Once they are created, branch sites are then assigned to network profiles that match the branch requirements
+
+- Network profiles include information such as the following:
+
+    - Configuration for LAN and WAN virtual interfaces
+
+    - Services or VNFs to be used, such as firewall or WAN optimizer, and their requirements such as service chaining parameters, CPU, and memory requirements
+
+    - Device configuration required for VNFs, which can be customized by using custom configuration templates created through a template editor tool
+
+- Below we can see the Cisco DNA Center Add Services window, where services of VNFs can be added and services can be service chained to each other using multiple interface types, such as LAN, management, and services interface
+
+![dna-center-add-services](./dna-center-add-services.png)
+
+- Plug and Play provisioning provides a way to automatically and remotely provision and onboard new network devices
+
+- When a new ENVF platform is brought up for the first time, you can use Plug and Play to register with DNA center
+
+- Then DNA Center matches the site to the network profile assigned for the site and then provisions and onboards the device automatically
+
+##### Virtual Network Functions and Applications
+
+- The Cisco Enterprise NFV solution provides an environment for virtualization of both network functions and applications in the enterprise branch
+
+- Both Cisco and third-party VNFs can be onboarded into the solution
+
+- Application running in a Linux server or Windows server environment can also be instantiated on top of NFVIS and can be supported by DNA center
+
+- Cisco supported VNFs include the following:
+
+    - Cisco Catalyst 8000V Edge for Viptela SD-WAN and virtual routing
+
+    - Cisco vEdge SD-WAN Cloud router for Viptela SD-WAN
+
+    - Cisco Secure Firewall ASA Virtual for a virtual firewall
+
+    - Cisco Secure Firewall Threat Defense Virtual for integrated firewall and intrusion detection and prevention
+
+    - Cisco virtual Wide Area Application Services (vWAAS) for virtualized WAN optimization
+
+    - Cisco Catalyst 9800-CL Cloud Wireless Controller for virtualized wireless LAN controllers
+
+    - ThousandEyes
+
+    - Meraki vMX
+
+- VNFs from the following third-party vendors are supported:
+
+    - Microsoft Windows Server
+
+    - Linux Server
+
+    - Accedian
+
+    - AVI Networks
+
+    - Check Point
+
+    - Citrix
+
+    - CTERA
+
+    - F5
+
+    - Fortinet
+
+    - Info Vista
+
+    - NETSCOUT
+
+    - Palo Alto Networks
+
+    - Riverbed Technology
+
+##### Network Functions Virtualization Infrastructure Software (NFVIS)
+
+- NFVIS is based on standard Linux packages with additional functions for virtualization
+
+- VNF lifecycle management, monitoring, device programability, and hardware acceleration
+
+- The components and functionality delivered by NFVIS are shown below:
+
+![nfvis-components](./nfvis-components.png)
+
+- **Linux**: Linux drives the underlying hardware platforms (such as ENCS, Cisco UCS servers, or x86 enhanced network devices) and hosts the virtualization layer for VNFs, virtual switching API interfaces, interface drivers, platform drivers, and management
+
+- **Hypervisor**: The hypervisor for virtualization is based on Kernel-based Virtual Machine (KVM) and includes Quick Emulator (QEMU), Libvirt, and other associated processes
+
+- **Virtual Switch (vSwitch)**: The vSwitch is Open vSwitch (OVS), and it enables communication between different VNFs (service chaining) and to the outside world
+
+- **VM Lifecycle Management**: NFVIS provides the VIM functionality as specified in the NFV architectural framework through the NFVIS embedded Elastic Services Controller (ESC) Lite
+
+- ESC-Lite supports dynamic bringup of VNFs - creating and deleting VNFs and adding CPU cores, memory and storage
+
+- It also includes build-in VNF monitoring capability that allows for auto restart of VNFs when they are down and sending alarms (SNMP or syslog)
+
+- **Plug and Play client**: This client automates the bringing up of any NFVIS-based host
+
+- The Plug and Play client communicates with a Plug and Play server running in Cisco DNA Center and is provisioned with the right host configuration
+
+- It also enables a true zero-touch deployment model (that is, no human intervention) and allows for quick and error-free deployment of network services
+
+- **Orchestration**: REST, CLI, HTTPS, and NETCONF/YANG communication models are supported for orchestration and management
+
+- **HTTPS web server**: The web server can enable connectivity into NFVIS through HTTPS to a local device's web portal
+
+- From this portal it is possible to upload VNF packages, implement full lifecycle management, turn services up and down, connect to VNF consoles, and monitor critical parameters, without the need for complex commands
+
+- **Device Management**: Tools are packaged into NFVIS to support device management, including a resource manager, to get information on the number of CPU cores allocated to VMs and the CPU cores that are already used by the VMs
+
+- **Role-based access control (RBAC)**: Users accessing the system are authenticated using RBAC
+
+##### x86 Hosting Platforms
+
+- Cisco Enterprise NFVIS is supported on the following Cisco x86 hosting platforms:
+
+    - Cisco Enterprise Network Compute System (ENCS)
+
+    - Cisco Catalyst 8200 Series Edge uCPE
+
+- Which platform to choose depends on the requirements and features needed, such as voice over IP (VOIP), requirements for non-Ethernet-based interfaces (such as T1 or DSL), 4G-LTE, I/O technologies supported (for example, SR-IOV), and the number of CPU cores needed to suport the existing service requirements (VNFs and services) as well as future requirements
+
+- 
+
