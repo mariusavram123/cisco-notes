@@ -729,3 +729,744 @@ HTTP Status Code                            Result                              
 - YANG models use a tree structure
 
 - Within that structure, the models are similar in format to XML and are constructed in modules
+
+- These modules are hierarchical in nature and contain all the different data and types that make up a YANG device model
+
+- YANG models make a clear distinction between configuration data and state information
+
+- The three structure represents how to reach a specific element of the model, and the elements can be either configurable or not configurable
+
+- Each element has a defined type
+
+- For example, an interface can be configured to be on or off
+
+- However, the operational interface state cannot be changed; for example, if the options are only up or down, it is either up or down, and nothing else is possible
+
+- Below is a simple YANG module taken from RFC 6020
+
+```yang
+container food {
+    choose snack {
+        case sports-arena {
+            leaf pretzel {
+                type empty;
+            }
+            lead popcorn {
+                type empty;
+            }
+        }
+        case late-night {
+            leaf chocolate {
+                type enumeration {
+                    enum dark;
+                    enum milk;
+                    enum first-available;
+                }
+            }
+        }
+    }
+}
+```
+
+- The output from above can be read as follows:
+
+- There is food
+
+- Of that food there is a choice of snack
+
+- The snack choices are pretzels and popcorn
+
+- If it is late at night, the snack choices are two different types of chocolate
+
+- A choice must be made to have milk chocolate or dark chocolate, and if the consumer is in a hurry and does not want to wait, the consumer can have the first available chocolate
+
+- Below is shown a network-oriented example that uses the same structure
+
+```yang
+list interface {
+    key "name";
+    leaf name {
+        type string;
+    }
+    leaf speed {
+        type enumeration {
+            enum 10m,
+            enum 100m;
+            enum auto
+        }
+    }
+    leaf observed-speed {
+        type uint32;
+        config false;
+    }
+}
+```
+
+- The YANG model from the above can be read as follows:
+
+- There is a list of interfaces
+
+- Of the available interfaces, there is a specific interface that has three configurable speeds
+
+- Those speeds are 10 Mbps, 100 Mbps and auto, as listed in the leaf named speed
+
+- The leaf named observed-speed cannot be configured due to the config false command
+
+- This is because as the leaf is named, the speeds in the leaf are what was auto-detected (observed); hence, it is not a configurable leaf
+
+- This is because it represents the auto-detected value on the interface, not a configurable value
+
+#### NETCONF
+
+- NETCONF, defined in RFC 4741 and RFC 6241, is an IETF standard protocol that uses YANG data models to communicate with the various devices on the network
+
+- NETCONF runs over SSH, TLS, and (although not common), Simple Object Access Protocol (SOAP)
+
+- Some of the key differences between SNMP and NETCONF are listed below
+
+- One of the most important differences is that SNMP can't distinguish between configuration data and operational data, but NETCONF can
+
+- Another key differentiator is that NETCONF uses paths to describe resources, whereas SNMP uses object identifiers (OIDs)
+
+- A NETCONF path can be similar to interfaces/interface/eth0, which is much more descriptive than you would expect from SNMP
+
+- The following is a list of some of the common use cases for NETCONF:
+
+    - Collecting the status of specific fields
+
+    - Changing the configuration of specific fields
+
+    - Taking administrative actions
+
+    - Sending event notifications
+
+    - Backing up and restoring configurations
+
+    - Testing configurations before finalizing the tranzaction
+
+```
+Feature                                 SNMP                                                NETCONF
+
+Resources                               OIDs                                                Paths
+
+Data models                             Defined in MIBs                                     YANG core models
+
+Data modeling language                  SMI                                                 YANG
+
+Management operations                   SNMP                                                NETCONF
+
+Encoding                                BER                                                 Either XML or JSON
+
+Transport stack                         UDP                                                 SSH/TCP
+```
+
+- Transactions are all of nothing
+
+- There is no order of operations or sequencing within a transaction
+
+- This means there is no part of the configuration that is done first; the configuration is deployed all at the same time
+
+- Transactions are processed in the same order every time on every device
+
+- Transactions, when deployed run in parallel state and do not have any impact on each other
+
+- Parallel transactions touching different areas of the configuration on a device does not overwrite or interfere with each other
+
+- They also do not impact each other if the same transaction is run against multiple devices
+
+- Below is provided an example of a NETCONF element from RFC 4741
+
+- This NETCONF output can be read as follows: 
+
+- There is an XML list of users named users
+
+- In that list, there are individual users named Dave, Rafael, and Dirk
+
+```xml
+<rpc-reply message-id="101">
+    xmlns="urn:ietf:params:xml:ns:netconf:base:1.0"
+    <data>
+        <top xmlns="http://example.com/schema/1.2/config">
+            <users>
+                <user>
+                    <name>Dave</name>
+                </user>
+                <user>
+                    <name>Rafael</name>
+                </user>
+                <user>
+                    <name>Dirk</name>
+                </user>
+            </users>
+        </top>
+    </data>
+</rpc-reply>
+```
+
+- An alternative way of looking at this type of NETCONF output is to simply look at it as though it were a shopping list
+
+- Below is provided an example of the shopping list concept
+
+- It can be read as follows:
+
+- There is a group called beverages
+
+- Of these beverages, there are soft drinks and tea
+
+- The available soft drinks are cola and root beer
+
+- Of the available tea, there is sweetened and unsweetened
+
+```
+Beverages
+    Soft drinks
+        Cola
+        Root beer
+    Tea
+        Sweetened
+        Unsweetened
+```
+
+- Below we can see how NETCONF uses YANG data models to interact with network devices and then talk back with the management applications
+
+- The dotted lines shows how the devices talking back directly to the management applications, and the solid lines illustrates the NETCONF protocol talking between the management applications and the devices
+
+![netconf-and-yang-models](./netconf-and-yang-models.png)
+
+- NETCONF exchanges information called capabilities when the TCP connection has been made
+
+- Capabilities tell the client what the device it's connected to can do
+
+- Furthermore, other information can be gathered by using the common NETCONF operations shown below
+
+```
+NETCONF Operation                                               Description
+
+<get>                                                           Requests running configuration and state information of the device
+
+<get-config>                                                    Requests some or all of the configuration from the datastore
+
+<edit-config>                                                   Edits a configuration datastore by using CRUD operations
+
+<copy-config>                                                   Copies the configuration to another datastore
+
+<delete-config>                                                 Deletes the configuration
+```
+
+- Information and configurations are stored in datastores
+
+- Datastores can be manipulated by using NETCONF operations listed above
+
+- NETCONF uses Remote Procedure Call (RPC) messages in XML format to send the information between hosts
+
+- Now that we've looked at the basics of NETCONF and XML, let's examine some actual examples of a NETCONF RPC message
+
+- Below is shown an example of an OSPF NETCONF RPC message that provides the OSPF routing configuration of an IOS XE device
+
+```xml
+<rpc-reply message-id="urn:uuid:0e2c04cf-9119-4e6a-8c05-238ee7f25208"
+xmlns="urn:ietf:params:xml:ns:netconf:base:1.0" xmlns:nc="urn:ietf:params:
+xml:ns:netconf:base:1.0">
+  <data>
+    <native xmlns="http://cisco.com/ns/yang/ned/ios">
+      <router>
+        <ospf>
+          <id>100</id>
+          <redistribute>
+            <connected>
+                <redist-options>
+                    <subnets/>
+                </redist-options>
+            </connected>
+          </redistribute>
+          <network>
+            <ip>10.0.0.0</ip>
+            <mask>0.0.255.355</mask>
+            <area>0</area>
+          </network>
+          <network>
+            <ip>20.20.0.0</ip>
+            <mask>0.0.255.255</mask>
+            <area>0</area>
+          </network>
+          <network>
+            <ip>100.100.0.0</ip>
+            <mask>0.0.255.255</mask>
+            <area>0</area>
+          </network>
+        </ospf>
+      </router>
+    </native>
+  </data>
+</rpc-reply>
+```
+
+- The same OSPF router configuration that would be seen in the command-line interface of a Cisco router can be seen using NETCONF
+
+- The data is just structured in XML format rather than what users are accustomed to seeing in the CLI
+
+- It is easy to read the output in these examples because of how legible XML is
+
+- Below is a configuration save example of a network device by leveraging NETCONF
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<rpc xmlns="urn:ietf:parms:xml:ns:netconf:base:1.0" message-id="">
+    <cisco-ia:save-config xmlns:cisco-ia="http://cisco.com/yang/cisco-ia"/>
+</rpc>
+```
+
+#### RESTCONF
+
+- RESTCONF, defined in RFC 8040 is used to programatically interface with data defined in YANG models while using the datastore concepts defined in NETCONF
+
+- It is a common misconception that RESTCONF is meant to replace NETCONF, but this is not the case
+
+- Both are very common methods used for programmability and data manipulation
+
+- In fact, RESTCONF uses the same YANG models as NETCONF and Cisco IOS XE
+
+- The goal or RESTCONF is to provide a RESTful API experience while leveraging the device abstraction capabilities provided by NETCONF
+
+- RESTCONF supports the following HTTP methods and CRUD operations:
+
+    - GET
+
+    - POST
+
+    - PUT
+
+    - DELETE
+
+    - OPTIONS
+
+- The RESTCONF requests and responses can use either JSON or XML structured data formats
+
+- Below is shown a brief example of a RESTCONF get request on a Cisco router to retrieve the logging severity level that is configured
+
+- This example uses JSON instead of XML
+
+- Notice the HTTP status 200, which indicates that the request was successful
+
+```
+RESTCONF GET
+
+.............................
+
+URL: https://10.85.116.59:443/restconf/data/Cisco-IOS-XE-native:native/logging/monitor/severity
+
+Headers: {'Accept-Encoding': 'gzip, deflate', 'Accept': 'application/yang-data+json, application/yang-data.errors+json'}
+
+Body:
+
+
+RESTCONF RESPONSE
+
+............................
+
+200
+
+{
+    "Cisco-IOS-XE-native:severity": "critical"
+}
+```
+
+#### Cisco DevNet
+
+- Examples and tools discussed are available for use and practice at Cisco DevNet (https://developer.cisco.com)
+
+- Network operators who are looking to enhance or increase their skills with APIs, coding, Python or even controller concepts can find a wealth of help at DevNet
+
+- At DevNet it is easy to find learning labs and content to help solidify current knowledge of network programability 
+
+![devnet-home-page](./devnet-home-page.png)
+
+- High level overview of DevNet
+
+- Options for the home page:
+
+    - Documentation
+
+    - Learn
+
+    - Technologies
+
+    - Community
+
+    - Events
+
+##### Documentation
+
+- The documentation page is a single place to get information on API documentation for a variety of solutions such as Cisco DNA center, Cisco SD-WAN, IoT, Collaboration, and more
+
+- The API references provide information on how to programatically interact with these solutions
+
+- This is a great place to start when learning how to interact with devices and software-defined controllers
+
+##### Learn
+
+- The Learn page is where you can navigate the different offerings that DevNet has available
+
+- Under this tab are subsections for guided learning tracks, which guide you through various technologies and the associated API labs
+
+- Some of the labs you interact with are Programming the Cisco Digital Network Architecture (DNA), ACI programming, Getting started with Cisco WebEx teams APIs, and Introduction to DevNet
+
+- When you choose a learning lab and start a module, the website tracks all your progress so you can go away and come back and continue where you left off
+
+- This is helpful to continue your education over the course of multiple days or weeks
+
+##### Technologies
+
+- The Technologies page allows you to pick relevant content based on the technology you want to study and dive directly into the associated labs and training for that technology
+
+- Networking content currently available
+
+![network-technologies-available](./networking-technologies-available-devnet.png)
+
+##### Community
+
+- Perhaps one of the most important sections of DevNet is the Community page
+
+- This is where users have access to many different people at various stages of learning
+
+- DevNet ambasadors and evangelists are available to help at various stages of your learning journey
+
+- The Community page puts the latest events and news at your fingertips
+
+- This is also the place to read blogs, sign up for developer forums, and follow DevNet on all major social media platforms
+
+- This is a safe zone for asking questions, simple or complex
+
+- The DevNet community page is the place to start for all things Cisco and Network Programmability
+
+- Below are shown some of the available options for users on the Community page
+
+##### Events
+
+- The DevNet events page, provides a full list of events that have happened in the past or that will be happening in the future
+
+- This is where a user can find the upcoming DevNet Express events as well as conferences where DevNet will be presenting
+
+### GitHub
+
+- One of the most efficient and commonly adopted ways of using version control is by using GitHub
+
+- GitHub is a hosted web-based repository for code
+
+- It has capabilities for bug tracking and task management as well
+
+- Using GitHub is one of the easiest ways to track changes in your files, collaborate with other developers, and share code with the online community
+
+- It is a great place to look for code to get started on programmability
+
+- Often times, other engineers or developers are trying to accomplish similar tasks and have already created and tested the code necessary to do so
+
+- One of the most powerful features of using GitHub is the ability to rate and provide feedback on other developers' code
+
+- Peer review is encouraged in the coding community
+
+- GitHub provides a guide that steps through how to create a repository, start a branch, add comments, and open a pull request
+
+- You can also just start a GitHub project when you are more familiar with the GitHub tool and it's associated processes
+
+- Projects are repositories that contain code files
+
+- GitHub provides a single pane to create, edit, and share code files
+
+- Below is shown a repository that contains three files:
+
+    - ENCORE.txt
+
+    - JSON_Example.txt
+
+    - README.md
+
+![github-encore-repo](./github-encore-repo.png)
+
+- GitHub also gives a great summary of commit logs, so when you save a change in one of your files or create a new file
+
+- GitHub shows details about it on the main repository page
+
+- If you drill down into one of the files in the repository, you can see how easy it is to edit and save code
+
+- If you drill down into JSON_Example.txt, for example, GitHub shows it's contents and how to edit the file in the repository
+
+- If you click the filename JSON_Example.txt, you can see that the file has seven lines of code and is 77 bytes in size
+
+- Below is shown the content of the JSON_Example.txt file and the options available with the file
+
+![json-example-file](./json-example-file-github.png)
+
+- The pencil allows you to go into editing mode and modify the file content
+
+- This editor is very similar to any other text editor
+
+- You can simply type into the editor or copy and paste files from other files directly into it
+
+- Below we can see the addition of another user called Zuul
+
+- If the code were to be committed, the changes in the file could be saved with the new user added to the file
+
+- Now that the file is available in the repository, other GitHub users and developers can contribute to this code or add and delete lines of code based on the code that was originally created
+
+- For example, if a user has some code to to add a new user via JSON syntax, someone could use that code and simply modify the usernames or add the code to enhance it
+
+- This is the true power of sharing code
+
+### Basic Python Components and Scripts
+
+- **Python** has by a longshot become one of the most common programming languages in therms of network programmability
+
+- Learning to use programming languages can be daunting
+
+- Python is one of the easiest languages to get started with and interpret
+
+- We will see how to build some of the fundamental skills necessary to be able to interpret Python scripts
+
+- When you understand the basics of interpreting what a Python script is designed to do, it will be easier to understand and leverage other scripts that are available
+
+- GitHub has some amazing Python scripts available for download that come with very detailed instructions and documentation
+
+- Now we can leverage the new knowledge gained about APIs, HTTP operations, DevNet, and GitHub
+
+- Below is shown a Python script that sets up the environment to log in to the Cisco DNA Center sandbox
+
+- This script uses the same credentials used with the Token API used earlier in this chapter
+
+- Env_Lab.py
+
+```py
+""" Set the environment information needed to access your lab
+
+The provided sample code in this repository will reference this file to get 
+the information needed to connect to your lab backend. You provide this info here once
+and the scripts in this repository will access it as needed by the lab
+
+(...)
+
+"""
+
+# User Input
+
+# Please select the lab environment that you will be using today
+#
+#   sandbox - Cisco DevNet Always-On /Reserved sandboxes
+#   express - Cisco DevNet Express Lab Backend
+#   custom - Your own "Custom" Lab Backend
+
+ENVIRONMENT_IN_USE = "sandbox"
+
+# Set the 'Environment Variables' based on the lab environment in use
+
+if ENVIRONMENT_IN_USE == "sandbox":
+    dnac = {
+        "host": "sandboxdnac.cisco.com",
+        "port": 443,
+        "username": "devnetuser",
+        "password": "Cisco123!"
+    }
+```
+
+- The Env_Lab.py python script starts with three quotation marks
+
+- These three quotation marks begin and end a multiline string
+
+- A string is simply one or more alphanumeric characters
+
+- A string can comprise many numbers or letters, depending on the Python version in use
+
+- In the case of this script, the creator used a multiple-line to put additional overall comments into the script
+
+- This is not mandatory, but you can see that comments are helpful
+
+- The # character indicates a comment in the Python script file
+
+- Some comments usually describe the intent of an action within the code
+
+- Comments often appear right above the action they describe
+
+- Some scripts have a comment for each option, and some are not documented very well, if at all
+
+- The comments in the Env_Lab.py indicate that there are three available options for selecting the lab environment to use:
+
+    - **Sandbox**: The line in this python script that says ENVIRONMENT_IN_USE = "sandbox", corresponds with the selection of the sandbox type of lab environments available throug Cisco DevNet
+
+    - In this instance, "sandbox" refers to the always-on and reserved sandboxes that can be accessed through https://developer.cisco.com
+
+    - **Express**: This is the back end that is used for the DevNet Express Events that are held globally at various locations and Cisco office locations
+
+    - **Custom**: This is used in the event that there is already a Cisco DNA Center installed either in a lab or other facility, and it needs to be accessed using this script
+
+- As you can see in the python script, a few variables are used to target the DevNet Cisco DNA Center sandbox specifically:
+
+```
+Variable                        Value                                   Description
+
+host                            sandboxdnac.cisco.com                   Cisco DNA Center sandbox URL
+
+port                            443                                     TCP port to access the URL securely (HTTPS)
+
+username                        devnetuser                              Username to log in to Cisco DNA Center sandbox (via API or GUI)
+
+password                        Cisco123!                               Password to log in to Cisco DNA Center sandbox (via API or GUI) 
+```
+
+- The variables shown should look familiar as they are similar to the JSON data format
+
+- Remember that JSON uses key/value pairs and is extremely easy to read and interpret
+
+- In the script you can see the key/value pair "username": "devnetuser" 
+
+- The structure used to hold all the key/value pairs in this script is called dictionary
+
+- In this particular python script, the dictionary is named dnac
+
+- The dictionary named dnac contains multiple key/value pairs, and it starts and ends with curly braces ({})
+
+```py
+dnac = {
+    "host": "sandboxdnac.cisco.com",
+    "port": 443,
+    "username": "devnetuser",
+    "password": "Cisco123!"
+}
+```
+
+- Dictionaries can be written in multiple different ways
+
+- Whereas above is shown a multi-line dictionary that is easy redable, below is shown the same dictionary written as a single line:
+
+```py
+dnac = {"host": "sandboxdnac.cisco.com", "port": 443, "username": "devnetuser", "password": "Cisco123!"}
+```
+
+- Notice that the line `ENVIRONMENT_IN_USE = "sandbox"` is used in this script
+
+- Following that line in the script there is a line that states `if ENVIRONMENT_IN_USE = "sandbox":`
+
+- This is called a condition (if statement)
+
+- A logical if question is asked, and depending on the answer, an action happens
+
+- In this exammple, the developer called out to use the sandbox option with the line of code `ENVIRONMENT_IN_USE = "sandbox"` and then used a condition to say that if the environment in use is sandbox, call a dictionary called dnac to provide the sandbox details that are listed in key/value pairs
+
+- Below is shown the two relevant lines of code to illustrate this
+
+- Now let's look at a script that showcases much of the API information that was covered above and also builds on all the basic Python information that has just been provided
+
+- Python script is called get_dnac_devices.py
+
+```py
+# specifies what version and interpreter of python will be used
+#!/usr/bin/env python3
+
+# Calls dnac dictionary from the Env_Lab.py script covered earlier
+from Env_Lab import dnac
+# Imports the json module so that python can understand the data format that contains key/value pairs
+import json
+# Imports requests module which handle HTTP headers and form data
+import requests
+# Imports urllib3 module which is an HTTP client
+import urllib3
+# Imports HTTPBasicAuth method from the requests.auth module to handle authentication with username and password
+from requests.auth import HTTPBasicAuth
+# Imports prettytable components from PrettyTable module to structure return data in table format
+from prettytable import PrettyTable
+
+# Puts return data into a easily readable table with the specified column names 
+dnac_devices = PrettyTable(["Hostname", "Platform ID", "Software Type", "Software Version", "Series", 
+                            "IP address", "Up Time"])
+
+dnac_devices.padding_width = 1
+
+# Silence the insecure warnings due to SSL Certificates
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+# Sends specific HTTP headers when issuing HTTP GET to the Network Devices API
+headers = {
+    "content-type": "application/json",
+    "x-auth-token": ""
+}
+
+
+# Get token from DNAC Token API
+# This function does an HTTP POST request to the DNAC Token API and uses the
+# values built in the key/value pair  formats taken from Env_Lab.py script
+# The response is stored as the token that is used to make future API calls
+# for the authenticated user
+def dnac_login(host, username, password):
+    url = f"https://{host}/api/system/v1/auth/token"
+    response = requests.request("POST", url, auth=HTTPBasicAuth(username, password),
+                                headers=headers, verify=False)
+
+    return response.json()["Token"]
+
+# Get network devices information and add them to the table
+def network_device_list(dnac, token):
+    url = f"https://{dnac['host']}/api/v1/network-device"
+    headers['x-auth-token'] = token
+    response = requests.get(url, headers=headers, verify=False)
+    data = response.json()
+    # print(f"Data is:\n {data}")
+    for item in data["response"]:
+        dnac_devices.add_row([item['hostname'], item["platformId"], item["softwareType"], item["softwareVersion"], 
+                             item["series"], item["managementIpAddress"], item["upTime"]])
+
+login = dnac_login(dnac["host"], dnac["username"], dnac["password"])
+
+network_device_list(dnac, login)
+
+print(dnac_devices)
+
+```
+
+- It might seem like there is a lot going on in the get_dnac_device.py script
+
+- However many of the details have already been explained
+
+- The first section of code tells the Python interpreter what modules this particular script will use
+
+- Think of a module as a collection of actions and instructions
+
+- To better explain the content, comments are inserted throughout the script to help document each section
+
+- Modules help Python understand what it is capable of
+
+- For example, if a developer tried to do a HTTP GET request without having the requests modules imported, it would be difficult for python how to interpret the HTTP call
+
+- Although there are other ways of doing HTTP calls from python, the requests modules greatly simplify the process
+
+- Functions are blocks of code that are built to perform specific actions
+
+- Functions are very structured in nature and can often be reused later on within a Python script
+
+- Some functions are built into Python and do not have to be created
+
+- A great example of this is the print function which can be used to print data to a terminal screen
+
+- You can see the print function at the end of our script
+
+- Remember that in order to execute any API calls to Cisco DNA Center you must be authenticated using the Token API
+
+- The dnac_login function is used to get the token information from the token API, as we have seen in Postman/Bruno earlier, and be used to make requests to any DNA Center API after this
+
+- The network_device_list function ties the Token API to the Network Device API call to retrieve the information from the Cisco DNA Center
+
+- The line that says `headers["x-auth-token"] = token` is mapping the JSON response from the previous function, which is the token, into the header called x-auth-token
+
+- In addition, the URL for the API was changed to network_device, and the response is sending a requests.get to that URL
+
+- This is exactly the same example made with Postman/Bruno earlier
+
+- The final section of the get_dnac_devices function shows code that ties together the dnac dictionary to the dnac_login function
+
+- In addition, the print function takes the response received from the response.get that was send to the network device API, and puts it into the table format that was specified with the name dnac_devices
+
+- The Python script examples from above makes it easy to see the power and easy-to-use nature of Python
+
+- The tools mentioned here, including Bruno and Python are readily available on the Internet for free
+
+- A great way to practice is by using a sandbox environment and just building code and running it to see what can be accomplished
+
+- You are only limited by your imagination and coding skills
