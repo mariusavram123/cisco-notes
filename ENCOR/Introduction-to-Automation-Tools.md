@@ -1290,3 +1290,490 @@ End
 - Administrators, developers, and IT managers like to use Ansible because it allows for easy ramp-up for users who aim to create new projects, and it sets the stage for long-term automation initiatives and processes to further benefit the business
 
 - Automation, by nature, reduces the risk of human error by automatically duplicating known best practices that have been thoroughly tested in an environment
+
+- However, automation can be dangerous if it duplicates a bad process or an errorneous configuration (This applies to any tool, not just Ansible)
+
+- When preparing to automate a task or set of tasks, it is important to start with the desired outcome of the automation, and then it's possible to move on to creating a plan to achieve the outcome
+
+- A methodology commonly used or this process is the PPDIOO (Prepare, Plan, Design, Implement, Operate, Optimize) lifecycle
+
+- Ansible uses **playbooks** to deploy configuration changes or retrieve information from hosts within a network
+
+- An Ansible Playbook is a structured set of instructions - much like the playbooks football players use to make different plays on the field during a game
+
+- An Ansible playbook contains multiple **plays** and each play contains the tasks that each player must accomplish in order for the particular play to be successful
+
+- Below are described the components used by Ansible and provides some commonly used examples of them
+
+![ppdioo-lifecycle](./ppdioo-lifecycle.png)
+
+```
+Components                      Description                             Use Case
+
+Playbook                        A set of plays for remote systems       Enforcing configuration and/or deployment steps
+
+Play                            A set of tasks applied to a single      Grouping a set of hosts to apply policy and configuration
+                                host or a group of hosts                to them
+
+Task                            A call to an Ansible module             Logging in to a device to issue a `show` command to retrieve output
+```
+
+- Ansible Playbooks are written using YAML (Yet Another Markup Language)
+
+- Ansible YAML files usually begin with a series of three dashes (---) and end with a series of three periods (...)
+
+- Although this structure is optional, it is common
+
+- YAML files also contain lists and dictionaries
+
+- Below is shown a YAML file that contains a list of musical genres
+
+```
+---
+# List of music genres
+Music:
+    - Metal
+    - Rock
+    - Rap
+    - County
+...
+```
+
+- YAML lists are very easy to read and consume
+
+- As you can see above, it is possible to add comments in YAML by beginning lines with a pound sign (#)
+
+- A YAML file often begin with --- and end with ...; in addition, as you can see above, each line of a list can start with a dash and a space (- ), and identation makes the YAML file readable
+
+- YAML uses dictionaries that are similar to JSON dictionaries as they also use key/value pairs
+
+- A JSON key/value pair appears as "key": "value"
+
+- A YAML key/value pair is similar but does not need the quotation marks -- key: value
+
+- Below is shown a YAML dictionary containing an employee record
+
+```
+---
+# HR employee record
+Employee1:
+    Name: John Dough
+    Title: Developer
+    Nickname: Mr. DBug
+```
+
+- Lists and dictionaries can be used together in YAML
+
+- Below is shown a dictionary and a list, both in the same YAML file
+
+```
+---
+# HR Employee records
+-  Employee1:
+    Name: John Dough
+    Title: Developer
+    Nickname: Mr. DBug
+    Skills:
+        - Python
+        - YAML
+        - JSON
+- Employee2:
+    Name: Jane Dough
+    Title: Network Architect
+    Nickname: Lay DBug
+    Skills:
+        - CLI
+        - Security
+        - Automation
+...
+```
+
+- YAML Lint is a free online tool that you can use to check the format of YAML files to make sure they have valid syntax
+
+- Simply go to https://www.yamllint.com/ and paste the contents of a YAML file into the interpreter and click  Go
+
+- Lint alerts you if there is an error in the file
+
+- Below is shown our dictionary with the formatting cleaned up and the comment removed
+
+![yaml-lint-example](./yaml-lint-example.png)
+
+- Ansible has a CLI tool that can be used to run playbooks or  ad hoc CLI commands or targeted hosts
+
+- This tool has very specific commands that you need to use to enable automation
+
+- Below are shown the most common Ansible CLI commands and associated use cases
+
+```
+CLI Command                         Use Case
+
+ansible                             Runs modules against targeted hosts
+
+ansible-playbook                    Runs playbooks
+
+ansible-docs                        Provides documentation on syntax and parameters in the CLI
+
+ansible-pull                        Changes Ansible clients from the default push model to the pull model
+
+ansible-vault                       Encrypts YAML files that contain sensitive data
+```
+
+- Ansible uses an inventory file to keep track of the hosts it manages
+
+- The inventory can be named group of hosts or a simple list of individual hosts
+
+- A host can belong to multiple groups and can be represented by either an IP address or a resolvable DNS name
+
+- Below is shown the content of the inventory file with the host 192.168.10.1 in two different groups
+
+```
+[routers]
+192.168.10.1
+192.168.20.1
+
+[switches]
+192.168.10.25
+192.168.10.26
+
+[primary-gateway]
+192.168.10.1
+```
+
+- Example of Ansible playbooks used to accomplish common tasks
+
+- Imagine using a playbook to deploy interface configuration on a device without having to manually configure it
+
+- You might take this idea a step further and use a playbook to configure an interface and deploy an EIGRP routing process
+
+- Below is shown the content of an Ansible Playbook called ConfigureInterface.yaml, which you can use to configure GigabitEthernet2 interface on a Cisco Router
+
+- By leveraging the ios_config Ansible module, this playbook adds the following configuration to the Gi2 interface on the router:
+
+```
+description Configured by ANSIBLE!!!
+ip address 10.1.1.1
+subnet mask 255.255.255.0
+no shutdown
+```
+
+```
+---
+- hosts: routers
+  gather_facts: false
+  connection: local
+  tasks:
+    - name: Configure Ethernet0/3 interface
+      ios_config:
+        lines:
+          - description: Configured by Ansible
+          - ip address 100.64.1.1 255.255.255.0
+          - no shutdown
+        parents:
+          - interface Ethernet0/3
+        host: "{{ ansible-host }}"
+        username: marius
+        password: Avram
+```
+
+- To execute this playbook, the ansible-playbook command is used to call the specific playbook YAML file (ConfigureInterface.yaml)
+
+- The important things to note in the output are the PLAY, TASK, and TASK RECAP sections, which list the name of the play and each individual task that gets executed in each play
+
+- The PLAY RECAP section shows the status of the playbook that is executed
+
+- The output shows that one play named CSR1kV-1, was launched followed by a task called Configure Ethernet0/3 interface
+
+- Based on the status ok=1, you know the change was successful, the changed=1 status means that a single change was made on the CSR1KV-1 router
+
+![inventory-output](./inventory-output.png)
+
+- Building out a playbook can greatly simplify configuration tasks
+
+- Below is an alternative of the ConfigureInterface,yaml playbook named EIGRP_Configuration_Example.yaml, with EIGRP added, along with the ability to save the configuration by issuing a "write memory"
+
+- These tasks are accomplished by leveraging the ios_command module in Ansible
+
+- This playbook adds the following configuration to the CSR1KV-1 router
+
+- On Gi2:
+
+    - description Configured by Ansible
+
+    - ip address 10.1.1.1
+
+    - subnet mask 255.255.255.0
+
+    - no shutdown
+
+- On Gi3:
+
+    - description Configured by Ansible
+
+    - no ip address
+
+    - shutdown
+
+- Global configuration:
+
+```
+router eigrp 100
+eigrp router-id 1.1.1.1
+no auto-summary
+network 10.1.1.0 0.0.0.255
+```
+
+- Save configuration:
+
+```
+write memory
+```
+
+```yaml
+---
+- hosts: CSR1KV-1
+  gather-facts: false
+  connection: local
+  tasks:
+    - name: Configure GigabitEthernet2 Interface
+      ios_config:
+        lines:
+          - description Configured by Ansible
+          - ip address 10.1.1.0 255.255.255.0
+          - no shutdown
+        parents: interface GigabitEthernet2
+        host: "{{ ansible_host }}"
+        username: cisco
+        password: testtest
+    - name: Config Gig3
+      ios_config:
+        lines:
+          - description Configured by Ansible
+          - no ip address
+          - shutdown
+        parents: GigabitEthernet3
+        host: "{{ ansible_host }}"
+        username: cisco
+        password: testtest
+    - name: Config EIGRP 100
+      ios_config:
+        lines:
+          - router eigrp 100
+          - eigrp router-id 10.1.1.1
+          - no auto-summary
+          - network 10.1.1.0 0.0.0.255
+        host: "{{ ansible_host }}"
+        username: cisco
+        password: testtest
+    - name: Write Memory
+      ios_command:
+        commands:
+          - write memory
+      host: "{{ ansible_host }}"
+      username: cisco
+      password: testtest
+...
+```
+
+- When the playbook is run, the output shows the tasks as they are completed and the status of each one
+
+- Based on the output shown below, you can see that tasks with the following names are completed and the return status changed:
+
+    - Configure GigabitEthernet2 interface
+
+    - Config Gig3
+
+    - Config EIGRP 100
+
+![eigrp-configuration](./eigrp-configuration-example.png)
+
+- Furthermore, the Write Memory task completes which is evident from the status ok: [CSR1KV-1]
+
+- At the bottom of the output, notice the PLAY RECAP section, which has the status ok=4 and changed=3
+
+- This means that out of the four tasks, three actually modified the router and made configuration changes, and one task saved the configuration after it was modified
+
+- After the EIGRP_Configuration_Example.yaml has been run against CSR1KV-1, you need to verify the configuration to make sure it was correctly applied
+
+- Below are shown the relevant sections of the startup configuration from CSR1KV-1 to verify the tasks that were applied to the router
+
+```
+interface Ethernet0/2
+ ip address 10.1.1.1 255.255.255.0
+!
+interface Ethernet0/3
+ no ip address
+ shutdown
+!
+!
+router eigrp 100
+ network 10.1.1.0 0.0.0.255
+ eigrp router-id 10.1.1.1
+!
+```
+
+- The last task in the playbook is to issue the `write memory` command, and you can verify that it happened by issuing the `show startup-config` command with some filters to see relevant configuration on the router
+
+- Below is shown the output of the command `show startup-config | s Ethernet0/2|net0/3|router eigrp 100`
+
+```
+R1#show startup-config | s Ethernet0/2|net0/3|router eigrp 100
+interface Ethernet0/2
+ ip address 10.1.1.1 255.255.255.0
+interface Ethernet0/3
+ no ip address
+ shutdown
+router eigrp 100
+ network 10.1.1.0 0.0.0.255
+ eigrp router-id 10.1.1.1
+```
+
+### Puppet Bolt
+
+- Puppet bolt allows you to leverage the power of Puppet without having to install a puppet server of puppet agents on devices or nodes
+
+- Much like Ansible, Puppet Bolt connects to devices by using SSH or WinRM connections
+
+- Puppet bolt is an open source tool that is based on Ruby language and can be installed as a single package
+
+- In Puppet Bolt, tasks can be used for pushing configuration and for managing services, such as starting and stopping services and deploying applications
+
+- Tasks are sharable
+
+- For example, users can visit Puppet Forge to find and share tasks with others in the community
+
+- Tasks are really good for solving problems that don't fit in the traditional model of client/server or puppet server and puppet client
+
+- As mentioned earlier, Puppet is used to ensure configuration on devices and can periodically validate that the change or specific value is indeed configured
+
+- Puppet bolt allows you to execute a change or configuration immediately and then validate it
+
+- There are two ways to use Puppet Bolt:
+
+    - **Orchestrator-driven tasks**: Orchestrator-driven tasks can leverage the Puppet architecture and use services to connect to devices
+
+    - This design is meant for large-scale environments
+
+    - **Standalone tasks**: Standalone tasks are for connecting directly to devices or nodes to execute tasks and do not require any Puppet environment or components to be set up in order to realize the benefits and value of Puppet Bolt
+
+- Individual commands can be run from the command line by using the command `bolt command run <command-name>` followed by a list of devices to run the command against
+
+- In addition to manually running the commands, you can construct scripts that contain multiple commands
+
+- You can construct these scripts in Python, Ruby, and any other scripting language that the devices can interpret
+
+- After a script is built, you can execute it from the command line against the remote devices that need to be configured, using the command `bolt script run <script-name>` followed by the list of devices to run the script against
+
+- Below are shown the available commands for Puppet Bolt
+
+- The Puppet Bolt command line is not the Cisco command line; rather it can be a Linux, OS X, or windows operating system
+
+- Puppet enterprise allow for the use of a GUI to execute tasks
+
+![bolt-command-line](./bolt-command-line.png)
+
+- Puppet Bolt copies the script into a temporary directory on the remote device, executes the script, captures the results, and removes the script from the remote system as if it were never copied there
+
+- This is a really clean way of executing remote commands without leaving residual scripts or files on the remote devices
+
+- Much as the Cisco DNA Center and Cisco vManage APIs, Puppet Bolt tasks use an API to retrieve data between Puppet Bolt and the remote device
+
+- This provides a structure for the data that Puppet Bolt expects to see
+
+- Tasks are part of the Puppet modules and use the naming structure modulename::taskfilename
+
+- Tasks can be called from the command line much like commands and scripts
+
+- You can use the command `bolt task run modulename::taskfilename` to invoke these tasks from the command line
+
+- The modulename::taskfilename naming structure allows the tasks to be shared with other users on Puppet Forge
+
+- A task is commonly accompanied by a metadata file that is in JSON format
+
+- A JSON metadata file contains information about a task, how to run the task, and any comment about how the file is written
+
+- Often, the metadata file is named the same as the task script but with a JSON extension
+
+- This is a standard way of sharing documentation about what a script can do and how is it structured
+
+- You can see this documentation by running the command `bolt task show modulename::taskfilename` at the command line
+
+### SaltStack SSH (Server-Only Mode)
+
+- SaltStack offers an agentless option called Salt SSH that allows users to run Salt commands without having to install a minion on the remote device or node
+
+- This is similar in concept with Puppet Bolt
+
+- The main requirements to use Salt SSH are that the remote system must have SSH enabled and Python installed
+
+- Salt SSH connects to a remote device and installs a Lightweight version of SaltStack in a temporary directory and then can optionally delete the temporary directory upon completion, leaving the remote system clean
+
+- These temporary directories can be left on the remote systems along with any necessary files to run Salt SSH
+
+- This way, the files do not have to be reinstalled on the remote device, which can be useful when time is a consideration
+
+- This is often useful on devices that are using Salt SSH more frequently than other devices in the environment
+
+- Another benefit of using Salt SSH is that it can work in conjunction with the master/minion environment, or it can be used completely agentless across the environment
+
+- By default, Salt SSH uses roster files to store connection information for any host that doesn't have a minion installed
+
+- Below is shown the content structure of this file
+
+- It is easy to interpret the roster files associated with Salt SSH because they are constructed in human-readable form
+
+```
+managed:
+    host: 192.168.10.1
+    user: admin
+```
+
+- One of major design considerations when using Salt SSH is that it is considerabily slower than the 0MQ distributed messaging library
+
+- However, Salt SSH is often considered faster than logging in to the system to execute the commands
+
+- By automating daily configuration tasks, it can gain some of the following benefits:
+
+    - Increased agility
+
+    - Reduced opex
+
+    - Streamlined management
+
+    - Reduced human error
+
+### Comparing tools
+
+- Many organizations face lean IT problems and high turnover, and network engineers are being asked to do more with less
+
+- Utilizing some of the presented tools, can help aleviate some of the presure put on the IT staff by offloading some of more tedious, time consuming and repetitive tasks
+
+- A network operator can then focus more on critical mission responsabilities such as network design and growth planning
+
+- A majority of these tools function very similar to one another
+
+- Below is a high level comparison of the tools covered:
+
+```
+Factor                  Puppet                  Chef                    Ansible                     SaltStack
+
+Architecture            Puppet servers and      Chef server and         Control station and         Salt master and
+                        puppet agents           chef agents             remote hosts                minions
+
+Language                Puppet DSL              Ruby DSL                YAML                        YAML
+
+Terminology             Modules and             Cookbooks and           Playbooks and plays         Pillars and grains
+                        manifests               recipes
+
+Support for             yes                     yes                     yes                         yes
+large-scale deployments 
+
+Agentless versions      Puppet bolt             N/A                     yes                         Salt SSH
+```
+
+- The most important factors in choosing a tool are how the tools are used and the skills of the operations staff who are adopting them
+
+- For instance, if the team is very fluent in ruby, it may make sense to look at Chef
+
+- On the other hand, if the team is very confident at the command line, Ansible or SaltStack may be a good fit
+
+- The best tool for the job depends on the customer, and choosing one requires a thorough understanding of differences between the tools and solid knowledge of what the operations team is confortable with and that will play to their strengths
