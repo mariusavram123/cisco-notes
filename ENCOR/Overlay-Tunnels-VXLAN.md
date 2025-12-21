@@ -533,3 +533,251 @@ conf t
 - We ca view the VXLAN topology as a giant access switch, which countless of ports, each connected to a VNI
 
 ![vxlan-topology-physical-view](./vxlan-topology-logical-view.png)
+
+- Topology-VXLAN-config:
+
+![vxlan-topology](./vxlan-ipsecikev2.png)
+
+- VTEP1 config - CSR1000V:
+
+```
+bridge-domain 10 
+ member vni 6001
+ member GigabitEthernet2 service-instance 1
+  remote circuit id 1
+!
+interface Loopback0
+ ip address 10.1.1.1 255.255.255.255
+!
+interface GigabitEthernet1
+ ip address 10.12.1.1 255.255.255.252
+ negotiation auto
+ no mop enabled
+ no mop sysid
+!
+interface GigabitEthernet2
+ no ip address
+ negotiation auto
+ no mop enabled
+ no mop sysid
+ service instance 1 ethernet
+  encapsulation dot1q 10
+  rewrite ingress tag pop 1 symmetric
+ !
+!
+interface GigabitEthernet3
+ no ip address
+ shutdown
+ negotiation auto
+ no mop enabled
+ no mop sysid
+!         
+interface GigabitEthernet4
+ no ip address
+ shutdown
+ negotiation auto
+ no mop enabled
+ no mop sysid
+!
+interface nve1
+ no ip address
+ source-interface Loopback0
+ vxlan udp port 4789
+ member vni 6001
+  ingress-replication 10.2.2.2
+ !
+ no mop enabled
+ no mop sysid
+!
+router ospf 1
+ network 10.1.1.1 0.0.0.0 area 0
+ network 10.12.1.0 0.0.0.3 area 0
+!
+```
+
+- VTEP2- CSR1000V
+
+```
+bridge-domain 10 
+ member vni 6001
+ member GigabitEthernet2 service-instance 1
+!
+interface Loopback0
+ ip address 10.2.2.2 255.255.255.255
+!         
+interface GigabitEthernet1
+ ip address 10.22.22.1 255.255.255.252
+ ip ospf 1 area 0
+ negotiation auto
+ no mop enabled
+ no mop sysid
+!
+interface GigabitEthernet2
+ no ip address
+ negotiation auto
+ no mop enabled
+ no mop sysid
+ service instance 1 ethernet
+  encapsulation dot1q 10
+  rewrite ingress tag pop 1 symmetric
+ !
+!
+interface GigabitEthernet3
+ no ip address
+ shutdown
+ negotiation auto
+ no mop enabled
+ no mop sysid
+!         
+interface GigabitEthernet4
+ no ip address
+ shutdown
+ negotiation auto
+ no mop enabled
+ no mop sysid
+!
+interface nve1
+ no ip address
+ source-interface Loopback0
+ member vni 6001
+  ingress-replication 10.1.1.1
+ !
+ no mop enabled
+ no mop sysid
+!
+router ospf 1
+ network 10.2.2.2 0.0.0.0 area 0
+!
+```
+
+- Verification VTEP1:
+
+```
+VTEP1#show bridge-domain 10 
+Bridge-domain 10 (2 ports in all)
+State: UP                    Mac learning: Enabled
+Aging-Timer: 300 second(s)
+Maximum address limit: 65536
+    GigabitEthernet2 service instance 1
+    vni 6001
+   AED MAC address    Policy  Tag       Age  Pseudoport
+   0   5254.00BD.800A forward dynamic   99   GigabitEthernet2.EFP1
+   0   5254.00B9.800A forward dynamic   100  nve1.VNI6001, VxLAN 
+                                             src: 10.1.1.1 dst: 10.2.2.2
+
+
+VTEP1#show nve vni 
+Interface  VNI        Multicast-group VNI state  Mode  BD    cfg vrf                      
+nve1       6001       N/A             Up         L2DP  10    CLI N/A
+```
+
+- Verification VTEP2:
+
+```
+VTEP2#show bridge-domain 10
+Bridge-domain 10 (2 ports in all)
+State: UP                    Mac learning: Enabled
+Aging-Timer: 300 second(s)
+Maximum address limit: 65536
+    GigabitEthernet2 service instance 1
+    vni 6001
+   AED MAC address    Policy  Tag       Age  Pseudoport
+   0   5254.00BD.800A forward dynamic   203  nve1.VNI6001, VxLAN 
+                                             src: 10.2.2.2 dst: 10.1.1.1
+   0   5254.00B9.800A forward dynamic   204  GigabitEthernet2.EFP1
+
+
+VTEP2#show nve vni 
+Interface  VNI        Multicast-group VNI state  Mode  BD    cfg vrf                      
+nve1       6001       N/A             Up         L2DP  10    CLI N/A                      
+```
+
+- CSR router info:
+
+```
+VTEP1#show version 
+Cisco IOS XE Software, Version 17.03.08a
+Cisco IOS Software [Amsterdam], Virtual XE Software (X86_64_LINUX_IOSD-UNIVERSALK9-M), Version 17.3.8a, RELEASE SOFTWARE (fc3)
+Technical Support: http://www.cisco.com/techsupport
+Copyright (c) 1986-2023 by Cisco Systems, Inc.
+Compiled Fri 20-Oct-23 15:48 by mcpre
+
+
+Cisco IOS-XE software, Copyright (c) 2005-2023 by cisco Systems, Inc.
+All rights reserved.  Certain components of Cisco IOS-XE software are
+licensed under the GNU General Public License ("GPL") Version 2.0.  The
+software code licensed under GPL Version 2.0 is free software that comes
+with ABSOLUTELY NO WARRANTY.  You can redistribute and/or modify such
+GPL code under the terms of GPL Version 2.0.  For more details, see the
+documentation or "License Notice" file accompanying the IOS-XE software,
+or the applicable URL provided on the flyer accompanying the IOS-XE
+software.
+
+
+ROM: IOS-XE ROMMON
+
+VTEP1 uptime is 1 hour, 40 minutes
+Uptime for this control processor is 1 hour, 41 minutes
+System returned to ROM by reload
+System image file is "bootflash:packages.conf"
+Last reload reason: reload
+
+
+
+This product contains cryptographic features and is subject to United
+States and local country laws governing import, export, transfer and
+use. Delivery of Cisco cryptographic products does not imply
+third-party authority to import, export, distribute or use encryption.
+Importers, exporters, distributors and users are responsible for
+compliance with U.S. and local country laws. By using this product you
+agree to comply with applicable laws and regulations. If you are unable
+to comply with U.S. and local laws, return this product immediately.
+
+A summary of U.S. laws governing Cisco cryptographic products may be found at:
+http://www.cisco.com/wwl/export/crypto/tool/stqrg.html
+
+If you require further assistance please contact us by sending email to
+export@cisco.com.
+
+License Level: ax
+License Type: N/A(Smart License Enabled)
+Next reload license Level: ax
+
+The current throughput level is 1000 kbps 
+
+
+Smart Licensing Status: UNREGISTERED/No Licenses in Use
+
+cisco CSR1000V (VXE) processor (revision VXE) with 1104920K/3075K bytes of memory.
+Processor board ID 9SVJOZ6W44O
+Router operating mode: Autonomous
+4 Gigabit Ethernet interfaces
+32768K bytes of non-volatile configuration memory.
+3012036K bytes of physical memory.
+6188032K bytes of virtual hard disk at bootflash:.
+
+Configuration register is 0x2102
+```
+
+- Adding more hosts:
+
+```
+VTEP2#show bridge-domain 10
+Bridge-domain 10 (2 ports in all)
+State: UP                    Mac learning: Enabled
+Aging-Timer: 300 second(s)
+Maximum address limit: 65536
+    GigabitEthernet2 service instance 1
+    vni 6001
+   AED MAC address    Policy  Tag       Age  Pseudoport
+   0   622C.B1B6.9392 forward dynamic   197  nve1.VNI6001, VxLAN 
+                                             src: 10.2.2.2 dst: 10.1.1.1
+   0   5254.00BD.800A forward dynamic   263  nve1.VNI6001, VxLAN 
+                                             src: 10.2.2.2 dst: 10.1.1.1
+   0   5254.008D.6328 forward dynamic   274  nve1.VNI6001, VxLAN 
+                                             src: 10.2.2.2 dst: 10.1.1.1
+   0   5254.00B9.800A forward dynamic   256  GigabitEthernet2.EFP1
+
+```
+
+![final-vxlan-topology](./final-vxlan-topology.png)

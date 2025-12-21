@@ -1334,3 +1334,100 @@ interface: Tunnel1
 
      outbound pcp sas:
 ```
+
+- IPSec config with IKEv2 profile and proposal
+
+- Topology:
+
+![ipsec-ikev2-proposal-profile](./vxlan-ipsecikev2.png)
+
+- VTEP1:
+
+```
+conf t
+ ip access-list extended GRE-IN-IPSEC
+  10 permit gre any any
+
+ crypto isakmp policy 10
+  encryption aes 256
+  hash sha256
+  authentication pre-share
+  group 14
+ crypto isakmp key MARIUS12345 address 10.2.2.2 255.255.255.252
+
+ crypto ikev2 proposal PROPOSAL1 
+  encryption aes-gcm-256 aes-gcm-128
+  prf sha256
+  group 14 16
+
+ crypto ikev2 profile MYPROFILE
+  match address local 10.1.1.1
+  match identity remote address 10.2.2.2 255.255.255.252 
+  authentication remote pre-share key MARIUS12345
+  authentication local pre-share key MARIUS12345
+
+ crypto ipsec transform-set MYTRANSPORT esp-aes 256 esp-sha256-hmac 
+  mode tunnel
+
+ crypto map MYCRYPTOMAP 1 ipsec-isakmp 
+  set peer 10.2.2.2
+  set transform-set MYTRANSPORT 
+  set ikev2-profile MYPROFILE
+  match address GRE-IN-IPSEC
+
+ interface Loopback0
+  ip address 10.1.1.1 255.255.255.255
+  crypto map MYCRYPTOMAP
+
+ interface tunnel 1
+  tunnel source l0
+  tunnel destination 10.2.2.2
+  no sh
+  ip address 10.100.1.1 255.255.255.252
+```
+
+- VTEP2:
+
+```
+conf t
+ ip access-list extended GRE-IN-IPSEC
+  10 permit gre any any
+
+ crypto isakmp policy 10
+  encryption aes 256
+  hash sha256
+  authentication pre-share
+  group 14
+
+ crypto isakmp key MARIUS12345 address 10.1.1.1
+
+ crypto ikev2 proposal 1 
+  encryption aes-gcm-256 aes-gcm-128
+  prf sha256
+  group 14 16
+
+ crypto ikev2 profile MYPROFILE
+  match address local 10.2.2.2
+  match identity remote address 10.1.1.1 255.255.255.252 
+  authentication remote pre-share key MARIUS12345
+  authentication local pre-share key MARIUS12345
+
+ crypto ipsec transform-set MYTRANSPORT esp-aes 256 esp-sha256-hmac 
+  mode tunnel
+
+ crypto map MYCRYPTOMAP 1 ipsec-isakmp 
+  set peer 10.1.1.1
+  set transform-set MYTRANSPORT 
+  set ikev2-profile MYPROFILE
+  match address GRE-IN-IPSEC
+
+ interface Loopback0
+  ip address 10.2.2.2 255.255.255.255
+  crypto map MYCRYPTOMAP
+
+ interface tunnel 1
+  no shut
+  tunnel source l0
+  tunnel destination 10.1.1.1
+  ip address 10.100.1.2 255.255.255.252
+```
