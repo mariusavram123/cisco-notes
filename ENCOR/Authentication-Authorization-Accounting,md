@@ -482,3 +482,46 @@ hostname CAT8k
 !
 ...
 ```
+
+### SSH authentication with RADIUS server
+
+- Router configuration:
+
+```
+username marius privilege 15 algorithm-type scrypt secret <secret>
+enable algorithm-type scrypt secret <secret>
+
+aaa new-model
+aaa authentication login default group radius local enable
+aaa authorization exec default group radius local 
+aaa session-id common
+
+! radius-server authorization default Framed-Protocol ppp
+! radius-server vsa send nas-port protocol pppoe vsa1
+radius server Test
+ address ipv4 172.16.29.17 auth-port 1812 acct-port 1813
+ non-standard
+ key <key-id>
+```
+
+- Freeradius configuration:
+
+```
+root@debian13-radius:~# grep router -A 5 /etc/freeradius/3.0/clients.conf
+client router {
+        ipaddr          = 172.16.29.16
+        secret          = <client-secret>
+#       require_message_authenticator = false
+}
+
+root@debian13-radius:~# grep marius -A 2 /etc/freeradius/3.0/users 
+marius  Cleartext-Password := "mypass"
+        Reply-Message := "Hello, %{User-Name}"
+
+marius123       Cleartext-Password := "mypass"
+        Reply-Message := "Hello, %{User-Name}"
+
+test123         Cleartext-Password := "mypass"
+        Reply-Message := "Hello, %{User-Name}"
+
+```

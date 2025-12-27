@@ -1,0 +1,41 @@
+# clients.conf
+
+client localhost {
+    ipaddr = 127.0.0.1
+    secret = testing123
+    require_message_authenticator = no
+    nas_type = other
+}
+client 10.2.2.1 {
+    ipaddr = 10.2.2.1
+    secret = Marius12345
+    require_message_authenticator = no
+    nas_type = other
+}
+
+# radiusd.conf
+
+log {
+    # Send all log messages to stdout
+    destination = stdout
+}
+
+listen {
+    type = auth
+    ipaddr = *
+    port = 1812
+}
+
+listen {
+    type = acct
+    ipaddr = *
+    port = 1813
+}
+
+# users
+
+testuser Cleartext-Password := "testpassword"
+marius Cleartext-Password := "Marius12345"
+marius123 Cleartext-Password := "Marius12345"
+radiustestuser Cleartext-Password := "Marius12345"
+

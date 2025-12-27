@@ -1456,23 +1456,49 @@ subnet mask 255.255.255.0
 no shutdown
 ```
 
+- First add into /etc/hosts the names for your hosts - or set dns resolve for them
+
+- Update - not needed - everything can be defined into the hosts file
+
 ```
+10.15.1.1 R1
+10.20.22.2 R2
+10.15.1.20 SW1
+```
+
+- Create a hosts file:
+
+```
+[routers]
+R1 ansible_host=10.15.1.1 ansible_user=marius ansible_password=<pass> ansible_become=yes ansible_become_method=enable ansible_become_password=<pass> ansible_network_os=cisco.ios.ios
+R2 ansible_host=10.20.22.2 ansible_user=marius ansible_password=<pass> ansible_become=yes ansible_become_method=enable ansible_become_password=<pass> ansible_network_os=cisco.ios.ios
+
+#[switches]
+#SW1
+
+```
+
+- Install the needed modules: (in fedora):
+
+```
+sudo dnf install python3-paramiko python3-ansible-pylibssh
+```
+
+```yaml
 ---
-- hosts: routers
-  gather_facts: false
-  connection: local
+- name: Configure Cisco router
+  hosts: R1
+  connection: network_cli
   tasks:
-    - name: Configure Ethernet0/3 interface
+    - name: Configure interface E0/3
       ios_config:
         lines:
-          - description: Configured by Ansible
-          - ip address 100.64.1.1 255.255.255.0
           - no shutdown
+          - ip address 100.64.1.1 255.255.255.0
+          - description Configured with ansible
         parents:
-          - interface Ethernet0/3
-        host: "{{ ansible-host }}"
-        username: marius
-        password: Avram
+          - interface Ethernet 0/3
+
 ```
 
 - To execute this playbook, the ansible-playbook command is used to call the specific playbook YAML file (ConfigureInterface.yaml)
@@ -1485,7 +1511,9 @@ no shutdown
 
 - Based on the status ok=1, you know the change was successful, the changed=1 status means that a single change was made on the CSR1KV-1 router
 
-![inventory-output](./inventory-output.png)
+- Real inventory run:
+
+![ansible-playbook-run-conf-interfaces](./ansible-playbook-run-conf-interfaces.png)
 
 - Building out a playbook can greatly simplify configuration tasks
 
@@ -1530,48 +1558,35 @@ write memory
 
 ```yaml
 ---
-- hosts: CSR1KV-1
-  gather-facts: false
-  connection: local
+- hosts: R2
+  connection: network_cli
   tasks:
-    - name: Configure GigabitEthernet2 Interface
+    - name: Configure Ethernet0/3 Interface
       ios_config:
         lines:
           - description Configured by Ansible
-          - ip address 10.1.1.0 255.255.255.0
+          - ip address 100.64.0.2 255.255.255.0
           - no shutdown
-        parents: interface GigabitEthernet2
-        host: "{{ ansible_host }}"
-        username: cisco
-        password: testtest
-    - name: Config Gig3
+        parents: interface Ethernet0/3
+    - name: Configure Ethernet 0/2
       ios_config:
         lines:
           - description Configured by Ansible
           - no ip address
           - shutdown
-        parents: GigabitEthernet3
-        host: "{{ ansible_host }}"
-        username: cisco
-        password: testtest
+        parents: interface Ethernet 0/2
     - name: Config EIGRP 100
       ios_config:
         lines:
           - router eigrp 100
           - eigrp router-id 10.1.1.1
           - no auto-summary
-          - network 10.1.1.0 0.0.0.255
-        host: "{{ ansible_host }}"
-        username: cisco
-        password: testtest
+          - network 100.65.0.0 0.0.3.255
     - name: Write Memory
       ios_command:
         commands:
           - write memory
-      host: "{{ ansible_host }}"
-      username: cisco
-      password: testtest
-...
+
 ```
 
 - When the playbook is run, the output shows the tasks as they are completed and the status of each one
@@ -1584,7 +1599,7 @@ write memory
 
     - Config EIGRP 100
 
-![eigrp-configuration](./eigrp-configuration-example.png)
+![eigrp-configuration](./ansible-enable-eigrp-playbook.png)
 
 - Furthermore, the Write Memory task completes which is evident from the status ok: [CSR1KV-1]
 
@@ -1594,21 +1609,37 @@ write memory
 
 - After the EIGRP_Configuration_Example.yaml has been run against CSR1KV-1, you need to verify the configuration to make sure it was correctly applied
 
-- Below are shown the relevant sections of the startup configuration from CSR1KV-1 to verify the tasks that were applied to the router
+- Below are shown the relevant sections of the startup configuration from R2 to verify the tasks that were applied to the router
 
 ```
-interface Ethernet0/2
- ip address 10.1.1.1 255.255.255.0
+R2#sh run | s router eigrp
+router eigrp 100
+ network 100.65.0.0 0.0.3.255
+ eigrp router-id 10.1.1.1
+R2#
+R2#
+R2#
+R2#sh run int e0/2
+Building configuration...
+
+Current configuration : 89 bytes
 !
-interface Ethernet0/3
+interface Ethernet0/2
+ description Configured by Ansible
  no ip address
  shutdown
+end
+
+R2#sh run int e0/3
+Building configuration...
+
+Current configuration : 101 bytes
 !
-!
-router eigrp 100
- network 10.1.1.0 0.0.0.255
- eigrp router-id 10.1.1.1
-!
+interface Ethernet0/3
+ description Configured by Ansible
+ ip address 100.64.0.2 255.255.255.0
+end
+
 ```
 
 - The last task in the playbook is to issue the `write memory` command, and you can verify that it happened by issuing the `show startup-config` command with some filters to see relevant configuration on the router
@@ -1616,14 +1647,16 @@ router eigrp 100
 - Below is shown the output of the command `show startup-config | s Ethernet0/2|net0/3|router eigrp 100`
 
 ```
-R1#show startup-config | s Ethernet0/2|net0/3|router eigrp 100
+R2#show startup-config | s Ethernet0/2|net0/3|router eigrp 100
 interface Ethernet0/2
- ip address 10.1.1.1 255.255.255.0
-interface Ethernet0/3
+ description Configured by Ansible
  no ip address
  shutdown
+interface Ethernet0/3
+ description Configured by Ansible
+ ip address 100.64.0.2 255.255.255.0
 router eigrp 100
- network 10.1.1.0 0.0.0.255
+ network 100.65.0.0 0.0.3.255
  eigrp router-id 10.1.1.1
 ```
 

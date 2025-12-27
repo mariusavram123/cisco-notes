@@ -492,3 +492,29 @@ PC(config)#do sh ntp assoc
  * sys.peer, # selected, + candidate, - outlyer, x falseticker, ~ configured
 ```
 
+- NTP access groups:
+
+- Restrict NTP settings to a specific ACL and also restrict what type of messages are processed from the server
+
+```
+conf t
+ ntp access-group {peer|serve|serve-only|query-only} <acl-name/number>
+```
+
+- The access group options are scaned in the following order, from least restrictive to most restrictive
+
+- However, if NTP matches a deny ACL rule in a configured peer, ACL processing stops and does not continue to the next access group notion
+
+    - The **peer** keyword enables the device to receive time requests and NTP control queries and to syncronize itself with the servers specified in the access list
+
+    - The **serve** keyword enables the device to receive time requests and NTP control queries from the time servers specified in the access list **but not synchronize itself** with the specified servers
+
+    - The **serve-only** keyword enables the device to receive **only time requests** from servers specified in the access-list
+
+    - The **query-only** keyword enable the device to receive **only NTP control queries** from the servers specified in the access list
+
+- Verification:
+
+```
+show ntp access-groups
+```

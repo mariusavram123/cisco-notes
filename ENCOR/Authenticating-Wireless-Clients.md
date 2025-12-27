@@ -444,8 +444,6 @@ ln -s /etc/freeradius/3.0/mods-available/sql /etc/freeradius/3.0/mods-enabled/
 ```
 vim /etc/freeradius/3.0/mods-enabled/sql
 
-
-
 ```
 
 - Set ownership

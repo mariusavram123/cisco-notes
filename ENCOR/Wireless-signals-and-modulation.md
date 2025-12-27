@@ -16,7 +16,7 @@
 
 - The wire itself is continuous and conductive, so the signal can propagate rather easily
 
-- A wireless link has no phisical strands of anything to carry the signal along
+- A wireless link has no physical strands of anything to carry the signal along
 
 - How then can an electrical signal be sent across the air, or free space?
 
@@ -172,7 +172,7 @@ Gigahertz               GHz                                             1.000.00
 
     - 6425 to 6525 GHZ - U-NII-6
 
-    - 6425 to 6825 GHz - U-NII-7
+    - 6625 to 6825 GHz - U-NII-7
 
     - 6825 to 7125 GHz - U-NII-8
 
@@ -274,7 +274,7 @@ Gigahertz               GHz                                             1.000.00
 
 - A point that is halfway along the cycle is at the 180-degree mark
 
-- Because an oscilating signal si cyclic, you can think of the phase traveling along a cycle again and again
+- Because an oscilating signal is cyclic, you can think of the phase traveling along a cycle again and again
 
 - When two identical signals are produced at exactly the same time, their cycles match up and they are said to be in phase with each other
 
@@ -494,7 +494,7 @@ x10                                             +10 dB
 
 - Now use the dB laws to replace the doubling and x10 with the dB equivalents
 
-- The result is E = D + 3 + 3 + 10 or E = D + 6 dB
+- The result is E = D + 3 + 3 + 10 or E = D + 16 dB
 
 - You may also find other ways to reach the same result
 
@@ -560,7 +560,7 @@ db = 10log(10)(0.000031623 mW/100 mW) = -65 dB
 
 - This effectively increases the dB value of the signal above that of the transmitter alone
 
-- Antennas provide positive fain
+- Antennas provide positive gain
 
 - By itself, the antenna does not generate any amount of absolute power
 
@@ -724,7 +724,7 @@ where d is the distance in kilometers, and f is the frequency in megahertz
 
 - To get a feel for the actual range difference between different bands, an impromptu test was performed by carying a test receiver away from colocated 2,4, 5, and 6 GHz transmitters until the received signal strength reached -67 dBm
 
-- On a 2.4 GHz channel, the range has measured to be 140 feet, whereas at 5GHz it was reduced to 80 feet and at 60 GHz to 50 feet
+- On a 2.4 GHz channel, the range has measured to be 140 feet, whereas at 5GHz it was reduced to 80 feet and at 6 GHz to 50 feet
 
 - While the free space path loss is the largest contributor to the difference, other factors like antenna size and receiver sensitivity that differ between the 2.4, 5 and 6 GHz radios has some effect too
 
@@ -1150,7 +1150,7 @@ Wi-Fi 6                                         Up to 8 spatial streams
 
 - Remember that more complex modulation and coding schemes can be used to transport more date when the SNR is high
 
-- As a receiver gets farther away from a transmitter, the RSSI (and SNR) decreases
+- As a receiver gets further away from a transmitter, the RSSI (and SNR) decreases
 
 - More basic modulation and coding schemes are needed there because of the increase in noise and the need to transmit more data
 

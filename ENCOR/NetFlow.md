@@ -172,7 +172,7 @@ Gi0/1         172.16.29.17    Local         172.16.29.16    11 CE0D 00A1    73
 
 ### Flexible NetFlow
 
-- Flexible NetFlow was created to aid in more complex traffic analysis configuration that is possible with traditional NetFlow
+- Flexible NetFlow was created to aid in more complex traffic analysis configuration that is not possible with traditional NetFlow
 
 - Flexible NetFlow allows for the use and reuse of configuration components
 

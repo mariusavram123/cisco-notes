@@ -120,7 +120,7 @@
 
     - Multiple APs in bridge mode can form an indoor or outdoor mesh network 
 
-    - **Flex + Bridge**: FlexConnect operation is enabled on a mesh AP
+    - **Flex + Bridge**: FlexConnect operation is enabled on a mesh/bridge AP
 
     - **SE-Connect**: The AP dedicates it's radios to spectrum analyzis on all wireless channels
 
@@ -158,7 +158,7 @@
 
 - If you have more APs than the maximum, you need to add more WLCs to the design, each located centrally
 
-- A typical centralized WLC meant for large enterprise can support up to 6000 APs and up to 64000 wireless clients
+- A typical centralized WLC meant for large enterprise can support from up to 6000 APs and up to 64000 wireless clients
 
 - The latest two schemes, both have the same topology
 
@@ -176,7 +176,7 @@
 
 - The centralized architecture also affects wireless user mobility
 
-- For example, as a wireless user moves throug the coverage area of the four APs from our figure, that user might associate with many different APs at the access layer
+- For example, as a wireless user moves through the coverage area of the four APs from our figure, that user might associate with many different APs at the access layer
 
 - Because all the APs are joined to a single WLC, that WLC can easily maintain the users connectivity to all other areas of the network as the user moves arround
 
@@ -750,7 +750,7 @@
 
 - Next, the plot is followed in either direction until the value decreases by 3 dB, indicating the point where the signal is one-half of the strongest power
 
-- A line is drown from the center of the plot to intersect each 3dB point, and then the angle between the two lines is measured
+- A line is drown from the center of the plot to intersect each 3 dB point, and then the angle between the two lines is measured
 
 - Below is shown a simple example
 
