@@ -529,3 +529,7 @@ Nov  1 09:19:34 172.16.29.16 BGP(0): Revise route installing 1 of 1 routes for 1
 Nov  1 09:20:40 172.16.29.16 %GRUB-5-CONFIG_WRITING: GRUB configuration is being updated on disk. Please wait...
 Nov  1 09:20:41 172.16.29.16 %GRUB-5-CONFIG_WRITTEN: GRUB configuration was written to disk successfully.
 ```
+
+- More documentation for syslog (Read the origin-id command)
+
+[DOC-SYSLOG](https://packet-lab.com/main/images/stories/configuringsyslog/configuring%20syslog%20server%20on%20cisco%20routers%20slides.pdf)

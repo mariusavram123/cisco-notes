@@ -62,7 +62,7 @@
 
     - **Secure Segmentation**: With SD-Access, it is easier to **segment** the network to support guest, corporate, facilities and IOT-enabled infrastructure
 
-    - **Network Virtualization**: SD-Access makes it possible to leverage a single phyisical infrastructure to support multiple virtual routing and forwarding (VRF) instances, referred to as virtual networks [VNs], which with a distinct set of access policies
+    - **Network Virtualization**: SD-Access makes it possible to leverage a single physical infrastructure to support multiple virtual routing and forwarding (VRF) instances, referred to as virtual networks [VNs], which with a distinct set of access policies
 
 #### What is SD-Access?
 
@@ -428,7 +428,7 @@
 
     - **Cisco Identity Services Engine (ISE)**: The basic role of ISE is to provide all the identity and policy services for the physical layer and network layer
 
-    - ISE provides Network Access Control (NAC) and identity services for dynamic endpoint-to-group mapping and policy definition in a variety of ways, including using 802.1X, **MAP Authentication Bypass (MAB)**, and **Web Authentication (WebAuth)**
+    - ISE provides Network Access Control (NAC) and identity services for dynamic endpoint-to-group mapping and policy definition in a variety of ways, including using **802.1X**, **MAP Authentication Bypass (MAB)**, and **Web Authentication (WebAuth)**
 
     - ISE also collects and uses the contextual information shared from NDP and NCP (and other systems, such as Active Directory and AWS)
 
@@ -532,6 +532,6 @@
 
     - **Devices 360**: Used to monitor and resolve device-specific status and issues (such as resource usage and loss and latency), with links to connected clients
 
-    - **Issues**: Used to minitor and resolve open issues (reactive) and/or developing trends (proactive) with clients and devices at specific sites
+    - **Issues**: Used to monitor and resolve open issues (reactive) and/or developing trends (proactive) with clients and devices at specific sites
 
 - Assurance workflow: Web interface -> Assurance -> Health, Dashboards, Issues, Manage

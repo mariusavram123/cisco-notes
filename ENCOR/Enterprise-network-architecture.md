@@ -112,7 +112,9 @@
 
 - As networks grow beyond three distribution layers in a single location, organizations should consider using a core layer to optimize the design
 
-- The core layer is the backbone and aggregation point for multiple networks and provides scalability, high availability, and fast convergence to the network
+- The core layer is the backbone (also called backbone layer) and aggregation point for multiple networks and provides scalability, high availability, and fast convergence to the network
+
+- Can also be called the network backbone or high speed transit layer in some contexts
 
 - The core can provide high-speed connectivity for large enterprises with multiple campus networks distributed worldwide, and it can also provide interconnectivity between the end-user/endpoint campus access layer and other network blocks, such as the data center, the private cloud, the public cloud, the WAN, the Internet edge, and network services
 
@@ -248,7 +250,7 @@
 
 ### Enterprise Network Architecture Options
 
-- Multiple network architecture design options are available for deploying a campus network, depending on the size of the campus as well as the reliability, resiliency, reliability, performance, security, and scalability required for it
+- Multiple network architecture design options are available for deploying a campus network, depending on the size of the campus as well as the reliability, resiliency, performance, security, and scalability required for it
 
 - Each possible option should be evaluated against business requirements
 

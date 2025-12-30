@@ -8,7 +8,7 @@
 
 - The famous saying about "three sides to every story" holds true when troubleshooting network-based issues, where there are the perspectives of the local device, the remote device and what is transmitted on the wire
 
-- Regrardless of whether one device is a router, a firewall, a load balancer, or a computer there are often tools that allow for troubleshooting processes locally on the device
+- Regardless of whether one device is a router, a firewall, a load balancer, or a computer there are often tools that allow for troubleshooting processes locally on the device
 
 - Understanding what was transmitted on the wire can help pinpoint problems
 
@@ -32,7 +32,7 @@
 
     - **Local Switched Port Analyzer**: You can capture local network traffic on a switch and send a copy of the network traffic to a local port attached to some sort of traffic analyzer
 
-    - **Remote Switched Port Analyzer (RSPAN)**: You can capture network traffic on a remote switch and send  a copy of it to the local switch throughout Layer 2 (switching) toward a local port attached to some sort of traffic analyzer
+    - **Remote Switched Port Analyzer (RSPAN)**: You can capture network traffic on a remote switch and send a copy of it to the local switch throughout Layer 2 (switching) toward a local port attached to some sort of traffic analyzer
 
     - **Encapsulated Remote Switched Port Analyzer (ERSPAN)**: You can capture network traffic on a remote device and send the traffic to the local system through Layer 3 (routing) toward a local port attached to some sort of traffic analyzer
 

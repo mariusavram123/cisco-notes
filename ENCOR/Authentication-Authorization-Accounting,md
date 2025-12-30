@@ -214,7 +214,7 @@ Primary use                             Secure network access                   
 
     - Command authorization is applied on a per-privilege-level basis, so it is necessary to configure a command authorization method list for every privilege level that requires command authorization
 
-    - Command authorization is commonly confiugured for levels 0, 1 and 15 only
+    - Command authorization is commonly configured for levels 0, 1 and 15 only
 
     - The other levels, 2 to 14 are useful only for local authorization with the `privilege level` command
 

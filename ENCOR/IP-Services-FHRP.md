@@ -4,7 +4,7 @@
 
 - Resiliency with Layer 2 forwarding is accomplished by adding multiple Layer 2 switches into the topology
 
-- Resiliency with Layer 3 forwarding is accomplished by adding multiple layer 3 paths or routers
+- Resiliency with Layer 3 forwarding is accomplished by adding multiple Layer 3 paths or routers
 
 - The concept of resiliency by using multiple Layer 2 switches and routers from the left or by adding resiliency with multiple multilayer switches on the right of the picture below
 
@@ -169,7 +169,7 @@ Track 2
 
 ### Hot Standby Router Protocol
 
-- Hot Standby Router Protocol (HSRP) is a Cisco Proprietary protocol that provides transparent failover of the first-hop device, which typically acts as gateway to thr hosts
+- Hot Standby Router Protocol (HSRP) is a Cisco Proprietary protocol that provides transparent failover of the first-hop device, which typically acts as gateway to the hosts
 
 - HSRP provides routing redundancy for IP hosts on an Ethernet network configured with a default gateway IP address
 
@@ -1025,7 +1025,7 @@ Vlan30 - Group 30
 
 - The command `show glbp brief` shows high-level details of the GLBP group, including the interface, group, active AVG, standby AVG and the statusses of the AVFs
 
-- The first entry contains a - for the Fwd state, which means that is the entry for the AVG
+- The first entry contains a "-" for the Fwd state, which means that is the entry for the AVG
 
 - The following two entries are for the AVF instances; they identify which device is active for each AVF
 

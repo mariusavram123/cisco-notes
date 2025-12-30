@@ -82,7 +82,7 @@
 
 - Every vBond has a permanent control plane connection over a **Datagram Transport Layer Security (DTLS)** tunnel with every vSmart controller
 
-- As edge devices authenticaste with the vBond, they are directed to the appropriate vSmart and vManage device
+- As edge devices authenticate with the vBond, they are directed to the appropriate vSmart and vManage device
 
 - NAT is detected and then the edge device session is torn down
 
@@ -92,7 +92,7 @@
 
 - The vManage NMS is a single pane of glass network management system (NMS) GUI that is used to configure and manage the full SD-WAN solution
 
-- It contains all of the edge device configurations controls software updates, and should be used for control and data plane policy creation
+- It contains all of the edge device configurations controls, software updates, and should be used for control and data plane policy creation
 
 - The vManage NMS also provides a method of configuring the SD-WAN fabric via APIs
 

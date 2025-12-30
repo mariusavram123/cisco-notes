@@ -286,7 +286,7 @@ Time stamp system uptime last       Non-key                                     
 
 - Many of the predefined flow records that are available may be suitable for many use cases
 
-- Having the ability to build a custom flow record for a specific and unique use case makes it exteremely powerful
+- Having the ability to build a custom flow record for a specific and unique use case makes it extremely powerful
 
 - Below is shown a custom record named CUSTOM1 being defined on R4
 
@@ -901,10 +901,13 @@ IPV4 DST ADDR         bytes        pkts
 Flow record
     |
     |
+    \/
 Flow exporter
     |
     |
+    \/
 Flow monitor (unite it with the record and exporter)
     |
     |
+    \/
 Apply to inferfaces (input/output/both)
