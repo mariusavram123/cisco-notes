@@ -518,3 +518,101 @@ monitor session 1 type erspan-source
   ipv6 ttl 0
   origin ip address 192.168.99.11
 ```
+
+- ERSPAN uses a GRE tunnel to encapsulate the RSPAN data
+
+- Cisco documentation:
+
+[DOC-ERSPAN-CISCO](https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/lanswitch/configuration/xe-3s/lanswitch-xe-3s-book/lnsw-conf-erspan.html#GUID-4CAB13D7-0803-4D67-B720-4AB56A978FEF)
+
+- NetworkLessons documentation:
+
+[ERSPAN-NETWORKLESSONS](https://networklessons.com/system-management/erspan)
+
+- CML-LAB
+
+![erspan-lab-topology](./erspan-csr1kv.png)
+
+- R1 - ERSPAN source:
+
+```
+conf t
+ monitor session 1 type erspan-source
+  description ERSPAN-SESSION
+  source interface gigabitEthernet 2 both
+  no shutdown
+  destination
+   erspan-id 10
+   ip address 10.2.1.51
+   mtu 128
+   ! this is the origin ip address used on the gre packets - not needed on the other side
+   origin ip address 10.12.1.1
+```
+
+- Verify the session:
+
+```
+R1#sh monitor session 1
+Session 1
+---------
+Type                     : ERSPAN Source Session
+Status                   : Admin Enabled
+Description              : ERSPAN-SESSION
+Source Ports             : 
+    Both                 : Gi2
+Destination IP Address   : 10.2.1.51
+MTU                      : 128
+Destination ERSPAN ID    : 10
+Origin IP Address        : 10.12.1.1
+IPv6 DSCP                : 0
+IPV6 TTL                 : 0
+
+
+R1#sh run | s monitor ses
+monitor session 1 type erspan-source
+ description ERSPAN-SESSION
+ source interface Gi2
+ destination
+  erspan-id 10
+  mtu 128
+  ip address 10.2.1.51
+  ipv6 dscp 0
+  ipv6 ttl 0
+  origin ip address 10.12.1.1
+
+```
+
+- R2 - ERSPAN destination:
+
+```
+conf t
+ monitor session 1 type erspan-destination
+  destination interface g2
+  no shutdown
+  source
+   erspan-id 10
+   ip address 10.2.1.51
+```
+
+- The erspan session comes up after all parameters are defined and you get out of the erspan config mode (same way as with vlans)
+
+- Verification:
+
+```
+R2(config-mon-erspan-dst)#do sh monitor sess 1 
+Session 1
+---------
+Type                     : ERSPAN Destination Session
+Status                   : Admin Enabled
+Destination Ports        : Gi2
+Source IP Address        : 10.2.1.51
+Source ERSPAN ID         : 10
+
+
+R2(config-mon-erspan-dst)#do sh run | s monitor session
+monitor session 1 type erspan-destination
+ destination interface Gi2
+ source
+  erspan-id 10
+  ip address 10.2.1.51
+```
