@@ -10,11 +10,9 @@
 
 - A router is necessary to transmit packets between network segments
 
-- This chapter explains the process a router uses to insert routes into the routing table from routing protocol databases and the methodologies for selecting a path
+- The process a router uses to insert routes into the routing table from routing protocol databases and the methodologies for selecting a path
 
-- A brief overview of static routing is provided as well
-
-- By the end of this chapter you should have a solid understanding of the routing process on a router
+- A brief overview of static routing
 
 ## Routing Protocol Overview
 
@@ -324,7 +322,6 @@ IS-IS                   115         10.3.3.0/24         no
 - The logic for selecting the best path for a routing protocol can vary
 
 - Most IGPs prefer internally learned routes over external routes and further prioritize the path with the lowest metric 
-
 
 #### Equal-Cost Multipathing
 

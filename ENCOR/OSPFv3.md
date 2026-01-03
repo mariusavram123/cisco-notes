@@ -74,7 +74,7 @@
 
 	- LS type: 0x4005, Name: AS external, Description: Autonomous system boundary routers advertise AS external LSAs to announce default routes or routes learned through redistribution from other protocols
 
-	- LS type: 0x2007, Name: NSSA, Description: Autonomous system boundary routers that are located in a no-so-stubby area advertise NSSA LSAs for routers redistributed into the area
+	- LS type: 0x2007, Name: NSSA, Description: Autonomous system boundary routers that are located in a not-so-stubby area advertise NSSA LSAs for routers redistributed into the area
 
 	- LS type: 0x0008, Name: Link, Description: The link LSA maps all the global unicast address prefixes associated with an interface to the link local interface IP address of the router
 
@@ -104,7 +104,7 @@
 
 	- **Hello packet**: Source: Link-local address, Destination: FF02::5, Description: Discover and maintain neighbors
 
-					Source: Link-local address, Destination: Link-local address, Description: Initial adjacency forming, immediate hello
+					    Source: Link-local address, Destination: Link-local address, Description: Initial adjacency forming, immediate hello
 
 	- **Database description**: Source: Link-local address, Destination: Link-local address, Description: Summarize database contents
 
@@ -347,7 +347,7 @@ show ospfv3 interface <id> | include Passive
 
 - A common mistake with summarization of IPv6 addresses is to confuse hex with decimal
 
-- We tipically perform summarization logic in decimal, as the first and the third digit in an octet should not be confused as decimal values
+- We typically perform summarization logic in decimal, as the first and the third digit in an octet should not be confused as decimal values
 
 - Example: IPv6 address 2001::1/128 is not 20 and 1. The number 2001::1 is 32 and 1
 

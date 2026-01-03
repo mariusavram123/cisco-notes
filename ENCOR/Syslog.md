@@ -533,3 +533,77 @@ Nov  1 09:20:41 172.16.29.16 %GRUB-5-CONFIG_WRITTEN: GRUB configuration was writ
 - More documentation for syslog (Read the origin-id command)
 
 [DOC-SYSLOG](https://packet-lab.com/main/images/stories/configuringsyslog/configuring%20syslog%20server%20on%20cisco%20routers%20slides.pdf)
+
+## Configuration backup functionality
+
+- To enable automatic backup of the running config to a certain server or on a file on the device itself the archive functionality can be used
+
+- Example configuration:
+
+```
+conf t
+ archive
+  path flash:config.cli
+  write-memory
+  time-period 1
+```
+
+- Path can be a local or a remote device:
+
+```
+R1(config-archive)#path ?
+  bootflash:  Write archive on bootflash: file system
+  flash:      Write archive on flash: file system
+  ftp:        Write archive on ftp: file system
+  http:       Write archive on http: file system
+  https:      Write archive on https: file system
+  pram:       Write archive on pram: file system
+  rcp:        Write archive on rcp: file system
+  scp:        Write archive on scp: file system
+  sftp:       Write archive on sftp: file system
+  tftp:       Write archive on tftp: file system
+```
+
+- Verifying:
+
+```
+R1#sh archive 
+The maximum archive configurations allowed is 10.
+There are currently 3 archive configurations saved.
+The next archive file will be named bootflash:config.cli-<timestamp>-3
+ Archive #  Name
+   1        bootflash:config.cli-Jan--1-12-15-49.924-0 
+   2        bootflash:config.cli-Jan--1-12-16-52.585-1 
+   3        bootflash:config.cli-Jan--1-12-17-52.684-2 <- Most Recent
+   4         
+   5         
+   6         
+   7         
+   8         
+   9         
+   10        
+```
+
+- Viewing the files:
+
+```
+more flash:config.cli-Jan--1-12-16-52.585-1
+```
+
+- Disable archive function:
+
+```
+R1(config)#no archive
+```
+
+- Applying the archive to the device's running config:
+
+```
+R1#copy flash:config.cli-Jan--1-12-16-52.585-1 running-config 
+Destination filename [running-config]? 
+A system RELOAD is required before templating state change
+
+(...)
+
+reload ! (with config save)
+```

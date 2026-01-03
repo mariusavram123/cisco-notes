@@ -54,7 +54,7 @@
     
     - Authentication then takes place using the selected EAP method
 
-    3. If authentication is successful, the authentication server returns a RADIUS access-accept message with an ecapsulated EAP-success message, as well as an authorization option such as a downloadable ACL (dACL)
+    3. If authentication is successful, the authentication server returns a RADIUS access-accept message with an encapsulated EAP-success message, as well as an authorization option such as a downloadable ACL (dACL)
 
     - When this is done, the authenticator opens the port
 
@@ -64,7 +64,7 @@
 
 - Many different EAP methods are available, most of them based on Transport Layer Security (TLS)
 
-- Which one to choose depends on the security requirements and the EAP methods supported by the supplicants and the authentication server
+- Which one to choose depends on the security requirements and the EAP methods supported by the supplicants and the authentication servers
 
 - The following are the most commonly used EAP methods:
 

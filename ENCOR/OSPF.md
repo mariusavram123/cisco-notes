@@ -104,7 +104,7 @@
 
     1. **Hello**: These packets are for discovering and maintaining neighbors. Packets are sent out periodically on all OSPF interfaces to discover new neighbors while ensuring that other adjacent neighbors are still online
 
-    2. **Database Description (DBD or DDP)**: These packets are for summarizing database contents. Packets are exchanged when an OSPF adjacency is first being formed. These packets are used to discribe the contents of the LSDB
+    2. **Database Description (DBD or DDP)**: These packets are for summarizing database contents. Packets are exchanged when an OSPF adjacency is first being formed. These packets are used to describe the contents of the LSDB
 
     3. **Link-state request (LSR)**: These packets are for database downloads. When a router thinks that part of LSDB is stale, it may request a portion of neighbor's database by using this packet type
 
@@ -854,8 +854,6 @@ O*E2	0.0.0.0/0 [110/1] via 10.23.1.2, 00:02:56, GigabitEthernet0/1
 
 - Almost every network requires tunning based on the equipment, technical requirements, or a variety of other factors
 
-- The following sections explain the common concepts for tuning an OSPF network
-
 #### Link Costs
 
 - Interface cost is an essential component of Dijikstra's SPF calculation because the shortest path metric is based on the cummulative interface cost (that is, metric) from the router to the destination
@@ -974,7 +972,7 @@ GigabitEthernet0/1 is up, line protocol is up
 
 - Placing the DR and BDR roles on routers with adequate resources is recommended
 
-- In the following section the DR election process and how the DR role can be assigned to specific hardware
+- The DR election process and how the DR role can be assigned to specific hardware
 
 #### Designated Router Elections
 
