@@ -1359,3 +1359,53 @@ O		192.168.1.1 [110/65] via 10.12.1.1, 00:37:15, Serial0/0
 - Notice that R1's loopback address is a /32 network and R2's loopback address is a /24 network
 
 - Both loopbacks were configured with a /24 network; however, because R1's Lo0 is an OSPF network type of loopback, it is advertised as a /32 network
+
+- For route filtering to remember:
+
+    - OSPF External routes (type 1 or type 2) cannot be filtered with `area x filter-list ...`. The way to to this is to filter them with a route map when redistributing them into OSPF 
+
+    - Distribute lists can filter these for getting into the local router's routing table but not for being advertised to neighbors
+
+```
+conf t
+ ip prefix-list DROP-LOOP seq 3 deny 10.2.2.2/32
+ ip prefix-list DROP-LOOP seq 5 deny 10.1.1.1/32
+ ip prefix-list DROP-LOOP seq 10 deny 10.1.1.2/32
+ ip prefix-list DROP-LOOP seq 15 deny 10.3.3.3/32
+ ip prefix-list DROP-LOOP seq 20 deny 10.4.4.4/32
+ ip prefix-list DROP-LOOP seq 25 deny 10.5.5.5/32
+ ip prefix-list DROP-LOOP seq 30 permit 0.0.0.0/0 le 32
+
+ router ospf 50
+  router-id 10.8.8.8
+  auto-cost reference-bandwidth 10000
+  redistribute eigrp 65001 metric-type 1 subnets route-map DENY-EIGRP
+  distribute-list prefix DROP-LOOP in
+
+ route-map DENY-EIGRP permit 10
+  match ip address prefix-list DROP-EIGRP
+  set metric 250
+  set tag 10
+
+ ip prefix-list DROP-EIGRP seq 10 deny 10.89.10.0/24 ge 27
+ ip prefix-list DROP-EIGRP seq 20 deny 10.9.9.9/32
+ ip prefix-list DROP-EIGRP seq 30 deny 10.10.10.10/32
+ ip prefix-list DROP-EIGRP seq 40 permit 0.0.0.0/0 le 32
+
+ router eigrp TEST
+ !
+ address-family ipv4 unicast autonomous-system 65001
+  !
+  af-interface GigabitEthernet0/1
+   summary-address 0.0.0.0 0.0.0.0
+  exit-af-interface
+  !
+  topology base
+   default-metric 1000000 1 255 1 1500
+   redistribute ospf 50
+  exit-af-topology
+  network 10.8.8.8 0.0.0.0
+  network 10.89.10.0 0.0.0.31
+  eigrp stub connected
+ exit-address-family
+```

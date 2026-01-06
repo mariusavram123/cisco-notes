@@ -160,6 +160,10 @@ P 10.4.4.0/24, 1 successors, FD is 3328 ---> Feasible distance
 
 - EIGRP metric formula:
 
+```
+Metric = [(K1 * BW + (K2 * BW / 256 - load) + K3 * delay) * K5 / (K4 + reliability)]
+```
+
 ![metric-formula](./eigrp-metric.jpg)
 
 - EIGRP uses K values to define which factors the formula uses and the associate impact of a factor when calculating the metric
@@ -170,7 +174,7 @@ P 10.4.4.0/24, 1 successors, FD is 3328 ---> Feasible distance
 
 - BW represents the slowest link in the path scaled to a 10 Gbps link (10^7)
 
-- Link speed is collecte from the configured interface bandwidth on an interface
+- Link speed is collected from the configured interface bandwidth on an interface
 
 - Delay is the total measure of delay in the path, measured in tens of microseconds (us)
 
@@ -180,9 +184,19 @@ P 10.4.4.0/24, 1 successors, FD is 3328 ---> Feasible distance
 
 ![eigrp-metric](./eigrp-metric-explained.jpg)
 
+```
+Metric = 256 *[(K1 * 10^7/Min_bandwidth) + ((10^7 / K2 * Min_bandwidth)/ 256 - Load + (K3 * Total_delay) / 10) * K5 / (K4 + Reliability)]
+```
+
 - By default K1 and K3 have the value 1, and K2, K4 and K5 are set to 0
 
 - Placing the default K values in the formula it becomes:
+
+```
+Metric = 256 * [(1 * 10^7/Min_bandwidth + 10^7/(0 * Min_bandwidth)/(256 - load)) + (1 * Total_delay / 10) * 0/ 0 + Reliability]
+
+Metric = 256 * (10^7 / Min_bandwidth + Total_delay / 10)
+```
 
 ![default-metric](./eigrp-with-default-metrics.jpg)
 
@@ -527,7 +541,18 @@ conf t
   eigrp stub connected
 ```
 
+- Configure stub in EIGRP named mode:
+
+```
+conf t
+ router eigrp TEST
+  address-family ipv4 autonomous-system 65001
+   eigrp stub connected
+```
+
 - You can use only `eigrp stub` command but it will not advertise any networks to neighbors. To advertise the connected networks use `eigrp stub connected`
+
+- The `eigrp stub` commands do not work well with summary addresses. When using stub the summary route is not advertised to EIGRP peers, but only present as a Null0 route on the local router
 
 #### Configuring timers on interfaces
 
@@ -566,11 +591,23 @@ conf t
   ip summary address eigrp 1 172.16.0.0 255.255.252.0
 ```
 
+- With named mode summarization is made in af-interface mode:
+
+```
+conf t
+ router eigrp TEST
+  address-family ipv4 autonomous-system 65001
+   af-interface g0/1
+    summary-address 0.0.0.0 0.0.0.0
+```
+
 - Verifying on R6 there is only one network now in the routing table for the range 172.16.0.0/22
 
 ```
 show ip route
 ```
+
+- Summarization can also be used for default route advertisement, as in the EIGRP named mode example above
 
 - Automatically summarize routes:
 
@@ -713,7 +750,7 @@ conf t
 
 #### Set metric version (32bit or 64bit metrics)
 
-- On my IOL router is only possible to set it for named mode eigrp
+- On my IOL router is only possible to set it for named mode eigrp (not possible on IOSv)
 
 - R2:
 
@@ -749,4 +786,30 @@ conf t
    af-interface e0/1
     bandwidth-percent 50
 ```
+
+#### EIGRP route filtering in named mode
+
+- This can be done using distribute lists
+
+- Distribute lists can match access-lists, prefix-lists or route-maps
+
+- Route filtering using a distribute list matching a prefix list:
+
+```
+conf t
+ ip prefix-list DROP-LOOP seq 3 deny 10.2.2.2/32
+ ip prefix-list DROP-LOOP seq 5 deny 10.1.1.1/32
+ ip prefix-list DROP-LOOP seq 10 deny 10.1.1.2/32
+ ip prefix-list DROP-LOOP seq 15 deny 10.3.3.3/32
+ ip prefix-list DROP-LOOP seq 20 deny 10.4.4.4/32
+ ip prefix-list DROP-LOOP seq 25 deny 10.5.5.5/32
+ ip prefix-list DROP-LOOP seq 30 permit 0.0.0.0/0 le 32
+
+ router eigrp TEST
+  address-family ipv4 unicast autonomous-system 65001
+   topology base
+    distribute-list prefix DROP-LOOP in
+```
+
+- This does not work for routes originated from other protocols (example OSPF External or OSPF inter area routes) - these need to be filtered from redistribution with a route map
 
