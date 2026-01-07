@@ -374,7 +374,7 @@ show tcp brief
 
     - **Step 2**: Optional - Statically define the BGP router ID (RID). The dynamic RID allocation logic uses the highest IP address on any up loopback interface. If there is not an up loopback interface, then the highest IP address of any up interface becomes the RID when the BGP process initializes
 
-    - To ensure that the RID does not change, a static RID is assigned (typically representing an IPv4 address that resides on the router(such as a loopback address). Any IPv4 address can be used, including IP addresses not configured on the router
+    - To ensure that the RID does not change, a static RID is assigned (typically representing an IPv4 address that resides on the router(such as a loopback address)). Any IPv4 address can be used, including IP addresses not configured on the router
 
     - When the BGP router ID changes, the BGP sessions reset and need to be reestablished
 
@@ -399,7 +399,7 @@ show tcp brief
 
     - Cisco IOS activates IPv4 address family by default. This can simplify the configuration in IPv4 endvironments as step 4 and step 5 are optional but may cause confusion when working with other address families
 
-    - Disabling the defaul IPv4 address family configuration:
+    - Disabling the default IPv4 address family configuration:
 
     ```
     conf t
@@ -668,7 +668,7 @@ TCP Semaphore      0x0FFF0EB4  FREE
 conf t
  router bgp 65100
   address-family ipv4 unicast
-   network <network-prefix> mask <subnet-mask> [route-map <route-map-name>]
+   network <network-prefix> mask <subnet-mask> [route-map <route-map-name>] [in | out]
 ```
 
 - The optional `route-map` provides a method for setting specific BGP PAs when the prefix installs into the Loc-RIB table
@@ -1049,7 +1049,7 @@ RPKI validation codes: V valid, I invalid, N Not found
  *>   192.168.5.5/32   10.12.1.1                2             0 65100 ?
 ```
 
-- Notice that on R1 the next-hip matches the next-hop learned from the RIB, the AS_Path is blank and the origin codes is IGP (for routes learned from network statement) or incomplete (redistributed)
+- Notice that on R1 the next-hop matches the next-hop learned from the RIB, the AS_Path is blank and the origin codes is IGP (for routes learned from network statement) or incomplete (redistributed)
 
 - The metric is carried from R3's and R5's IGP routing protocols and is reflected as the MED. R2 learnes the routes strictly from eBGP and sees only the MED and the origin codes
 
@@ -1630,7 +1630,7 @@ R1#sh bgp ipv4 uni | b Net
 
 - During the initial open message negotiation, the BGP peer routers exchange capabilities
 
-- The MP-BGP extension includes an address family identifier (AFI) that describes the supported protocols, along with subsequent address family identifier (SAFI) attibute field that describe wether the prefix applies to the unicast or multicast routing table
+- The MP-BGP extension includes an address family identifier (AFI) that describes the supported protocols, along with subsequent address family identifier (SAFI) attibute field that describe whether the prefix applies to the unicast or multicast routing table
 
     - **IPv4 unicast**: AFI 1, SAFI 1
 

@@ -30,8 +30,6 @@
 
 - BGP is the routing protocol used on the internet
 
-
-
 ### Conditional Matching
 
 - Standard ACLs
@@ -84,7 +82,7 @@
 
 ```
 permit any - Permits all networks
-permit 172.16.0.0 0.0.255.255 - Permits all networks in the 172.16.0.0 range
+permit 172.16.0.0 0.0.255.255 - Permits all networks in the 172.16.0.0/16 range
 permit host 192.168.1.1 - Permits only the 192.168.1.1/32 network
 ```
 
@@ -102,6 +100,14 @@ permit ip 10.0.0.0 0.0.0.0 255.255.0.0 0.0.0.0 - Permits only the 10.0.0.0/16 ne
 permit ip 10.0.0.0 0.0.255.0 255.255.255.0 0.0.0.0 - Permits any 10.0.x.0 network with a /24 prefix length
 permit ip 172.16.0.0 0.0.255.255 255.255.255.0 0.0.0.255 - Permits any 172.16.x.x network with a /24 to /32 prefix length
 permit ip 172.16.0.0 0.0.255.255 255.255.255.128 0.0.0.127 - Permits any 172.16.x.x network with a /25 to /32 prefix length
+```
+
+- IPv6 access-lists:
+
+```
+conf t
+ ipv6 access-list TESTMARIUS
+  permit ipv6 2001:DB8:45:6::/64 any
 ```
 
 ### Prefix Matching
@@ -844,4 +850,16 @@ R1(config)#do sh bgp ipv4 uni | b Net
 
 ```
 clear bgp <afi> <safi> <ip-address | *> soft <in | out>
+```
+
+#### BGP Authentication
+
+- BGP supports MD5 authentication
+
+- Configuration for authentication:
+
+```
+conf t
+ router bgp 65000
+  neighbor 10.5.5.5 password <your-password>
 ```

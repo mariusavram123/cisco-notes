@@ -155,7 +155,7 @@ conf t
 
 - The `protocol-options` keyword differs based on the protocol specified by the ACE
 
-- For example, when TCP or UDP protocols are defined, eq, lt, and gt (equal to, less than, and greater than) keywords become available to specift ports to be matched as well as more granular options such as SYN and ACK
+- For example, when TCP or UDP protocols are defined, eq, lt, and gt (equal to, less than, and greater than) keywords become available to specify ports to be matched as well as more granular options such as SYN and ACK
 
 - Below we can see how a numbered extended ACL is created and applied to an interface to block all telnet and ICMP traffic as well as deny all IP traffic from host 10.1.2.2 to host 10.1.2.1
 
