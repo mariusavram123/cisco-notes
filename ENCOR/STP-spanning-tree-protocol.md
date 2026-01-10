@@ -19,7 +19,7 @@
 
 - STP iterations:
 
-	- 802.1D - the original specification
+	- 802.1D - the original specification (known as Common Spanning Tree)
 	
 	- Per-VLAN Spanning Tree (PVST)
 	
@@ -588,7 +588,7 @@ show spanning-tree vlan <id> detail
 	
 		- There should be only one Root Port per VLAN on a switch
 	
-	- **Designated Port**(DP): A network port that receives and forwards frames to other switches 
+	- **Designated Port**(DP): A network port that receives and forwards frames to other switches, away from the root bridge
 	
 		- Designated Ports provide connectivity to downstream devices and switches
 		
@@ -704,9 +704,9 @@ show spanning-tree
 debug spanning-tree events
 ```
 
-- This command executes a script that sets the priority to certain values
+- The command `spanning-tree vlan <id> root <primary|secondary>` executes a script that sets the priority to certain values
 
-	- Primary sets the priority to 24576 (If you already have a switch with a lower priority the primary keyword is going to set the priority with 4096 less than the actual root bridge)
+	- Primary sets the priority to 24576 (If you already have a switch with a lower priority the primary keyword is going to set the priority with 4096 less than the actual root bridge). It cannot set the priority to a value under 4096
 	
 	- Secondary sets the priority to 28672 (It does not look at already assigned priorities)
 	

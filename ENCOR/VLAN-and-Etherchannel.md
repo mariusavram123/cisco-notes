@@ -56,7 +56,7 @@ vtp primary
 
 ### VTP Communication
 
-- VTP advertises updates by using a multicast address across the trunk links for advertising updates to all the switches in the VTP domain (01:00:0c:cc:cc:cc) ()
+- VTP advertises updates by using a multicast address across the trunk links for advertising updates to all the switches in the VTP domain (01:00:0c:cc:cc:cc)
 
 - There are three main types of advertisements:
 
@@ -77,6 +77,7 @@ vtp primary
 	- Summary advertisement packet format:
 
 	![Summ-adv](./VTP-summ-adv.png)
+
 	- The `Followers` field indicates that this packet is followed by a Subset Advertisement packet
 
 	- The `Updater Identity` is the IP address of the switch that is the last to have incremented the configuration revision
@@ -98,11 +99,13 @@ vtp primary
 	- Subset advertisement packet format:
 
 	![Subs-adv](./subset-advert-packet-format-vtp.png)
+
 	- Each VLAN information field contains information for a different VLAN
 
 	- It is ordered so that lowered-valued ISL VLANs occur first
 
 	![VLAN-info](./VTP-vlan-info-fields.png)
+
 	- Subset packet fields:
 
 	- `Code` - The format is 0x02 for subset advertisement
@@ -122,6 +125,7 @@ vtp primary
 	- Structure of the advertisement request message:
 
 	![VTP-adv](./VTP-advertisement-req-structure.png)
+
 	- `Code` - The format 0x03 is for an advertisement request
 
 	- `Start-Value` - This is used in cases in which there are several subsequent advertisements
@@ -194,6 +198,7 @@ vtp primary
 	```
 	vtp primary
 	```
+
 - Enabling VTP per port (per interface) - only VTP version 3
 
 ```
@@ -219,8 +224,6 @@ show vtp interface g0/1
 #### VTP configuration guidelines
 
 - All switches have the same VTP domain name, unless the network design requires different VTP domains
-
-- All switches in the same VTP domain 
 
 - All switches in a VTP domain have the same VTP password, if there are any
 
@@ -409,6 +412,7 @@ show vtp counters
 	- **Trunk**: This mode statically places the switch port as a trunk and advertises DTP packets to the other end to establish a dynamic trunk
 
 	- Enabling this mode:
+
 	```
 	conf t
 	 interface g0/1
@@ -420,6 +424,7 @@ show vtp counters
 	- If it is successful in negotiation, the port becomes a trunk port
 
 	- Enabling this mode on a port:
+
 	```
 	conf t
 	 interface g0/1
@@ -431,6 +436,7 @@ show vtp counters
 	- It responds to DTP packets and, upon successful negotiation, the port becomes a trunk port
 
 	- Enabling the port in this mode:
+
 	```
 	conf t
 	 interface g0/1
@@ -473,7 +479,7 @@ show interface g0/1 switchport
 
 - When a link between switches becomes saturated, how can more bandwidth be added to prevent packet loss?
 
-- If both switches have available ports with faster throughput than the current link (for example, 10 Gbps versus 1 Gbps)m then changing the link to higher-speed solves the bandwidth contingency problem
+- If both switches have available ports with faster throughput than the current link (for example, 10 Gbps versus 1 Gbps) then changing the link to higher-speed solves the bandwidth contingency problem
 
 - However in most cases this is not feasible
 
@@ -591,6 +597,7 @@ conf t
 	 interface range g1/0/1 - 2
 	  channel-group <etherchannel-id> mode on
 	```
+
 	- **LACP EtherChannel**: Can be configured as follows
 
 	```
@@ -598,6 +605,7 @@ conf t
 	 interface range g1/0/1 - 2
 	  channel-group <etherchannel_id> mode <active|passive>
 	```
+    
 	- **PAgP EtherChannel**: can be configured as follows:
 
 	```

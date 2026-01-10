@@ -127,7 +127,7 @@ spanning-tred mst configuration
  instance <number> vlan <id> # Here can be defined a range or a list of VLANs
 ```
 
-- **Step 4**: Specify the MST version number
+- **Step 4**: Specify the MST version (revision) number
 
 - The MST region number must match for all switches in the same MST region
 
@@ -275,7 +275,7 @@ conf t
 
 - Pruning of VLANs on a trunk link is a common practice for load balancing
 
-- However it is important that pruning of VLANs does not occur for VLANs in the same MST on different on different network links
+- However it is important that pruning of VLANs does not occur for VLANs in the same MST on different network links
 
 ![Pruning](./MSTP-pruning.png)
 
