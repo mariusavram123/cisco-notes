@@ -964,7 +964,7 @@ Age of the port in the current state: 0d:00h:06m:11s
 
 	- This is known as *LACP Fast* because a link can be identified and removed in 3 seconds compared to the 90 seconds specified in the initial LACP standard
 
-	- LACP fast is enabled on the member interfaces by using the following command:
+	- LACP fast is enabled on the member interfaces by using the following command (available on IOL-L2 switch in CML but not in IOSv):
 
 	```
 	conf t

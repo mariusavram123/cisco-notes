@@ -863,3 +863,58 @@ conf t
  router bgp 65000
   neighbor 10.5.5.5 password <your-password>
 ```
+
+### BGP path selection
+
+1. Weight
+
+2. Local preference
+
+3. Local originated (network statement, redistribution, or aggregation)
+
+4. AIGP
+
+5. Shortest AS Path
+
+6. Origin Type
+
+7. Lowest MED
+
+8. eBGP over iBGP
+
+9. Lowest IGP next hop
+
+10. Oldest path prefered over the new one
+
+11. Lowest peer router ID
+
+12. Minimum cluster list length
+
+13. Lowest neighbor IP address
+
+
+### Simplified path selection
+
+1. Weight
+
+2. Local Preference
+
+3. Originate (Path sourced locally)
+
+4. AIGP
+
+5. AS Path length
+
+6. Origin Code (network command, EGP or redistribution) (Network (preferred) -> EGP -> redistribution)
+
+7. MED
+
+8. eBGP over iBGP
+
+9. Shortest IGP path to BGP next hop
+
+10. Oldest Path
+
+11. Router ID
+
+12. Neighbor IP address

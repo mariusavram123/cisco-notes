@@ -294,7 +294,7 @@ Gigahertz               GHz                                             1.000.00
 
 - Wavelength is usually designated by the Greek lambda (λ)
 
-- To get the feel for the dimensions of a wireless LAN sygnal, assuming that you could see it travels in front of you, a 2.4 GHz signal would have of 4.92 inches, a 5 GHz sygnal would be 2.36 inches, and a 6 GHz signal would be 1.97 inches
+- To get the feel for the dimensions of a wireless LAN sygnal, assuming that you could see it travels in front of you, a 2.4 GHz signal would have of 4.92 inches, a 5 GHz signal would be 2.36 inches, and a 6 GHz signal would be 1.97 inches
 
 - Below we can see the wavelength of two different waves
 
@@ -876,7 +876,7 @@ where d is the distance in kilometers, and f is the frequency in megahertz
 
 - At the physical layer, modern wireless LANs can be broken down into the following two common spread-spectrum categories:
 
-    - **Direct Squence Spread Spectrum (DSSS)**: Used in the 2.4 GHz band, where a small number of fixed, wide channels support complex phase modulation schemes and somehow scalable data rates
+    - **Direct Sequence Spread Spectrum (DSSS)**: Used in the 2.4 GHz band, where a small number of fixed, wide channels support complex phase modulation schemes and somehow scalable data rates
 
     - Typically these channels are wide enough to augment the data by spreading it out and making it more resilient to disruption
 
