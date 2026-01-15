@@ -166,7 +166,7 @@
 
 - The Cisco SD-Access fabric is based on multiple exisiting technologies
 
-- The combination of these technologies and the automated management provided by Cisco DNA center make Cisco SD-Access powerfull and unique
+- The combination of these technologies and the automated management provided by Cisco DNA center make Cisco SD-Access powerful and unique
 
 - There are three basic planes of operation in the SD-Access fabric:
 
