@@ -336,7 +336,7 @@
 
 - A fabric WLC also performs PxTR registrations to the fabric control plane (on behalf of the fabric edges) and can be thought of as a fabric edge for wireless clients
 
-- The control node maps the host EID to the current fabric access point and fabric edge node location the access point is attached to
+- The control node maps the host EID to the current fabric access point and fabric edge node locating the access point is attached to
 
 - In traditional wireless deployments, the WLC is typically centralized, and all control plane and data plane (wireless client data) traffic needs to be tunelled to the WLC through Control and Provisioning of Wireless Access Points (CAPWAP tunnel)
 

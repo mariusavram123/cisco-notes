@@ -302,3 +302,78 @@ History Statistics:
 - When IP SLA is set up and running appropriately, it can be monitored using CISCO-RTTMON-MIB file with SNMP, and traps can be sent to a NMS via Syslog
 
 - There are many other things that IP SLA can help with, including tracking reachability, monitoring interface states, and manipulating routing based on IP SLA operations
+
+- LAB:
+
+![ip-sla-lab](./ip-sla-lab-cml.png)
+
+- R1 - configure icmp echo operation
+
+```
+conf t
+ ip sla 1
+  icmp-echo 10.23.1.2 source-interface Ethernet0/0
+   threshold 1500
+   timeout 3600
+   frequency 10
+ ip sla schedule 1 life forever start-time now
+```
+
+- R1 - configure udp jitter operation
+
+```
+ip sla 2
+ udp-jitter 10.23.1.2 5070 source-ip 10.12.1.1 source-port 5070
+  threshold 1000
+  timeout 3600
+  frequency 10
+ip sla schedule 2 life forever start-time now
+```
+
+- R1 - configure tcp-connect operation
+
+```
+ip sla 3
+ tcp-connect 10.23.1.2 5000
+  frequency 30000
+  timeout 10000
+ip sla schedule 3 life forever start-time now
+```
+
+- R1 - configure a tracking to track the status of an IP SLA operation:
+
+```
+track 2 ip sla 2 reachability
+```
+
+- R1 - configure a backup default route in case the tracking object fails
+
+```
+conf t
+ ip route 0.0.0.0 0.0.0.0 10.12.1.2 track 2
+ ip route 0.0.0.0 0.0.0.0 10.22.22.2 10
+```
+
+- R3 - configure as IP SLA responder
+
+```
+conf t
+ ip sla responder ! enable the responder functionality
+ ip sla responder udp-echo ipaddress 10.12.1.1 port 5070
+ ip sla responder tcp-connect ipaddress 10.12.1.1 port 5000
+```
+
+- To test the route, shut down the E0/0 interface on R2 and then view the IP routing table on R1
+
+```
+R1#sh ip route  | b Gate
+Gateway of last resort is 10.22.22.2 to network 0.0.0.0
+
+S*    0.0.0.0/0 [10/0] via 10.22.22.2
+      10.0.0.0/8 is variably subnetted, 5 subnets, 2 masks
+C        10.12.1.0/30 is directly connected, Ethernet0/0
+L        10.12.1.1/32 is directly connected, Ethernet0/0
+C        10.22.22.0/30 is directly connected, Ethernet0/1
+L        10.22.22.1/32 is directly connected, Ethernet0/1
+S        10.23.1.0/30 [1/0] via 10.12.1.2
+```

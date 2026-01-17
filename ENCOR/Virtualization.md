@@ -24,7 +24,7 @@
 
 - A virtual machine (VM) is a software emulation of a physical server with an operating system
 
-- From an application's point of view, the VM provides the look and feel of a real phyisical server, including all it's components, such as CPU, memory and network interface cards (NICs)
+- From an application's point of view, the VM provides the look and feel of a real physical server, including all it's components, such as CPU, memory and network interface cards (NICs)
 
 - The virtualization software that allows that creates VMs and performs the hardware abstraction, that allows multiple VMs to run concurently is known as a hypervisor
 
@@ -611,6 +611,3 @@
     - Cisco Catalyst 8200 Series Edge uCPE
 
 - Which platform to choose depends on the requirements and features needed, such as voice over IP (VOIP), requirements for non-Ethernet-based interfaces (such as T1 or DSL), 4G-LTE, I/O technologies supported (for example, SR-IOV), and the number of CPU cores needed to suport the existing service requirements (VNFs and services) as well as future requirements
-
-- 
-
