@@ -1488,7 +1488,7 @@ GigabitEthernet0/0 is up, line protocol is up
       224.0.1.40(1)  239.1.1.1(1)
 ```
 
-- Configuring auto-RP on R2:
+- **Configuring auto-RP on R2**:
 
 - First unset the RP address manually configured
 
@@ -1742,7 +1742,7 @@ Outgoing interface flags: H - Hardware switched, A - Assert winner, p - PIM Join
 
 - As you can see now the multicast traffic goes through R2
 
-- Configuring BSR and BSR candidate on R2:
+- **Configuring BSR and BSR candidate** on R2:
 
 - Disable the already-configured auto-RP:
 
