@@ -497,9 +497,18 @@ conf t
 - The following snippet provides sample output from the `show ip dhcp conflict` command
 
 ```
+R1#show ip dhcp conflict  
+IP address        Detection method   Detection time          VRF
+10.2.2.11         Ping               Feb 09 2026 07:41 PM                             
+```
+
+```
+R1#
+*Feb  8 20:37:52.943: %DHCPD-4-DECLINE_CONFLICT: DHCP address conflict:  client 0063.6973.636f.2d35.3235.342e.3030.3534.2e37.3935.652d.4769.302f.30 declined 10.2.2.11.
+
 R1#show ip dhcp conflict 
 IP address        Detection method   Detection time          VRF
-172.16.1.3        Ping               Oct 15 2025 8:56 PM
+10.2.2.11         Gratuitous ARP     Feb 08 2026 08:37 PM              
 ```
 
 - The output indicates a duplicate 172.16.1.3 IP address on the network, which the router discovered via ping
@@ -510,3 +519,490 @@ IP address        Detection method   Detection time          VRF
 clear ip dhcp conflict *
 ```
 
+- Below we can see the output of `show ip dhcp binding` command
+
+```
+R1#show ip dhcp binding 
+Bindings from all pools not associated with VRF:
+IP address          Client-ID/              Lease expiration        Type
+                    Hardware address/
+                    User name
+10.1.4.11           0063.6973.636f.2d35.    Feb 10 2026 07:42 PM    Automatic
+                    3235.342e.3030.6234.
+                    2e37.3766.332d.4769.
+                    302f.30
+10.2.2.12           0063.6973.636f.2d61.    Feb 10 2026 07:41 PM    Automatic
+                    6162.622e.6363.3830.
+                    2e31.3530.302d.566c.
+                    31
+10.2.2.13           0063.6973.636f.2d35.    Feb 10 2026 07:41 PM    Automatic
+                    3235.342e.3030.3534.
+                    2e37.3935.652d.4769.
+                    302f.30
+```
+
+- Below is shown the output of `debug ip dhcp server events` command
+
+- The output shows updates to the DHCP database
+
+```
+R1#debug ip dhcp server events 
+DHCP server event debugging is on.
+R1#
+R1#
+R1#
+*Feb 11 20:09:18.955: DHCPD: Sending notification of TERMINATION:
+*Feb 11 20:09:18.955:  DHCPD: address 10.2.2.11 mask 255.255.255.0
+*Feb 11 20:09:18.956:  DHCPD: reason flags: RELEASE 
+*Feb 11 20:09:18.956:   DHCPD: htype 1 chaddr aabb.cc80.1500
+*Feb 11 20:09:18.957:   DHCPD: lease time remaining (secs) = 85909
+*Feb 11 20:09:18.958: DHCPD: returned 10.2.2.11 to address pool LAN-RELAY.
+R1#
+*Feb 11 20:09:20.713: DHCPD: Seeing if there is an internally specified pool class:
+*Feb 11 20:09:20.714:   DHCPD: htype 1 chaddr aabb.cc80.1500
+*Feb 11 20:09:20.714:   DHCPD: remote id 020a00000a01020100000000
+*Feb 11 20:09:20.715:   DHCPD: circuit id 00000000
+*Feb 11 20:09:20.715: DHCPD: there is no pool for 10.1.2.1.
+R1#
+*Feb 11 20:09:57.732: DHCPD: Sending notification of DISCOVER:
+*Feb 11 20:09:57.733:   DHCPD: htype 1 chaddr aabb.cc80.1500
+*Feb 11 20:09:57.733:   DHCPD: remote id 020a00000a01020100000000
+*Feb 11 20:09:57.734:   DHCPD: circuit id 00000000
+*Feb 11 20:09:57.734: DHCPD: Seeing if there is an internally specified pool class:
+*Feb 11 20:09:57.735:   DHCPD: htype 1 chaddr aabb.cc80.1500
+*Feb 11 20:09:57.735:   DHCPD: remote id 020a00000a01020100000000
+*Feb 11 20:09:57.735:   DHCPD: circuit id 00000000
+*Feb 11 20:09:57.738: DHCPD: Allocated binding FFF2368
+*Feb 11 20:09:57.738: DHCPD: Adding binding to radix tree (10.2.2.14)
+R1#
+*Feb 11 20:09:57.739: DHCPD: Adding binding to hash tree
+*Feb 11 20:09:57.740: DHCPD: assigned IP address 10.2.2.14 to client 0063.6973.636f.2d61.6162.622e.6363.3830.2e31.3530.302d.566c.31.
+R1#
+*Feb 11 20:09:59.742: DHCPD: Sending notification of DISCOVER:
+*Feb 11 20:09:59.743:   DHCPD: htype 1 chaddr aabb.cc80.1500
+*Feb 11 20:09:59.743:   DHCPD: remote id 020a00000a01020100000000
+*Feb 11 20:09:59.744:   DHCPD: circuit id 00000000
+*Feb 11 20:09:59.744: DHCPD: Seeing if there is an internally specified pool class:
+*Feb 11 20:09:59.745:   DHCPD: htype 1 chaddr aabb.cc80.1500
+*Feb 11 20:09:59.745:   DHCPD: remote id 020a00000a01020100000000
+*Feb 11 20:09:59.746:   DHCPD: circuit id 00000000
+*Feb 11 20:09:59.754: DHCPD: Sending notification of ASSIGNMENT:
+*Feb 11 20:09:59.755:  DHCPD: address 10.2.2.14 mask 255.255.255.0
+R1#
+*Feb 11 20:09:59.755:   DHCPD: htype 1 chaddr aabb.cc80.1500
+*Feb 11 20:09:59.756:   DHCPD: lease time remaining (secs) = 86400
+R1#
+*Feb 11 20:10:06.999: DHCPD: Sending notification of DISCOVER:
+*Feb 11 20:10:07.000:   DHCPD: htype 1 chaddr aabb.cc00.1400
+*Feb 11 20:10:07.000:   DHCPD: remote id 020a00000a01020100000000
+*Feb 11 20:10:07.001:   DHCPD: circuit id 00000000
+*Feb 11 20:10:07.001: DHCPD: Seeing if there is an internally specified pool class:
+*Feb 11 20:10:07.002:   DHCPD: htype 1 chaddr aabb.cc00.1400
+*Feb 11 20:10:07.002:   DHCPD: remote id 020a00000a01020100000000
+*Feb 11 20:10:07.003:   DHCPD: circuit id 00000000
+*Feb 11 20:10:07.003: DHCPD: Found previous server binding
+*Feb 11 20:10:07.013: DHCPD: Sending notification of ASSIGNMENT:
+R1#
+*Feb 11 20:10:07.014:  DHCPD: address 10.2.2.13 mask 255.255.255.0
+*Feb 11 20:10:07.014:   DHCPD: htype 1 chaddr aabb.cc00.1400
+*Feb 11 20:10:07.015:   DHCPD: lease time remaining (secs) = 86400
+```
+
+- Below is shown the sample output of `debug ip dhcp server packet` command
+
+- The output shows a DHCPRELEASE message being received when a DHCP client with IP address 10.2.2.13 is shut down
+
+```
+R1#debug ip dhcp server packet 
+DHCP server packet debugging is on.
+R1#
+R1#
+R1#
+*Feb 11 20:14:49.900: DHCPD: client's VPN is .
+*Feb 11 20:14:49.901: DHCPD: No option 125
+*Feb 11 20:14:49.901: DHCPD: DHCPRELEASE message received from client 0063.6973.636f.2d61.6162.622e.6363.3030.2e31.3430.302d.4574.302f.30 (10.2.2.13).
+*Feb 11 20:14:49.902: DHCPD: Option 125 not present in the msg.
+*Feb 11 20:14:49.902: DHCPD: removing ARP entry (10.2.2.13 vrf default).
+R1#
+*Feb 11 20:14:51.077: DHCPD: client's VPN is .
+*Feb 11 20:14:51.078: DHCPD: No option 125
+*Feb 11 20:14:51.078: DHCPD: DHCPRELEASE message received from client 0063.6973.636f.2d61.6162.622e.6363.3030.2e31.3430.302d.4574.302f.30 (10.2.2.13).
+*Feb 11 20:14:51.079: DHCPD: Finding a relay for client 0063.6973.636f.2d61.6162.622e.6363.3030.2e31.3430.302d.4574.302f.30 on interface GigabitEthernet0/0.
+*Feb 11 20:14:51.080: DHCPD: Option 125 not present in the msg.
+R1#
+*Feb 11 20:14:58.787: DHCPD: client's VPN is .
+*Feb 11 20:14:58.788: DHCPD: No option 125
+*Feb 11 20:14:58.789: DHCPD: Option 125 not present in the msg.
+*Feb 11 20:14:58.789: DHCPD: DHCPDISCOVER received from client 0063.6973.636f.2d61.6162.622e.6363.3030.2e31.3430.302d.4574.302f.30 through relay 10.2.2.1.
+*Feb 11 20:14:58.790: DHCPD: Option 125 not present in the msg.
+*Feb 11 20:14:58.790: DHCPD: Allocate an address without class information (10.2.2.0)
+*Feb 11 20:14:58.794: DHCPD: Saving workspace (ID=0x59000006)
+R1#
+*Feb 11 20:15:00.794: DHCPD: Reprocessing saved workspace (ID=0x59000006)
+*Feb 11 20:15:00.795: DHCPD: Option 125 not present in the msg.
+*Feb 11 20:15:00.795: DHCPD: DHCPDISCOVER received from client 0063.6973.636f.2d61.6162.622e.6363.3030.2e31.3430.302d.4574.302f.30 through relay 10.2.2.1.
+*Feb 11 20:15:00.796: DHCPD: Option 125 not present in the msg.
+*Feb 11 20:15:00.796: DHCPD: Sending DHCPOFFER to client 0063.6973.636f.2d61.6162.622e.6363.3030.2e31.3430.302d.4574.302f.30 (10.2.2.15).DHCPD: Setting only requested parameters
+
+*Feb 11 20:15:00.798: DHCPD: Option 125 not present in the msg.
+*Feb 11 20:15:00.798: DHCPD: no option 125
+*Feb 11 20:15:00.798: DHCPD: unicasting BOOTREPLY for client aabb.cc00.1400 to relay 10.2.2.1.
+*Feb 11 20:15:00.812: DHCPD: New packet workspace 0x117A1988 (ID=0x8B000007)
+*Feb 11 20:15:00.813: DHCPD: client's VPN is .
+*Feb 11 20:15:00.813: DHCPD: No option 125
+*Feb 11 20:15:00.814: DHCPD: DHCPREQUEST received from client 0063.6973.636f.2d61.6162.622e.6363.3030.2e31.3430.302d.4574.302f.30.
+*Feb 11 20:15:00.814: DHCPD: Option 125 not present in the msg.
+*Feb 11 20:15:00.815: DHCPD: No default domain to append - abort update
+*Feb 11 20:15:00.815: DHCPD: Sending DHCPACK to client 0063.6973.636f.2d61.6162.622e.6363.3030.2e31.3430.302d.4574.302f.30 (10.2.2.15).
+R1#DHCPD: Setting only requested parameters
+
+*Feb 11 20:15:00.816: DHCPD: Option 125 not present in the msg.
+*Feb 11 20:15:00.816: DHCPD: no option 125
+*Feb 11 20:15:00.817: DHCPD: unicasting BOOTREPLY for client aabb.cc00.1400 to relay 10.2.2.1.
+```
+
+- You can see the four-step process of a DHCP client obtaining IP address 10.2.2.15 with the following messages: DHCPDISCOVER, DHCPOFFER, DHCPREQUEST and DHCPACK
+
+### IPv6 Addressing
+
+- Just as your personal street address uniquely defines where you live, an IPv6 address uniquely identifies where a device resides
+
+- As mentioned earlier, your street address is made of two parts - the number of your residence and the street name - and the combination of these parts is unique
+
+- Similarly, an IPv6 address is made up of two parts
+
+- The first 64 bits usually represent the subnet prefix (the network you belong to), and the last 64 bits usually represent the interface ID/host ID (who you are in the network)
+
+- IPv6 addressing and the knowledge needed for troubleshooting IPv6 addressing issues
+
+### IPv6 Addressing Review
+
+- As with IPv4, it is important that devices are configured with the appropriate IPv6 address based on where they reside so that packets are successfully routed to and from them
+
+- Below is a network that depicts an IPv6 network 2001:db8:a:a::/64 represents the first 64 bits of the IPv6 address, which is the network prefix
+
+- This is the IPv6 network the nodes resides in
+
+- Router1 has interface IPv6 address 2001:db8:a:a::1, where the last 64 bits, which are ::1 in this case, represent the interface/host ID (or who R1 is in the ipv6 network)
+
+- PC1 is ::10 and PC2 is ::20 
+
+- All the devices in 2001:db8:a:a::/64 are configured with the default gateway address of R1's g0/0 interface, which is 2001:db8:a:a::1
+
+![ipv6-addressing-example](./ipv6-addressing-example.png)
+
+- Just as with IPv4, when a host wants to communicate with another host, it compares it's network bits to exactly the same bits in the destination IP address
+
+- If they match the devices are in the same network; if they do not match, the devices are in different networks
+
+- If both devices are in the same network, they can communicate directly with each other, and if they are in different networks, they need to communicate through the default gateway
+
+- For example, when PC1 needs to communicate with the server at 2001:db8:d::1, it realizes that the web server is in a different network
+
+- Therefore, PC1 has to send the frame to the default gateway, using the default gateway's MAC address
+
+- If PC1 wants to communicate with PC2, it determines it is in the same network and communicates directly with it
+
+- You can verify the IPv6 address of a Windows PC using the `ipconfig` command or `ip addr` in linux, as shown below
+
+- In this example, PC1 has the link-local address fe80::a00:27ff:fe5d:6d6 and the global unicast address 2001:db8:a:a::10, which was statically configured
+
+- Notice the %11 at the end of the link local address in this case
+
+- This is the interface identification number and it is needed so that the system knows which interface to sent the packets out of; keep in mind that you can have multiple interfaces on the same device with the same link-local address assigned to them
+
+![ipconfig-ipv6-windows](./ipconfig-ipv6-windows.png)
+
+#### EUI-64
+
+- Recall that an IPv6 address consist of two parts: the subnet ID and the interface/host ID
+
+- The host ID is usually 64-bits long, and as a result, it is not something you might want to be configuring manually in your organization
+
+- Although you can statically define the interface ID, the best approach is to allow your end devices to automatically assign their own interface ID for global unicast and link-local addresses randomly based on the IEEE EUI-64 standard
+
+- EUI-64 takes the client's MAC address, which is 48 bits, splits it in half, and adds the hex values FFFE in the middle
+
+- In addition, it takes the seventh bit from the left and flips it
+
+- So, if it is a 1, it becomes a 0, and if it is a 0, it becomes a 1
+
+- Looking at the example from above, notice that the link-local address is fe80::a00:27ff:fe5d:6d6
+
+- The subnet ID is fe80::, and the interface id is a00:27ff:fe5d:6d6
+
+- If you fill in the missing leading 0's, the address is 0a00:27ff:fe5d:06d6
+
+- This is an EUI-64 interface ID because it has FFFE in it
+
+- Let's look at how it is derived
+
+- Below is shown the output of `ipconfig /all` on PC1
+
+- Notice that the MAC address is 08-00-27-5d-06-d6
+
+- Split it in half and add FFFE in the middle to get: 08-00-27-ff-fe-5d-06-d6
+
+- Now group the hex values into groups of four and replace each dash (-) with a colon like this: 0800:27ff:fe5d:06d6
+
+- This looks very close to what is listed in the link-local address, but it is not exactly the same
+
+- The interface ID in the link-local address starts with 0a, and ours start with 08
+
+- This is because the seventh bit is flipped, as seen earlier
+
+- 08 hex in binary is 00001000
+
+- The seventh bit from left to right is a 0, so make it a 1. Now you have 00001010
+
+- Convert to hex and you get 0a
+
+- So your interface ID is 0a00:27ff:fe5d:06d6
+
+![ipconfig-all-interface-verification](./ipconfig-all-interface-verification.png)
+
+- By default, routers use EUI-64 when generating the interface portion of the link-local address of an interface
+
+- Modern Windows PCs randomly generate the interface portion by default for the link-local address, and the global unicast address when autoconfiguring their IPv6 addresses
+
+- When you statically configure an IPv6 address on a PC, the interface portion is manually assigned
+
+- However, on a router, if you want to use EUI-64 for a statically configured global unicast address, use the eui-64 keyword as shown below
+
+```
+conf t
+ interface g0/0
+  ipv6 address 2001:db8:a:a::/64 eui-64
+```
+
+- You can verify the global unicast address and the EUI-64 interface ID assigned to an interface by using `show ipv6 interface` command as shown below
+
+- In this case, R2's G0/0 interface has a global unicast address that obtained the interface ID from EUI-64 standard
+
+```
+R2#show ipv6 interface g0/0
+GigabitEthernet0/0 is up, line protocol is up
+  IPv6 is enabled, link-local address is FE80::5054:FF:FE6E:87FD 
+  No Virtual link-local address(es):
+  Global unicast address(es):
+    2001:DB8:B:B:5054:FF:FE6E:87FD, subnet is 2001:DB8:B:B::/64 [EUI]
+  Joined group address(es):
+    FF02::1
+    FF02::2
+    FF02::1:FF6E:87FD
+  MTU is 1500 bytes
+  ICMP error messages limited to one every 100 milliseconds
+  ICMP redirects are enabled
+  ICMP unreachables are sent
+  ND DAD is enabled, number of DAD attempts: 1
+  ND reachable time is 30000 milliseconds (using 30000)
+  ND advertised reachable time is 0 (unspecified)
+  ND advertised retransmit interval is 0 (unspecified)
+  ND router advertisements are sent every 200 seconds
+  ND router advertisements live for 1800 seconds
+  ND advertised default router preference is Medium
+  Hosts use stateless autoconfig for addresses.
+```
+
+### IPv6 SLAAC, Stateful DHCPv6, and Stateless DHCPv6
+
+- Manually assigning IP addresses (either IPv4 or IPv6) is not a scalable option
+
+- With IPv4, DHCP is a dynamic addressing option
+
+- With IPv6, you have three dynamic options to choose from: *stateless addresss autoconfiguration (SLAAC), stateful DHCPv6, or stateless DHCPv6*
+
+- Issues that might arise for each of these options and how to troubleshoot them
+
+#### SLAAC
+
+- SLAAC is designed to enable a device to configure it's own IPv6 address, prefix and default gateway without a DHCPv6 server
+
+- Windows PCs automatically have SLAAC enabled and generate their own IPv6 addresses as show below - in the `ipconfig /all` output on PC1
+
+![slaac-ipv6-config-windows-pc](./slaac-ipv6-config-windows-pc.png)
+
+- On Cisco routers, if you want to take advantage of SLAAC, you need to enable it manually on an interface as follows:
+
+```
+conf t
+ interface g0/0
+  ipv6 address autoconfig
+```
+
+- When a Windows PC and router interface are enabled for SLAAC, they sent a Router Solicitation (RS) message to determine whether they are any routers connected to the local link
+
+- Then they wait for a router to send a Router Advertisement (RA) that identifies the prefix used by the router (the default gateway) connected to the same network they are on
+
+- They then use the same prefix information to generate their own IPv6 address in the same network as the router interface that generated the RA
+
+- The router use EUI-64 for the interface portion, and the PC randomly generates the interface portion
+
+- In addition, the PC uses the IPv6 link-local address of the device that sent the RA as the default gateway address
+
+- Below is shown the RA process. PC1 sends an RA out of it's g0/0 interface
+
+- The source IPv6 address is the g0/0 link-local address, and the source MAC address is the MAC address of the interface g0/0
+
+- The destination IPv6 address is the all-nodes link-local multicast address FF02::1
+
+- The destination MAC address is the all-nodes destination MAC address 33:33:00:00:00:01, which is associated with the all-nodes link-local multicast address FF02::1
+
+- By default, all IPv6-enabled interfaces listen for packets and frames destined for these two addresses
+
+- When PC1 in the image below receives the RA, it takes the prefix included in the RA, which is 2001:db8:a:a::/64, and then randomly creates the interface portion of it's IPv6 address
+
+- It also takes the link-local address from the source of the RA and uses it as the default gateway address, as shown below, in the output of `ipconfig` command
+
+![ipv6-router-advertisement-message](./ipv6-router-advertisement-message.png)
+
+![windows-pc-address-generated-slaac](./windows-pc-address-generated-slaac.png)
+
+- To verify an IPv6 address has been generated by SLAAC on a router interface, use the following command:
+
+```
+show ipv6 interface <interface-name>
+```
+
+```
+PC1#show ipv6 int e0/0
+Ethernet0/0 is up, line protocol is up
+  IPv6 is enabled, link-local address is FE80::A8BB:CCFF:FE00:1600 
+  No Virtual link-local address(es):
+  Stateless address autoconfig enabled
+  Global unicast address(es):
+    2001:DB8:A:A:A8BB:CCFF:FE00:1600, subnet is 2001:DB8:A:A::/64 [EUI/CAL/PRE] (SLAAC address)
+      valid lifetime 2591870 preferred lifetime 604670
+  Joined group address(es):
+    FF02::1
+    FF02::1:FF00:1600
+  MTU is 1500 bytes
+  ICMP error messages limited to one every 100 milliseconds
+  ICMP redirects are enabled
+  ICMP unreachables are sent
+  ND DAD is enabled, number of DAD attempts: 1
+  ND reachable time is 30000 milliseconds (using 30000)
+  ND NS retransmit interval is 1000 milliseconds
+  Default router is FE80::5054:FF:FE78:529D on Ethernet0/0 (This line is present only if IPv6 unicast routing is disabled on the host)
+```
+
+- Look for "Stateless address autoconfig enabled"
+
+- As shown above, the global unicast address was generated using SLAAC
+
+- Also notice at the bottom of the example that the default router is listed as the link local address of R1
+
+- However, note that this occurs only if IPv6 unicast routing was not enabled on the router and, as a result, the router is acting as an end device
+
+- PC1 when IPv6 unicast routing is enabled:
+
+```
+PC1#show ipv6 interface e0/0
+Ethernet0/0 is up, line protocol is up
+  IPv6 is enabled, link-local address is FE80::A8BB:CCFF:FE00:1600 
+  No Virtual link-local address(es):
+  Stateless address autoconfig enabled
+  Global unicast address(es):
+    2001:DB8:A:A:A8BB:CCFF:FE00:1600, subnet is 2001:DB8:A:A::/64 [EUI/CAL/PRE]
+      valid lifetime 2591944 preferred lifetime 604744
+  Joined group address(es):
+    FF02::1
+    FF02::2
+    FF02::1:FF00:1600
+  MTU is 1500 bytes
+  ICMP error messages limited to one every 100 milliseconds
+  ICMP redirects are enabled
+  ICMP unreachables are sent
+  ND DAD is enabled, number of DAD attempts: 1
+  ND reachable time is 30000 milliseconds (using 30000)
+  ND advertised reachable time is 0 (unspecified)
+  ND advertised retransmit interval is 0 (unspecified)
+  ND router advertisements are sent every 200 seconds
+  ND router advertisements live for 1800 seconds
+  ND advertised default router preference is Medium
+  Hosts use stateless autoconfig for addresses.
+```
+
+- It is important to realize that RAs are generated by default on a router interface only if the router interface is enabled for IPv6, IPv6 unicast routing is enabled, and RAs are not being suppressed on an interface
+
+- Therefore, if SLAAC is not working check the following:
+
+    - Make sure the IPv6 unicast routing is enabled on the router that should be generating the RAs as follows:
+
+    ```
+    show run | i ipv6 unicast-routing
+    ```
+
+    - Make sure the appropriate interface is enabled for IPv6 using the `show ipv6 interface <interface>` command
+
+    - Make sure that the router interface advertising RAs has a /64 prefix by using the `show ipv6 interface <interface>` command
+
+    - Make sure that RAs are not being suppressed on the interface by using the `show ipv6 interface <interface>` command
+
+- R1 - Interface IPv6 information:
+
+```
+R1#sh ipv6 int g0/1
+GigabitEthernet0/1 is up, line protocol is up
+  IPv6 is enabled, link-local address is FE80::5054:FF:FE78:529D 
+  No Virtual link-local address(es):
+  Stateless address autoconfig enabled
+  Global unicast address(es):
+    2001:DB8:A:A::1, subnet is 2001:DB8:A:A::/64 
+  Joined group address(es):
+    FF02::1
+    FF02::2
+    FF02::1:FF00:1
+    FF02::1:FF78:529D
+  MTU is 1500 bytes
+  ICMP error messages limited to one every 100 milliseconds
+  ICMP redirects are enabled
+  ICMP unreachables are sent
+  ND DAD is enabled, number of DAD attempts: 1
+  ND reachable time is 30000 milliseconds (using 30000)
+  ND advertised reachable time is 0 (unspecified)
+  ND advertised retransmit interval is 0 (unspecified)
+  ND router advertisements are sent every 200 seconds
+  ND router advertisements live for 1800 seconds
+  ND advertised default router preference is Medium
+  Hosts use stateless autoconfig for addresses.
+```
+
+- R1 - interface IPv6 information with RAs suppressed:
+
+```
+R1(config-if)#do sh ipv6 int g0/1     
+GigabitEthernet0/1 is up, line protocol is up
+  IPv6 is enabled, link-local address is FE80::5054:FF:FE78:529D 
+  No Virtual link-local address(es):
+  Stateless address autoconfig enabled
+  Global unicast address(es):
+    2001:DB8:A:A::1, subnet is 2001:DB8:A:A::/64 
+  Joined group address(es):
+    FF02::1
+    FF02::2
+    FF02::1:FF00:1
+    FF02::1:FF78:529D
+  MTU is 1500 bytes
+  ICMP error messages limited to one every 100 milliseconds
+  ICMP redirects are enabled
+  ICMP unreachables are sent
+  ND DAD is enabled, number of DAD attempts: 1
+  ND reachable time is 30000 milliseconds (using 30000)
+  ND RAs are suppressed (all) - (Here we can see all ND RAs are suppressed)
+  Hosts use stateless autoconfig for addresses.
+```
+
+- Enabling or disabling ND RA suppression on the interface:
+
+```
+conf t
+ interface g0/1
+  ipv6 nd ra suppress all 
+```
+
+- In addition, if you have more than one router on a subnet generating RAs, which is normal when you have redundant default gateways, the client learns about multiple default gateways from the RAs as shown below
+
+- The top default gateway is R2's link local address, and the bottom gateway is R1's link-local address
+
+- Now, this might seem like a benefit; however, it is a benefit if both default gateways can reach the same networks
