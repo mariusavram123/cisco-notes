@@ -995,10 +995,21 @@ GigabitEthernet0/1 is up, line protocol is up
 
 - Enabling or disabling ND RA suppression on the interface:
 
+(IOS - IOSv router)
+
 ```
 conf t
  interface g0/1
   ipv6 nd ra suppress all 
+```
+
+(IOS-XE - IOL router)
+
+```
+conf t
+ interface e0/0
+  ipv6 nd suppress-ra !or
+  ipv6 nd ra suppress all
 ```
 
 - In addition, if you have more than one router on a subnet generating RAs, which is normal when you have redundant default gateways, the client learns about multiple default gateways from the RAs as shown below
@@ -1006,3 +1017,162 @@ conf t
 - The top default gateway is R2's link local address, and the bottom gateway is R1's link-local address
 
 - Now, this might seem like a benefit; however, it is a benefit if both default gateways can reach the same networks
+
+![ipv6-slaac-and-dhcp-lab](./DHCPv6-lab.png)
+
+- If PC1 uses R2 as the default gateway, the packets to the web server are dropped because R2 does not have a way to route packets to the web server, as shown in the `ping` output from below, unless it redirects them back out the interface they arrived on, which is not a normal behavior
+
+- Therefore, if users are complaining that they cannot access resources, and they are connected to a network with multiple routers generating RAs, check the default gateways learned by SLAAC and make sure that those default gateways can route to the intended resources
+
+![verify-default-gateway-configured-pc](./verify-default-gateway-configured-pc.png)
+
+![pinging-web-server-ipv6](./pinging-web-server-ipv6.png)
+
+#### Stateful DHCPv6
+
+- Although a device is able to determine it's IPv6 address, prefix, and default gateway using SLAAC, there is not much else the devices can obtain
+
+- In a modern network, the devices may also need information such as Network Time Protocol (NTP) server information, domain name information, DNS server information, and Trivial File Transfer Protocol (TFTP) server information
+
+- To hand out the IPv6 addressing information along with all optional information, use a DHCPv6 server
+
+- Both Cisco routers and multilayer switches may act as DHCPv6 servers
+
+- Below is an example of an DHCPv6 server configuration on R1, and the `ipv6 dhcp server` interface command necessary to enable the interface to use the DHCP pool for handling out IPv6 addressing information
+
+- If you are troubleshooting an issue where clients are not receiving IPv6 addressing information or where they are receiving wrong IPv6 addressing information from a router or multilayer switch acting as an DHCPv6 server, check the interface and make sure it was associated with the correct pool
+
+```
+ipv6 dhcp pool TEST
+ address prefix 2001:DB8:A:A::/64 lifetime infinite infinite
+ dns-server 2001:DB8:A:A::1
+ domain-name test
+ ipv6 dhcp server TEST
+```
+
+- Interface configuration:
+
+```
+R1#sh run int g0/1
+Building configuration...
+
+Current configuration : 169 bytes
+!
+interface GigabitEthernet0/1
+ ip address 10.1.1.1 255.255.255.0
+ duplex auto
+ speed auto
+ media-type rj45
+ ipv6 address 2001:DB8:A:A::1/64
+ ipv6 dhcp server TEST
+end
+```
+
+- Displaying the bindings, interface commands and their output
+
+```
+R1#sh ipv6 dhcp binding 
+Client: FE80::A8BB:CCFF:FE00:1600 
+  DUID: 00030001AABBCC001600
+  Username : unassigned
+  VRF : default
+  IA NA: IA ID 0x00020001, T1 43200, T2 69120
+    Address: 2001:DB8:A:A:E16E:F91B:3405:5C4B
+            preferred lifetime INFINITY, , valid lifetime INFINITY, 
+Client: FE80::A8BB:CCFF:FE00:2A00 
+  DUID: 00030001AABBCC002A00
+  Username : unassigned
+  VRF : default
+  IA NA: IA ID 0x00020001, T1 43200, T2 69120
+    Address: 2001:DB8:A:A:399E:196:9E24:BE53
+            preferred lifetime INFINITY, , valid lifetime INFINITY, 
+```
+
+```
+R1#sh ipv6 dhcp int
+GigabitEthernet0/1 is in server mode
+  Using pool: TEST
+  Preference value: 0
+  Hint from client: ignored
+  Rapid-Commit: disabled
+```
+
+```
+R1#sh ipv6 dhcp pool 
+DHCPv6 pool: TEST
+  Address allocation prefix: 2001:DB8:A:A::/64 valid 4294967295 preferred 4294967295 (2 in use, 0 conflicts)
+  DNS server: 2001:DB8:A:A::1
+  Domain name: test
+  Active clients: 2
+```
+
+#### Stateless DHCPv6
+
+- Stateless DHCPv6 is a combination of SLAAC and DHCPv6
+
+- With stateless DHCPv6, clients use a router's RA to automatically determine the IPv6 address, prefix, and default gateway
+
+- Included in the RA is a flag that tells the client to get other non-addressing information from a DHCPv6 server, such as the address of the DNS server or a TFTP server
+
+- To accomplish this ensure that the following interface command is enabled:
+
+```
+conf t
+ interface g0/1
+  ipv6 nd other-config-flag
+```
+
+- This ensures that the RA informs the client that it must contact a DHCPv6 server for other information
+
+- Below notice that this command is configured under the g0/1 interface
+
+```
+R1(config-if)#do sh run int g0/1 
+Building configuration...
+
+Current configuration : 196 bytes
+!
+interface GigabitEthernet0/1
+ ip address 10.1.1.1 255.255.255.0
+ duplex auto
+ speed auto
+ media-type rj45
+ ipv6 address 2001:DB8:A:A::1/64
+ ipv6 nd other-config-flag
+ ipv6 dhcp server TEST
+end
+```
+
+- Also below is stated that hosts obtain the IPv6 addressing from stateless autoconfig and other information from a DHCP server
+
+```
+R1(config-if)#do sh ipv6 int g0/1
+GigabitEthernet0/1 is up, line protocol is up
+  IPv6 is enabled, link-local address is FE80::5054:FF:FE78:529D 
+  No Virtual link-local address(es):
+  Stateless address autoconfig enabled
+  Global unicast address(es):
+    2001:DB8:A:A::1, subnet is 2001:DB8:A:A::/64 
+    2001:DB8:A:A:5054:FF:FE78:529D, subnet is 2001:DB8:A:A::/64 [EUI/CAL/PRE]
+      valid lifetime 2591854 preferred lifetime 604654
+  Joined group address(es):
+    FF02::1
+    FF02::2
+    FF02::1:2
+    FF02::1:FF00:1
+    FF02::1:FF78:529D
+    FF05::1:3
+  MTU is 1500 bytes
+  ICMP error messages limited to one every 100 milliseconds
+  ICMP redirects are enabled
+  ICMP unreachables are sent
+  ND DAD is enabled, number of DAD attempts: 1
+  ND reachable time is 30000 milliseconds (using 30000)
+  ND advertised reachable time is 0 (unspecified)
+  ND advertised retransmit interval is 0 (unspecified)
+  ND router advertisements are sent every 200 seconds
+  ND router advertisements live for 1800 seconds
+  ND advertised default router preference is Medium
+  Hosts use stateless autoconfig for addresses.
+  Hosts use DHCP to obtain other configuration.
+```
