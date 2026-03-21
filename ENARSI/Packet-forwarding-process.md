@@ -695,4 +695,770 @@ GigabitEthernet0/0 is up, line protocol is up
 
 - Therefore, it cannot build the Layer 2 frame, and the result is an `encapsulation failure`, which you would be able to see if you were debugging packets
 
-- 
+![incomplete-arp-entries](./incomplete-arp-entries.png)
+
+- Because of the fact that R1 uses ARP to determine the MAC address of every destination IP address in every packet, you should never specify an Ethernet interface in a static route
+
+- Specifying an Ethernet interface in a static route results in excesive use of router resources, such as processor and memory, as the control plane gets involved during the forwarding process to determine the apropriate Layer 2 MAC address using ARP
+
+- Being able to recognize misconfigured static routes and the issues that arise is an important skill to have when troubleshooting because a misconfigured static route causes traffic to be misrouted or suboptimally routed
+
+- In addition, remember that static routes have an AD of 1; therefore, they are preferred over other sources of routing information to the same destination
+
+#### IPv6 Static Routes
+
+- To configure an IPv6 static route, you use the following command in global configuration mode:
+
+```
+conf t
+ ipv6 route <ipv6_prefix/prefix_length> <ipv6-address| interface_type interface_number> <administrative_distance> <next-hop-address>
+```
+
+- Below we can see the configuration of a static route on R1, as shown below:
+
+```
+conf t
+
+R1(config)#ipv6 route 2001:db8:b:b::/64 g1 fe80::2 8
+
+R1(config)#ipv6 route 2001:db8:0:3::/64 g1 fe80::2 8
+```
+
+- The second static route is training about the 2001:db8:0:3::/64 network
+
+- The network is reachable using the next-hop address fe80::2, which is R2's link-local address, and it was assigned an AD of 8. (The default is 1)
+
+- Notice that the exit Ethernet interface is specified
+
+- This is mandatory when using the link-local address as next-hop because the same link-local address can be used on multiple router interfaces, and therefore the router has to be told which interface to use to get to this specific link-local address
+
+- However, as long as the link-local addresses are unique between the devices within the same local network, communication occurs as intended even with duplicate link-local addresses on other interfaces
+
+- If you are using a global unicast address as the next hop, you do not have to specify the exit interface
+
+![ipv6-route-nexthop-linklocal](./ipv6-route-nexthop-linklocal.png)
+
+- Below is shown the output of `show ipv6 route static` on R1, and indicates that the 2001:db8:0:3::/64 network was learned by a static route, it is reachable via the next-hop IP address fe80::2, it has an AD of 8, and the metric is 0 because there is no way to know how far away the destination truly is (as there is with a dynamic routing protocol)
+
+```
+R1#show ipv6 route static 
+IPv6 Routing Table - default - 5 entries
+Codes: C - Connected, L - Local, S - Static, U - Per-user Static route
+       B - BGP, R - RIP, H - NHRP, I1 - ISIS L1
+       I2 - ISIS L2, IA - ISIS interarea, IS - ISIS summary, D - EIGRP
+       EX - EIGRP external, ND - ND Default, NDp - ND Prefix, DCE - Destination
+       NDr - Redirect, RL - RPL, O - OSPF Intra, OI - OSPF Inter
+       OE1 - OSPF ext 1, OE2 - OSPF ext 2, ON1 - OSPF NSSA ext 1
+       ON2 - OSPF NSSA ext 2, la - LISP alt, lr - LISP site-registrations
+       ld - LISP dyn-eid, lA - LISP away, le - LISP extranet-policy
+       lp - LISP publications, a - Application, m - OMP
+S   2001:DB8:0:3::/64 [8/0]
+     via FE80::2, GigabitEthernet1
+S   2001:DB8:B:B::/64 [8/0]
+     via FE80::2, GigabitEthernet1
+```
+
+- Recall that there are no broadcasts with IPv6
+
+- IPv6 does not use ARP
+
+- It uses NDP (Neighbor Discovery Protocol), which is multicast based to determine a neighboring's device MAC address
+
+- In this case, if R1 needs to route packets to 2001:db8:0:3::/64, the routing table says to use the next-hop address fe80::2, which is out G1 interface
+
+- Therefore it consults it's IPv6 neighbor table, to determine whether there is a MAC address for fe80::2 out G1
+
+```
+R1#show ipv6 neighbors 
+IPv6 Address                              Age Link-layer Addr State Interface
+2001:DB8:A:A::2                            71 5254.00ba.c24c  STALE Gi1
+FE80::2                                     0 5254.00ba.c24c  REACH Gi1
+FE80::5054:FF:FEBA:C24C                    71 5254.00ba.c24c  STALE Gi1
+
+```
+
+- It is imperative that the table have an entry that maps the link-local address and the interface
+
+- If an entry is found in the IPv6 neighbor table, it will be used
+
+- If there is no entry in the IPv6 neighbor table, a neighbor solicitation message is sent to discover the MAC address of the IPv6 address fe80::2 on Gi1
+
+- As you discovered earlier with IPv4, it is not acceptable to use the interface option in a static route when the interface is an Ethernet interface because Proxy ARP consumes an execessive amount of router resources
+
+- Note that proxy ARP does not exist in IPv6
+
+- Therefore, if you use the interface option with an Ethernet interface, it works only if the destination IPv6 address is directly attached to the router interface specified
+
+- This is because the destination IPv6 address in the packet is used as the next-hop address, and the MAC address needs to be discovered using NDP
+
+- If the destination is not in the directly connected network, neighbor discovery fails, and Layer 2 encapsulation ultimately fails
+
+- Consider our topology again
+
+- On R1, if you configured the following IPv6 static route (which is called a directly attached static route), what would happen?
+
+```
+conf t
+ ipv6 route 2001:db8:0:3::/64 g1
+```
+
+- When R1 receives a packet destined for 2001:db8:0:3::3, it determines based on the static route that it is directly connected to g1 (which is not according with our figure)
+
+- Therefore R1 sends a Neighbor Solicitation (NS) out G1 interface for MAC address associated with 2001:db8:0:3::3, using the solicited-node multicast address ff02::1:ff00:3
+
+- If no device attached to G1 is using the solicited-node multicast address ff02::1:ff00:3 and the IPv6 address 2001:db8:0:3::3m, the NS goes unanswered, and Layer 2 encapsulation fails
+
+- As you can see, being able to recognize misconfigured static routes and the issues that arise is an important skill to have when troubleshooting because a misconfigured static route cause traffic to be misrouted or suboptimally routed
+
+- In addition, remember that a static route has an AD of 1, by default; therefore static routes are preferred over other sources of routing information to the same destination
+
+## Trouble Tickets
+
+- Trouble tickets to troubleshoot real live scenarios or for exam environment
+
+### IPv4 Addressing and Addressing technologies Trouble Tickets
+
+- Trouble tickets 1-1 and 1-2 are based on the following topology:
+
+![ipv4-addressing-trouble-tickets-topology](./ipv4-addressing-trouble-tickets-topology.png)
+
+### Trouble Ticket 1-1
+
+- **Problem**: PC1 is not able to access resources on web server 192.0.2.1
+
+- You begin troubleshooting by verifying the issue with a ping from PC1 to 192.0.2.1
+
+- As shown below, the ping fails
+
+```
+PC1#ping 192.0.2.1
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 192.0.2.1, timeout is 2 seconds:
+.....
+Success rate is 0 percent (0/5)
+```
+
+- Next, you ping the default gateway for PC1, which is R1 at 10.1.1.1
+
+```
+PC1#ping 10.1.1.1
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 10.1.1.1, timeout is 2 seconds:
+!!!!!
+Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/1 ms
+PC1#
+```
+
+- Now the ping is successful
+
+- You decided to see whether this is an isolated client
+
+- You access PC2 and ping 192.0.2.1, which is successful
+
+```
+PC2#ping 192.0.2.1
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 192.0.2.1, timeout is 2 seconds:
+!!!!!
+Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/5 ms
+```
+
+- At this point, you have determined that Layer 2 and Layer 3 connectivity from PC1 and PC2 to the router are fine
+
+- You have also confirmed that PC2 can reach Internet resources even though PC1 cannot
+
+- There are many reasons this situation may exist
+
+- One of the big ones is that an access control list (ACL) on G1 or G3 is preventing PC1 from accessing resources on the internet
+
+- Alternatively, a NAT issue could be preventing 10.1.1.10 from being translated
+
+- However, before you go down the path, review the basics
+
+- For example, how about the default gateway configured on PC1?
+
+```
+PC1#sh run | s ip route
+ip route 0.0.0.0 0.0.0.0 10.1.1.100
+```
+
+- It is configured incorrectly
+
+- PC1 is sending packets that are destined to a remote subnet to the wrong default gateway
+
+- If you review the above output on R1, you see that the default gateway is configured as 10.1.1.100, which is not the IP address of R1's interface
+
+- After you change the default gateway on PC1 to 10.1.1.1, the ping to 192.0.2.1 is successful
+
+```
+PC1(config)#do sh run | i ip route
+ip route 0.0.0.0 0.0.0.0 10.1.1.100
+PC1(config)#no ip route 0.0.0.0 0.0.0.0 10.1.1.100
+PC1(config)#ip route 0.0.0.0 0.0.0.0 10.1.1.1
+PC1(config)#
+PC1(config)#
+PC1(config)#do sh ip ro
+Codes: L - local, C - connected, S - static, R - RIP, M - mobile, B - BGP
+       D - EIGRP, EX - EIGRP external, O - OSPF, IA - OSPF inter area 
+       N1 - OSPF NSSA external type 1, N2 - OSPF NSSA external type 2
+       E1 - OSPF external type 1, E2 - OSPF external type 2, m - OMP
+       n - NAT, Ni - NAT inside, No - NAT outside, Nd - NAT DIA
+       i - IS-IS, su - IS-IS summary, L1 - IS-IS level-1, L2 - IS-IS level-2
+       ia - IS-IS inter area, * - candidate default, U - per-user static route
+       H - NHRP, G - NHRP registered, g - NHRP registration summary
+       o - ODR, P - periodic downloaded static route, l - LISP
+       a - application route
+       + - replicated route, % - next hop override, p - overrides from PfR
+       & - replicated local route overrides by connected
+
+Gateway of last resort is 10.1.1.1 to network 0.0.0.0
+
+S*    0.0.0.0/0 [1/0] via 10.1.1.1
+      10.0.0.0/8 is variably subnetted, 2 subnets, 2 masks
+C        10.1.1.0/26 is directly connected, Ethernet0/0
+L        10.1.1.10/32 is directly connected, Ethernet0/0
+```
+
+```
+PC1(config)#do ping 192.0.2.1
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 192.0.2.1, timeout is 2 seconds:
+!!!!!
+Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/1 ms
+PC1(config)#
+```
+
+### Trouble Ticket 1-2
+
+**Problem**: PC1 is not able to access the web server at 192.0.2.1
+
+- You begin troubleshooting the issue with a ping from PC1 to 192.0.2.1. As shown below the ping fails
+
+```
+PC1#ping 192.0.2.1
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 192.0.2.1, timeout is 2 seconds:
+U.U.U
+Success rate is 0 percent (0/5)
+PC1#
+```
+
+- Next, you ping the default gateway for PC1, which is R1 at 10.1.1.1
+
+- This fails as well
+
+```
+PC1#ping 10.1.1.1
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 10.1.1.1, timeout is 2 seconds:
+U.U.U
+Success rate is 0 percent (0/5)
+```
+
+- Next, you decide to see whether this is an isolated incident by pinging from PC2 to the IP address 192.0.2.1 and to the default gateway at 10.1.1.1
+
+- As shown below, both of these pings fail as well, indicating that the problem is not isolated
+
+```
+PC2#ping 192.0.2.1
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 192.0.2.1, timeout is 2 seconds:
+U.U.U
+Success rate is 0 percent (0/5)
+PC2#ping 10.1.1.1
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 10.1.1.1, timeout is 2 seconds:
+U.U.U
+Success rate is 0 percent (0/5)
+PC2#
+```
+
+- At this point you have confirmed that there is no Layer 2 and Layer 3 connectivity from PC1 or PC2 to their default gateway
+
+- This can be caused by many different factors
+
+- For example VLANs, VLAN access control lists (VACLs), trunks, VLAN trunking protocol (VTP), and Spanning Tree Protocol (STP) could all possibly cause this issue to occur
+
+- However, always remember to check the basics first: in this case start with IP addressing on the client
+
+```
+PC1#sh ip ro | b Gate
+Gateway of last resort is not set
+
+      169.254.0.0/16 is variably subnetted, 2 subnets, 2 masks
+C        169.254.0.0/16 is directly connected, Ethernet0/0
+L        169.254.180.166/32 is directly connected, Ethernet0/0
+```
+
+- On PC1 you look at the IP addressing information
+
+- As shown above, PC1 has an APIPA (Automatic Private IP Addressing) address of 192.168.180.166/16 and no default gateway
+
+- This means that PC1 cannot contact a DHCP server and is autoconfiguring an IP address 
+
+- It still does not rule out VLAN, trunks, VTP, STP and so on causes
+
+- However it helps to narrow the focus
+
+- Notice in this Trouble Ticket topology that the DHCP server is located out interface Gi2 on R1
+
+- It is in a different subnet than the PCs
+
+- Therefore, R1 is required to forward the DHCPDISCOVER messages from PCs to the DHCP server at 172.16.1.10
+
+- To do this, it needs the `ip helper-address` command configured on Gi1 interface
+
+- You start there to eliminate this as the issue and then focus elsewhere if needed
+
+- On R1, you issue the command `show run int gi1` as shown below
+
+```
+R1#sh run int g1
+Building configuration...
+
+Current configuration : 165 bytes
+!
+interface GigabitEthernet1
+ ip address 10.1.1.1 255.255.255.192
+ ip helper-address 172.16.1.100
+ ip nat inside
+ negotiation auto
+ no mop enabled
+ no mop sysid
+end
+
+```
+
+- The output indicates that the IP helper address is 172.16.1.100, which is not correct according with the network diagram
+
+- After you fix the IP helper address with the `no ip helper-address 172.16.1.100` and issue the `ip helper-address 172.16.1.10` command in interface configuration mode, PC1 successfully receives IP addressing information from the DHCP server
+
+```
+PC1#sh ip int br
+Interface              IP-Address      OK? Method Status                Protocol
+Ethernet0/0            10.1.1.13       YES DHCP   up                    up      
+Ethernet0/1            unassigned      YES NVRAM  administratively down down    
+Ethernet0/2            unassigned      YES NVRAM  administratively down down    
+Ethernet0/3            unassigned      YES NVRAM  administratively down down    
+PC1#sh ip ro | b Gate
+Gateway of last resort is 10.1.1.1 to network 0.0.0.0
+
+S*    0.0.0.0/0 [254/0] via 10.1.1.1
+      10.0.0.0/8 is variably subnetted, 2 subnets, 2 masks
+C        10.1.1.0/26 is directly connected, Ethernet0/0
+L        10.1.1.13/32 is directly connected, Ethernet0/0
+      172.16.0.0/32 is subnetted, 1 subnets
+S        172.16.1.10 [254/0] via 10.1.1.1, Ethernet0/0
+PC1#
+```
+
+- After you verify the addressing information on PC1, the ping to 192.0.2.1 is successful, as shown below
+
+```
+PC1#ping 192.0.2.1
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 192.0.2.1, timeout is 2 seconds:
+!!!!!
+Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/1 ms
+PC1#
+```
+
+- Same for PC2:
+
+```
+PC2#show ip int br
+Interface              IP-Address      OK? Method Status                Protocol
+Ethernet0/0            10.1.1.11       YES DHCP   up                    up      
+Ethernet0/1            unassigned      YES NVRAM  administratively down down    
+Ethernet0/2            unassigned      YES NVRAM  administratively down down    
+Ethernet0/3            unassigned      YES NVRAM  administratively down down    
+PC2#sh ip ro | b Gate
+Gateway of last resort is 10.1.1.1 to network 0.0.0.0
+
+S*    0.0.0.0/0 [254/0] via 10.1.1.1
+      10.0.0.0/8 is variably subnetted, 2 subnets, 2 masks
+C        10.1.1.0/26 is directly connected, Ethernet0/0
+L        10.1.1.11/32 is directly connected, Ethernet0/0
+      172.16.0.0/32 is subnetted, 1 subnets
+S        172.16.1.10 [254/0] via 10.1.1.1, Ethernet0/0
+```
+
+```
+PC2#ping 192.0.2.1
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 192.0.2.1, timeout is 2 seconds:
+!!!!!
+Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/1 ms
+PC2#
+```
+
+## IPv6 Addressing Trouble Ticketa
+
+- Trouble tickets 1-3 and 1-4 are based on the topology shown below
+
+![ipv6-addressing-trouble-tickets-topology](./ipv6-addressing-trouble-tickets-topology.png)
+
+### Trouble Ticket 1-3
+
+**Problem**: PC1 is not able to access resources on the web server 2001:db8:d::1
+
+- Your network uses Stateless Address Autoconfiguration for IPv6 addressing and DHCPv6 for additional options such as a domain name, TFTP server addresses, and DNS server addresses
+
+- You begin troubleshooting by verifying the issue with a ping from PC1 to 2001:db8:d::1
+
+- As shown below the ping fails
+
+```
+root@88a0fbf88045:/# ping 2001:db8:d::7
+PING 2001:db8:d::7(2001:db8:d::7) 56 data bytes
+From 2001:db8:a:a::1 icmp_seq=1 Destination unreachable: Address unreachable
+From 2001:db8:a:a::1 icmp_seq=5 Destination unreachable: Address unreachable
+From 2001:db8:a:a::1 icmp_seq=9 Destination unreachable: Address unreachable
+From 2001:db8:a:a::1 icmp_seq=13 Destination unreachable: Address unreachable
+^C
+--- 2001:db8:d::7 ping statistics ---
+18 packets transmitted, 0 received, +4 errors, 100% packet loss, time 17419ms
+
+```
+
+- You ping the default gateway but the ping fails, as shown below
+
+```
+root@88a0fbf88045:/# ping 2001:db8:a:a::1
+ping: connect: Network is unreachable
+```
+
+- Next, you verify the IPv6 address on PC1, using the `show ipv6 int e0/0` command
+
+```
+PC1(config-if)#do sh ipv6 int e0/0
+Ethernet0/0 is up, line protocol is up
+  IPv6 is enabled, link-local address is FE80::A8BB:CCFF:FE00:600 
+  No Virtual link-local address(es):
+  No global unicast address is configured
+  Joined group address(es):
+    FF02::1
+    FF02::2
+    FF02::1:FF00:600
+  MTU is 1500 bytes
+  ICMP error messages limited to one every 100 milliseconds
+  ICMP redirects are enabled
+  ICMP unreachables are sent
+  ND DAD is enabled, number of DAD attempts: 1
+  ND reachable time is 30000 milliseconds (using 30000)
+  ND advertised reachable time is 0 (unspecified)
+  ND advertised retransmit interval is 0 (unspecified)
+  ND router advertisements are sent every 200 seconds
+  ND router advertisements live for 1800 seconds
+  ND advertised default router preference is Medium
+  Hosts use stateless autoconfig for addresses.
+```
+
+- This indicates that PC1 is not generating it's own global unicast address using stateless address autoconfiguration or identifying the default gateway in the network
+
+- Your phone rings, and the user at PC2 is indicating that they cannot access any of IPv6-enabled resources 
+
+- You access PC2 and issue the same command, and notice that it is also not generating an IPv6 address or identifying a default gateway
+
+```
+PC2(config-if)#do sh ipv6 int br
+Ethernet0/0            [up/up]
+    FE80::A8BB:CCFF:FE00:700
+Ethernet0/1            [administratively down/down]
+    unassigned
+Ethernet0/2            [administratively down/down]
+    unassigned
+Ethernet0/3            [administratively down/down]
+    unassigned
+```
+
+- Recall that IPv6 relies on RAs
+
+- Therefore, R1's G0/0 needs to be sending RAs on the link for PC1 and PC2 to generate their own IPv6 addresses using SLAAC
+
+- You issue the `show ipv6 interface g0/0` command on R1 as shown below
+
+- The output indicates that hosts use SLAAC for addresses, and DHCP is used for other configuration options
+
+- However, it also indicates that RAs are suppressed
+
+- Therefore PC1 and PC2 do not receive RAs that provide the prefix information necessary to perform autoconfiguration
+
+- You issue the command `show run interface g0/0` command to verify the configuration commands on the interface
+
+- As shown below, the interface is configured with the `ipv6 nd ra suppress all` command, which stops R1 for sending RAs
+
+```
+R1#sh run int g0/0
+Building configuration...
+
+Current configuration : 271 bytes
+!
+interface GigabitEthernet0/0
+ no ip address
+ duplex auto
+ speed auto
+ media-type rj45
+ ipv6 address 2001:DB8:A:A::1/64
+ ipv6 enable
+ ipv6 nd autoconfig default-route
+ ipv6 nd other-config-flag
+ ipv6 nd ra suppress all
+ ipv6 dhcp relay destination  2001:DB8:A:B::7
+end
+```
+
+- After you remove the command with `no ipv6 nd ra suppress all`, PC1 successfully generates an ipv6 address and defines an ipv6 gateway as shown below
+
+```
+PC2#show ipv6 route
+IPv6 Routing Table - default - 4 entries
+Codes: C - Connected, L - Local, S - Static, U - Per-user Static route
+       B - BGP, R - RIP, H - NHRP, HG - NHRP registered
+       Hg - NHRP registration summary, HE - NHRP External, I1 - ISIS L1
+       I2 - ISIS L2, IA - ISIS interarea, IS - ISIS summary, D - EIGRP
+       EX - EIGRP external, ND - ND Default, NDp - ND Prefix, DCE - Destination
+       NDr - Redirect, RL - RPL, O - OSPF Intra, OI - OSPF Inter
+       OE1 - OSPF ext 1, OE2 - OSPF ext 2, ON1 - OSPF NSSA ext 1
+       ON2 - OSPF NSSA ext 2, la - LISP alt, lr - LISP site-registrations
+       ld - LISP dyn-eid, lA - LISP away, le - LISP extranet-policy
+       lp - LISP publications, ls - LISP destinations-summary, a - Application
+       m - OMP
+ND  ::/0 [2/0]
+     via FE80::5054:FF:FE07:8298, Ethernet0/0
+NDp 2001:DB8:A:A::/64 [2/0]
+     via Ethernet0/0, directly connected
+L   2001:DB8:A:A:A8BB:CCFF:FE00:700/128 [0/0]
+     via Ethernet0/0, receive
+L   FF00::/8 [0/0]
+     via Null0, receive
+PC2#sh
+PC2#show ipv6 int br
+Ethernet0/0            [up/up]
+    FE80::A8BB:CCFF:FE00:700
+    2001:DB8:A:A:A8BB:CCFF:FE00:700
+Ethernet0/1            [administratively down/down]
+    unassigned
+Ethernet0/2            [administratively down/down]
+    unassigned
+Ethernet0/3            [administratively down/down]
+```
+
+- You confirm that IPv6 resources are accessible by pinging 2001:db8:d::1 as shown below and it is successful
+
+```
+PC1#ping 2001:db8:d::1
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 2001:DB8:D::1, timeout is 2 seconds:
+!!!!!
+Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/2 ms
+```
+
+- You then call the user at PC2 and confirm that he can access the resources as well
+
+- He indicates that he can
+
+### Trouble Ticket 1-4
+
+- **Problem**: PC1 is not able to access resources on the web server 2001:db8:d::1
+
+- Your network uses stateless address autoconfiguration for IPv6 addressing and DHCPv6 for additional options such as domain name, TFTP server address, and DNS server address
+
+- You begin troubleshooting with a ping from PC1 to 2001:db8:d::1. As shown below the ping fails
+
+```
+PC1#ping 2001:db8:d::1
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 2001:DB8:D::1, timeout is 2 seconds:
+
+% No valid route for destination
+Success rate is 0 percent (0/1)
+PC1#
+```
+
+- You ping the default gateway 2001:db8:a:a::1 but the ping fails:
+
+```
+PC1#ping 2001:db8:a:a::1
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 2001:DB8:A:A::1, timeout is 2 seconds:
+
+% No valid route for destination
+Success rate is 0 percent (0/1)
+```
+
+- Next, you verify the IPv6 address on PC1:
+
+```
+PC1(config-if)#do sh ipv6 ro    
+IPv6 Routing Table - default - 3 entries
+Codes: C - Connected, L - Local, S - Static, U - Per-user Static route
+       B - BGP, R - RIP, H - NHRP, HG - NHRP registered
+       Hg - NHRP registration summary, HE - NHRP External, I1 - ISIS L1
+       I2 - ISIS L2, IA - ISIS interarea, IS - ISIS summary, D - EIGRP
+       EX - EIGRP external, ND - ND Default, NDp - ND Prefix, DCE - Destination
+       NDr - Redirect, RL - RPL, O - OSPF Intra, OI - OSPF Inter
+       OE1 - OSPF ext 1, OE2 - OSPF ext 2, ON1 - OSPF NSSA ext 1
+       ON2 - OSPF NSSA ext 2, la - LISP alt, lr - LISP site-registrations
+       ld - LISP dyn-eid, lA - LISP away, le - LISP extranet-policy
+       lp - LISP publications, ls - LISP destinations-summary, a - Application
+       m - OMP
+ND  ::/0 [2/0]
+     via FE80::5054:FF:FE07:8298, Ethernet0/0
+NDp 2001:DB8:A::/60 [2/0]
+     via Ethernet0/0, directly connected
+L   FF00::/8 [0/0]
+     via Null0, receive
+PC1(config-if)#do sh ipv6 int br
+Ethernet0/0            [up/up]
+    FE80::A8BB:CCFF:FE00:600
+Ethernet0/1            [administratively down/down]
+    unassigned
+Ethernet0/2            [administratively down/down]
+    unassigned
+Ethernet0/3            [administratively down/down]
+    unassigned
+```
+
+- This indicates that PC1 is not generating it's own global unicast address using stateless address autoconfiguration, however it is identifying a default gateway on the network at link local address FE80::A8BB:CCFF:FE00:700
+
+- Your phone rings, and the user at PC2 is indicating that they cannot access any of the IPv6-enabled resources 
+
+- You access PC2 and issue the `ifconfig` command, and notice that it is experiencing the same issues as PC1
+
+- Recall that SLAAC relies on RAs
+
+- Therefore, R1's G0/0 interface must send RAs on the link for PC1 and PC2 to generate their own IPv6 address using SLAAC
+
+- You issue the command `show ipv6 interface g0/0` command on R1
+
+```
+R1(config-if)#do sh ipv6 int g0/0
+GigabitEthernet0/0 is up, line protocol is up
+  IPv6 is enabled, link-local address is FE80::5054:FF:FE07:8298 
+  No Virtual link-local address(es):
+  Global unicast address(es):
+    2001:DB8:A:A::1, subnet is 2001:DB8:A::/60 
+  Joined group address(es):
+    FF02::1
+    FF02::2
+    FF02::1:2
+    FF02::1:FF00:1
+    FF02::1:FF07:8298
+  MTU is 1500 bytes
+  ICMP error messages limited to one every 100 milliseconds
+  ICMP redirects are enabled
+  ICMP unreachables are sent
+  ND DAD is enabled, number of DAD attempts: 1
+  ND reachable time is 30000 milliseconds (using 30000)
+  ND advertised reachable time is 0 (unspecified)
+  ND advertised retransmit interval is 0 (unspecified)
+  ND router advertisements are sent every 200 seconds
+  ND router advertisements live for 1800 seconds
+  ND advertised default router preference is Medium
+  Hosts use stateless autoconfig for addresses.
+  Hosts use DHCP to obtain other configuration.
+```
+
+- The output indicates that hosts use SLAAC for addresses, and DHCP is used for other configuration values
+
+- Also there is no indication that RAs are being suppressed
+
+- There is also confirmed by the fact that PC1 and PC2 are identifying a default gateway
+
+- However, is it the right one?
+
+- According with our example, the default gateway is FE80::5054:FF:FE07:8298
+
+- Based on the last output, this is correct
+
+- If you review the output from above, can you see the issue?
+
+- If you did not spot it, look at the global prefix assigned to the interface g0/0
+
+- It is 2001:db8:a::/60
+
+- SLAAC only works if the prefix is /64
+
+- You issue the command `show run interface g0/0` command to verify the configuration commands on the interface
+
+```
+R1(config-if)#do sh run int g0/0
+Building configuration...
+
+Current configuration : 246 bytes
+!
+interface GigabitEthernet0/0
+ no ip address
+ duplex auto
+ speed auto
+ media-type rj45
+ ipv6 address 2001:DB8:A:A::1/60
+ ipv6 enable
+ ipv6 nd autoconfig default-route
+ ipv6 nd other-config-flag
+ ipv6 dhcp relay destination  2001:DB8:A:B::7
+end
+```
+
+- The interface is configured with the command `ipv6 address 2001:DB8:A:A::1/60`
+
+- RAs are still generated, but SLAAC does not work unless the prefix is /64
+
+- You confirm with your network design plans that the prefix should be /64
+
+- After you remove the command with `no ipv6 address 2001:db8:a:a::1/60` and issue the command `ipv6 address 2001:db8:a:a::1/64`, PC1 successfully generates a global IPv6 unicast address, as shown below
+
+```
+PC1#show ipv6 int br
+Ethernet0/0            [up/up]
+    FE80::A8BB:CCFF:FE00:600
+    2001:DB8:A:A:A8BB:CCFF:FE00:600
+Ethernet0/1            [administratively down/down]
+    unassigned
+Ethernet0/2            [administratively down/down]
+    unassigned
+Ethernet0/3            [administratively down/down]
+    unassigned
+
+PC1#show ipv6 route
+IPv6 Routing Table - default - 5 entries
+Codes: C - Connected, L - Local, S - Static, U - Per-user Static route
+       B - BGP, R - RIP, H - NHRP, HG - NHRP registered
+       Hg - NHRP registration summary, HE - NHRP External, I1 - ISIS L1
+       I2 - ISIS L2, IA - ISIS interarea, IS - ISIS summary, D - EIGRP
+       EX - EIGRP external, ND - ND Default, NDp - ND Prefix, DCE - Destination
+       NDr - Redirect, RL - RPL, O - OSPF Intra, OI - OSPF Inter
+       OE1 - OSPF ext 1, OE2 - OSPF ext 2, ON1 - OSPF NSSA ext 1
+       ON2 - OSPF NSSA ext 2, la - LISP alt, lr - LISP site-registrations
+       ld - LISP dyn-eid, lA - LISP away, le - LISP extranet-policy
+       lp - LISP publications, ls - LISP destinations-summary, a - Application
+       m - OMP
+ND  ::/0 [2/0]
+     via FE80::5054:FF:FE07:8298, Ethernet0/0
+NDp 2001:DB8:A::/60 [2/0]
+     via Ethernet0/0, directly connected
+NDp 2001:DB8:A:A::/64 [2/0]
+     via Ethernet0/0, directly connected
+L   2001:DB8:A:A:A8BB:CCFF:FE00:600/128 [0/0]
+     via Ethernet0/0, receive
+L   FF00::/8 [0/0]
+     via Null0, receive
+```
+
+- You confirm that IPv6 resources are accessible by pinging 2001:db8:d::1, and the ping is successful
+
+- In addition, you contact the user at PC2 and they indicate that everything is fine now
+
+```
+PC1#ping 2001:db8:d::1
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 2001:DB8:D::1, timeout is 2 seconds:
+!!!!!
+Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/4 ms
+```
+
+![ipv6-dhcp-tickets-lab](./ipv6-dhcp-tickets-lab.png)
+
+## Static Routing Trouble Tickets
+
