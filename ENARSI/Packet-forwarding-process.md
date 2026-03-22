@@ -1462,3 +1462,274 @@ Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/4 ms
 
 ## Static Routing Trouble Tickets
 
+- Trouble tickets 1-5 and 1-6 are based on the following topology:
+
+![static-routing-trouble-tickets](./static-routing-trouble-tickets.png)
+
+### Trouble Ticket 1-5
+
+![cml-lab-topology-static-routing](./cml-lab-topology-static-routing.png)
+
+- **Problem**: Users in the 10.1.1.0/24 network have indicated that they are not able to access resources on the FTP server in the 10.1.3.0/24 network
+
+- The FTP server uses the static IPv4 address 10.1.3.10
+
+- Users have indicated that they are able to access the web server at 10.1.3.5
+
+- (Note that the network uses only static routes)
+
+- You start your troubleshooting eforts by verifying the problem with a ping to 10.1.3.10 from PC1 in the 10.1.1.0/24 network
+
+- As shown below, the ping is not successful
+
+- R1 is responding with a `destination unreachabl/ host unreachable` message
+
+```
+PC1#ping 10.1.3.10  
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 10.1.3.10, timeout is 2 seconds:
+U
+*Mar 22 13:02:28.411: ICMP: dst (10.1.1.10) host unreachable rcv from 10.1.1.1 .U
+*Mar 22 13:02:30.415: ICMP: dst (10.1.1.10) host unreachable rcv from 10.1.1.1 .U
+Success rate is 0 percent (0/5)
+PC1#
+*Mar 22 13:02:32.418: ICMP: dst (10.1.1.10) host unreachable rcv from 10.1.1.1 
+```
+
+- This indicates that R1 does not known how to route the packet destined for 10.1.3.10
+
+- In addition, you ping 10.1.3.5 from PC1 and it is successful
+
+```
+PC1#ping 10.1.3.5
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 10.1.3.5, timeout is 2 seconds:
+!!!!!
+Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/1 ms
+PC1#
+*Mar 22 13:08:31.034: ICMP: echo reply rcvd, src 10.1.3.5, dst 10.1.1.10, topology BASE, dscp 0 topoid 0
+*Mar 22 13:08:31.035: ICMP: echo reply rcvd, src 10.1.3.5, dst 10.1.1.10, topology BASE, dscp 0 topoid 0
+*Mar 22 13:08:31.036: ICMP: echo reply rcvd, src 10.1.3.5, dst 10.1.1.10, topology BASE, dscp 0 topoid 0
+*Mar 22 13:08:31.037: ICMP: echo reply rcvd, src 10.1.3.5, dst 10.1.1.10, topology BASE, dscp 0 topoid 0
+*Mar 22 13:08:31.038: ICMP: echo reply rcvd, src 10.1.3.5, dst 10.1.1.10, topology BASE, dscp 0 topoid 0
+PC1#
+```
+
+- Next, you access R1 and issue the `show ip route` command on R1 to verify whether it knows how to route the packet to 10.1.3.10
+
+- The closest entry that matches 10.1.3.10 is the entry for 10.1.3.0/29
+
+- However, does 10.1.3.10 fall within that subnet?
+
+```
+R1(config)#do sh ip ro | b Gate                      
+Gateway of last resort is not set
+
+      10.0.0.0/8 is variably subnetted, 6 subnets, 3 masks
+C        10.1.1.0/24 is directly connected, GigabitEthernet0/0
+L        10.1.1.1/32 is directly connected, GigabitEthernet0/0
+S        10.1.3.0/29 [1/0] via 10.1.12.2
+C        10.1.12.0/24 is directly connected, GigabitEthernet0/1
+L        10.1.12.1/32 is directly connected, GigabitEthernet0/1
+S        10.1.23.0/24 [1/0] via 10.1.12.2
+```
+
+- The network 10.1.3.0/29 has a range of addresses from 10.1.3.0 to 10.1.3.7, and 10.1.3.10 does not fall within that subnet
+
+- However, 10.1.3.5 do fall within that range
+
+- This explains why the users can reach one address and not the other in the 10.1.3.0/24 network
+
+- If you execute the `show ip route 10.1.3.10` and `show ip route 10.1.3.5` commands on R1, the output verifies this further
+
+- Below we see that there is no match for 10.1.3.10, but there is a match for 10.1.3.5
+
+```
+R1(config)#do sh ip route 10.1.3.5
+Routing entry for 10.1.3.0/29
+  Known via "static", distance 1, metric 0
+  Routing Descriptor Blocks:
+  * 10.1.12.2
+      Route metric is 0, traffic share count is 1
+R1(config)#do sh ip route 10.1.3.10
+% Subnet not in table
+```
+
+- Because the network is 10.1.3.0/24, and the entry in the routing table is 10.1.3.0/29, it is possible that the static route was misconfigured
+
+- You need to verify this by examining the running configuration using `show run | include ip route` command, as shown below
+
+```
+R1(config)#do sh run | i ip route
+ip route 10.1.3.0 255.255.255.248 10.1.12.2
+ip route 10.1.23.0 255.255.255.0 10.1.12.2
+```
+
+- Notice the command `ip route 10.1.3.0 255.255.255.248 10.1.12.2` 
+
+- This is the command that is producing 10.1.3.0/29 entry in the routing table
+
+- If you look closely, you will notice that the subnet mask was not configured correctly
+
+- To solve this issue you need to remove the static route with the command `no ip route 10.1.3.0 255.255.255.248 10.1.12.2`, and create a new static route with the command `ip route 10.1.3.0 255.255.255.0 10.1.12.2`
+
+- After you do this, you issue the `show ip route` command on R1 and confirm that the entry in the routing table is 10.1.3.0/24 as shown below
+
+```
+R1(config)#no ip route 10.1.3.0 255.255.255.248 10.1.12.2
+R1(config)#ip route 10.1.3.0 255.255.255.0 10.1.12.2
+R1(config)#
+
+R1(config)#do sh ip route
+Codes: L - local, C - connected, S - static, R - RIP, M - mobile, B - BGP
+       D - EIGRP, EX - EIGRP external, O - OSPF, IA - OSPF inter area 
+       N1 - OSPF NSSA external type 1, N2 - OSPF NSSA external type 2
+       E1 - OSPF external type 1, E2 - OSPF external type 2
+       i - IS-IS, su - IS-IS summary, L1 - IS-IS level-1, L2 - IS-IS level-2
+       ia - IS-IS inter area, * - candidate default, U - per-user static route
+       o - ODR, P - periodic downloaded static route, H - NHRP, l - LISP
+       a - application route
+       + - replicated route, % - next hop override, p - overrides from PfR
+
+Gateway of last resort is not set
+
+      10.0.0.0/8 is variably subnetted, 6 subnets, 2 masks
+C        10.1.1.0/24 is directly connected, GigabitEthernet0/0
+L        10.1.1.1/32 is directly connected, GigabitEthernet0/0
+S        10.1.3.0/24 [1/0] via 10.1.12.2
+C        10.1.12.0/24 is directly connected, GigabitEthernet0/1
+L        10.1.12.1/32 is directly connected, GigabitEthernet0/1
+S        10.1.23.0/24 [1/0] via 10.1.12.2
+```
+
+- Next, you issue the `show ip route 10.1.3.10` command, and you can see that the IP address 10.1.3.10 now matches an entry in the routing table
+
+```
+R1(config)# do sh ip route 10.1.3.10
+Routing entry for 10.1.3.0/24
+  Known via "static", distance 1, metric 0
+  Routing Descriptor Blocks:
+  * 10.1.12.2
+      Route metric is 0, traffic share count is 1
+```
+
+- Finally, you ping from PC1 to the IP address 10.1.3.10, and the ping is successful
+
+```
+PC1#ping 10.1.3.10
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 10.1.3.10, timeout is 2 seconds:
+!!!!!
+Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/2 ms
+PC1#
+*Mar 22 13:33:14.418: ICMP: echo reply rcvd, src 10.1.3.10, dst 10.1.1.10, topology BASE, dscp 0 topoid 0
+*Mar 22 13:33:14.420: ICMP: echo reply rcvd, src 10.1.3.10, dst 10.1.1.10, topology BASE, dscp 0 topoid 0
+*Mar 22 13:33:14.420: ICMP: echo reply rcvd, src 10.1.3.10, dst 10.1.1.10, topology BASE, dscp 0 topoid 0
+*Mar 22 13:33:14.421: ICMP: echo reply rcvd, src 10.1.3.10, dst 10.1.1.10, topology BASE, dscp 0 topoid 0
+*Mar 22 13:33:14.422: ICMP: echo reply rcvd, src 10.1.3.10, dst 10.1.1.10, topology BASE, dscp 0 topoid 0
+```
+
+### Trouble Ticket 1-6
+
+- **Problem**: Your proactive traffic monitoring indicates that all traffic from 2001:db8:0:1::/64 destined to 2001:db8:0:3::/64 is going through R2, when it should be going directly through R3 over the G0/3 link
+
+- R2 should be used to forward traffic from 2001:db8:0:1::/64 to 2001:db8:0:3::/64 only if the G0/3 link fails, which is has not
+
+- You need to determine why traffic is being forwarded the wrong way and fix it
+
+- (Note that this network uses only static routes)
+
+- You confirm the problem with a traceroute from PC1 to 2001:db8:0:3::3, which is the IP address of G0/1 interface on R3
+
+- The trace confirms that the packets are being sent through R2
+
+```
+PC1#traceroute 2001:db8:0:3::3
+Type escape sequence to abort.
+Tracing the route to 2001:DB8:0:3::3
+
+  1 2001:DB8:0:1::1 3 msec 1 msec 0 msec
+  2 2001:DB8:0:12::2 1 msec 1 msec 1 msec
+  3 2001:DB8:0:23::3 1 msec 1 msec 1 msec
+PC1#
+```
+
+- Next, you issue the command `show ipv6 route 2001:db8:0:3::/64` on R1, as shown below and confirm that the next-hop IPv6 address for 2001:db8:0:3::/64 is 2001:db8:0:12::2, which is the IPv6 address of R2's G0/0 interface
+
+- The next-hop IPv6 address should be 2001:db8:0:13::3, which is R3's G0/3 interface
+
+```
+R1#show ipv6 route 2001:db8:0:3::/64
+Routing entry for 2001:DB8:0:3::/64
+  Known via "static", distance 1, metric 0
+  Route count is 1/1, share count 0
+  Routing paths:
+    2001:DB8:0:12::2
+      Last updated 00:32:51 ago
+
+```
+
+- It appears that someone provided the incorrect next-hop IPv6 address in the static route
+
+- You verify the static route configured on R1 for the 2001:db8:0:3::/64 network by using the command `show run | include ipv6 route`
+
+```
+R1(config)#do sh run | i ipv6 route                        
+ipv6 route 2001:DB8:0:3::/64 2001:DB8:0:12::2 10
+ipv6 route 2001:DB8:0:3::/64 2001:DB8:0:13::3 11
+ipv6 route 2001:DB8:0:23::/64 2001:DB8:0:12::2
+```
+
+- You notice that there are two commands for network 2001:db8:0:3::/64
+
+- One has a next-hop of 2001:db8:0:12::2 and the other has next-hop 2001:db8:0:13::3
+
+- Why is the `ipv6 route` command with the next-hop of 2001:db8:0:12::2 being preferred over the command with the next hop 2001:db8:0:13::3?
+
+- If you look closely at both commands, you can see that the one with a next-hop of 2001:db8:0:12::2 is configured with an AD of 10 and that the other, which has a next-hop of 2001:db8:0:13::3, is configured with an AD of 11
+
+- Because the lower AD is is preferred, the static route with the AD of 10 is more trustworthy and is therefore the one used
+
+- To solve the issue, you need to configure the static route with a next-hop of 2001:db8:0:13::3 with a lower AD
+
+- In this case you change the AD to 1, which is the default for static routes, by using the `ipv6 route 2001:db8:0:3::/64 2001:db8:0:13::3 1` command
+
+- After the change, you revisit the routing table with the command `show ipv6 route 2001:db8:0:3::/64` to verify that the static route with the next-hop of 2001:db8:0:13::3 is now in the routing table
+
+- Below is confirmed that the change is successful
+
+```
+R1#conf t
+Enter configuration commands, one per line.  End with CNTL/Z.
+R1(config)#ipv6 route 2001:DB8:0:3::/64 2001:DB8:0:13::3 1
+R1(config)#
+R1(config)#
+R1(config)#do sh run | i ipv6 route                       
+ipv6 route 2001:DB8:0:3::/64 2001:DB8:0:12::2 10
+ipv6 route 2001:DB8:0:3::/64 2001:DB8:0:13::3
+ipv6 route 2001:DB8:0:23::/64 2001:DB8:0:12::2
+R1(config)#
+R1(config)#do sh ipv6 route 2001:db8:0:3::/64
+Routing entry for 2001:DB8:0:3::/64
+  Known via "static", distance 1, metric 0
+  Backup from "static [11]"
+  Route count is 1/1, share count 0
+  Routing paths:
+    2001:DB8:0:13::3
+      Last updated 00:00:27 ago
+
+```
+
+- Next you perform a trace from PC1 to 2001:db8:0:3::3, and it confirms that R2 is no longer being used
+
+- The traffic is now flowing across the link between R1 and R3
+
+```
+PC1#traceroute 2001:db8:0:3::3
+Type escape sequence to abort.
+Tracing the route to 2001:DB8:0:3::3
+
+  1 2001:DB8:0:1::1 0 msec 0 msec 1 msec
+  2 2001:DB8:0:13::3 0 msec 1 msec 0 msec
+PC1#
+```
