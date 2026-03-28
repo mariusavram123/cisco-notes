@@ -403,3 +403,278 @@ R3#sh run | i ip route
 ip route vrf GREEN 10.1.12.0 255.255.255.252 10.1.13.1
 ip route vrf RED 10.2.12.0 255.255.255.0 10.111.111.2
 ```
+
+### IPSEC IKEV1 with FVRF (IPSEC tunnel with IKEv1 in VRF)
+
+- Define crypto keyring:
+
+- R2:
+
+```
+crypto keyring KR1 vrf GREEN 
+  pre-shared-key address 10.1.13.2 key MARIUS12345
+ rsa-pubkey address 10.1.13.2
+  address 10.1.13.2
+  serial-number 00111111
+  key-string
+  00101110
+  quit
+```
+
+- R3:
+
+```
+crypto keyring KR1 vrf GREEN 
+  pre-shared-key address 10.1.12.2 key MARIUS12345
+ rsa-pubkey address 10.1.12.2
+  address 10.1.12.2
+  serial-number 00111111
+  key-string
+  00101110
+  quit
+```
+
+- Define isakmp-profile and isakmp policy
+
+- R2:
+
+```
+crypto isakmp policy 10
+ encr aes 256
+ hash sha256
+ authentication pre-share
+ group 16
+crypto isakmp key MARIUS12345 address 0.0.0.0        
+crypto isakmp profile MYPROFILE
+   vrf GREEN
+   keyring KR1
+   match identity address 10.1.13.2 255.255.255.255 GREEN
+```
+
+- R3:
+
+```
+crypto isakmp policy 10
+ encr aes 256
+ hash sha256
+ authentication pre-share
+ group 16
+crypto isakmp key MARIUS12345 address 0.0.0.0        
+crypto isakmp profile MYPROFILE
+   vrf GREEN
+   keyring KR1
+   match identity address 10.1.12.2 255.255.255.255 GREEN
+```
+
+- Define IPSEC transport set and crypto map params:
+
+- R2:
+
+```
+crypto ipsec transform-set IPSEC-TUNNEL esp-aes 256 esp-sha256-hmac 
+ mode tunnel
+crypto map IPSEC-MAP isakmp-profile MYPROFILE
+crypto map IPSEC-MAP 10 ipsec-isakmp 
+ set peer 10.1.13.2
+ set transform-set IPSEC-TUNNEL 
+ set isakmp-profile MYPROFILE
+ match address GRE-IPSEC
+```
+
+- R3:
+
+```
+crypto ipsec transform-set IPSEC-TUNNEL esp-aes 256 esp-sha256-hmac 
+ mode tunnel
+crypto map IPSEC-MAP isakmp-profile MYPROFILE
+crypto map IPSEC-MAP 10 ipsec-isakmp 
+ set peer 10.1.12.2
+ set transform-set IPSEC-TUNNEL 
+ set isakmp-profile MYPROFILE
+ match address GRE-IPSEC
+```
+
+- Set the crypto map to the interface:
+
+- R2:
+
+```
+interface g0/0
+  crypto map IPSEC-MAP
+```
+
+- R3:
+
+```
+interface g0/0
+  crypto map IPSEC-MAP
+```
+
+- Cisco docs:
+
+[Cisco-IKEV1-FVRF](https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/sec_conn_ikevpn/configuration/xe-3s/VRF-Aware_IPsec.html)
+
+### IPSEC IKEV1 with FVRF (IPSEC tunnel with IKEv2 in VRF)
+
+1. IKEV2 proposal
+
+2. IKEV2 policy
+
+3. IKEV2 keyring (not really needed if you set local/remote auth methods as in this example)
+
+4. IKEV2 profile
+
+5. Transform set
+
+6. Crypto map
+
+- R2:
+
+1. 
+
+```
+crypto ikev2 proposal IKEv2PROPOSAL1 
+ encryption aes-cbc-256
+ integrity sha256
+ group 16
+```
+
+2. 
+
+```
+crypto ikev2 policy IKEv2POLICY1 
+ match fvrf GREEN
+ proposal IKEv2PROPOSAL1
+```
+
+3. 
+
+```
+crypto ikev2 keyring IKEv2KEYRING1
+ peer any
+  address 0.0.0.0 0.0.0.0
+  pre-shared-key local MARIUS12345
+  pre-shared-key remote MARIUS12345
+```
+
+4. 
+
+```
+crypto ikev2 profile IKEv2PROFILE1
+ match fvrf GREEN
+ match identity remote address 10.1.13.2 255.255.255.255 
+ identity local address 10.1.12.2
+ authentication remote pre-share key MARIUS12345
+ authentication local pre-share key MARIUS12345
+```
+
+5. 
+
+```
+crypto ipsec transform-set IPSEC-TUNNEL esp-aes 256 esp-sha256-hmac 
+ mode tunnel
+```
+
+6. 
+
+```
+crypto map IPSEC-MAP 10 ipsec-isakmp 
+ set peer 10.1.13.2
+ set transform-set IPSEC-TUNNEL 
+ set ikev2-profile IKEv2PROFILE1
+ match address GRE-IPSEC
+```
+
+```
+R2#sh run int g0/0
+Building configuration...
+
+Current configuration : 160 bytes
+!
+interface GigabitEthernet0/0
+ vrf forwarding GREEN
+ ip address 10.1.12.2 255.255.255.252
+ duplex auto
+ speed auto
+ media-type rj45
+ crypto map IPSEC-MAP
+end
+
+```
+
+- R3:
+
+1. 
+
+```
+crypto ikev2 proposal IKEv2PROPOSAL1 
+ encryption aes-cbc-256
+ integrity sha256
+ group 16
+```
+
+2. 
+
+```
+crypto ikev2 policy IKEv2POLICY1 
+ match fvrf GREEN
+ proposal IKEv2PROPOSAL1
+```
+
+3. 
+
+```
+crypto ikev2 keyring IKEv2KEYRING1
+ peer any
+  address 0.0.0.0 0.0.0.0
+  pre-shared-key local MARIUS12345
+  pre-shared-key remote MARIUS12345
+ !
+```
+
+4. 
+
+```
+crypto ikev2 profile IKEv2PROFILE1
+ match fvrf GREEN
+ match identity remote address 10.1.12.2 255.255.255.255 
+ identity local address 10.1.13.2
+ authentication remote pre-share key MARIUS12345
+ authentication local pre-share key MARIUS12345
+```
+
+5. 
+
+```
+crypto ipsec transform-set IPSEC-TUNNEL esp-aes 256 esp-sha256-hmac 
+ mode tunnel
+```
+
+6. 
+
+```
+crypto map IPSEC-MAP 10 ipsec-isakmp 
+ set peer 10.1.12.2
+ set transform-set IPSEC-TUNNEL 
+ set ikev2-profile IKEv2PROFILE1
+ match address GRE-IPSEC
+```
+
+```
+R3#sh run int g0/0
+Building configuration...
+
+Current configuration : 160 bytes
+!
+interface GigabitEthernet0/0
+ vrf forwarding GREEN
+ ip address 10.1.13.2 255.255.255.252
+ duplex auto
+ speed auto
+ media-type rj45
+ crypto map IPSEC-MAP
+end
+
+```
+
+[Cisco-IKEV2-FVRF](https://community.cisco.com/t5/security-knowledge-base/implementing-ikev2-vrf-aware-crypto-map-vpn/ta-p/5316297)
