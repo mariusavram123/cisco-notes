@@ -677,4 +677,30 @@ end
 
 ```
 
+- IKEv2 profile using the keyring for peers:
+
+- R2:
+
+```
+crypto ikev2 profile IKEv2PROFILE1
+ match fvrf GREEN
+ match identity remote address 10.1.13.2 255.255.255.255 
+ identity local address 10.1.12.2
+ authentication remote pre-share
+ authentication local pre-share
+ keyring local IKEv2KEYRING1
+```
+
+- R3:
+
+```
+crypto ikev2 profile IKEv2PROFILE1
+ match fvrf GREEN
+ match identity remote address 10.1.12.2 255.255.255.255 
+ identity local address 10.1.13.2
+ authentication remote pre-share
+ authentication local pre-share
+ keyring local IKEv2KEYRING1
+```
+
 [Cisco-IKEV2-FVRF](https://community.cisco.com/t5/security-knowledge-base/implementing-ikev2-vrf-aware-crypto-map-vpn/ta-p/5316297)
