@@ -136,3 +136,64 @@ interface GigabitEthernet3
 end
 
 ```
+
+- This even works with IOSv routers.
+
+- In place of using a static route with `default` at the end, use one with `global`
+
+```
+R1(config-if)#do sh run | i ip route
+ip route vrf GREEN 0.0.0.0 0.0.0.0 172.16.29.1 global
+ip route vrf GREEN 10.1.23.0 255.255.255.252 10.1.12.2
+ip route vrf GREEN 10.1.23.0 255.255.255.252 10.1.13.2
+```
+
+- Route-map config:
+
+```
+R1(config-if)#do sh run | s access-lis
+ip access-list extended ICMP-VRF
+ permit icmp any 10.1.12.0 0.0.0.3
+ permit icmp any 10.1.13.0 0.0.0.3
+ permit icmp any 10.1.23.0 0.0.0.3
+
+ route-map SET-VRF permit 10
+ match ip address ICMP-VRF
+ set vrf GREEN
+```
+
+- Interface config:
+
+```
+R1(config-if)#do sh run int g0/0
+Building configuration...
+
+Current configuration : 124 bytes
+!
+interface GigabitEthernet0/0
+ ip address dhcp
+ ip policy route-map SET-VRF
+ duplex auto
+ speed auto
+ media-type rj45
+end
+
+```
+
+```
+R2#ping vrf GREEN 172.16.29.1
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 172.16.29.1, timeout is 2 seconds:
+!!!!!
+Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/1 ms
+R2#tt
+R2#te
+R2#tr
+R2#traceroute vrf GREEN 172.16.29.1
+Type escape sequence to abort.
+Tracing the route to 172.16.29.1
+VRF info: (vrf in name/id, vrf out name/id)
+  1 10.1.12.1 0 msec 0 msec 1 msec
+  2 172.16.29.1 1 msec 1 msec 1 msec
+```
+
