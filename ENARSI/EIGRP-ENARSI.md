@@ -252,3 +252,643 @@ Opcode value                    Packet type                         Function
 
 - Ensuring the packets are received makes the transport method reliable
 
+- All update, query and reply packets are deemed reliable, and hello and ACK packets do not require acknowledgement and could be unreliable
+
+- If the originating router does not receive an ACK packet from the neighbor before the retransmit timeout expires, it notifies the non-acknowledging router to stop processing the multicast packets
+
+- The originating router sends all traffic by unicast until the neighbor is fully synchronized
+
+- Upon complete synchronization, the originating router notifies the destination router to start processing multicast packets again
+
+- All unicast packets require acknowledgement
+
+- EIGRP retries up to 16 times for each packet that requires confirmation, and it resets the neighbor relationship when the neighbor reaches the retry limit of 16
+
+- NOTE: In the context of EIGRP, do not confuse RTP with the Real-Time Transport Protocol (RTP), which is used for carrying audio or video over an IP network
+
+- EIGRP's RTP allows for confirmation of packets while supporting multicast
+
+- Other protocols that require reliable connection-oriented communication, such as TCP, cannot use multicast addressing
+
+##### Forming EIGRP Neighbors
+
+- Unlike other distance vector routing protocols, EIGRP requires a neighbor relationship to form before routes are processed and and added to the Routing Information Base (RIB)
+
+- Upon hearing an EIGRP hello packet, a router attempts to become the neighbor of the other router
+
+- The following parameters must match for the two routers to become neighbors:
+
+    - Metric formula K values
+
+    - Primary subnet matches
+
+    - Autonomous system number (ASN) matches
+
+    - Authentication matches
+
+- Below is shown the process EIGRP uses for forming neighbor adjacencies
+
+![eigrp-adjacency-process-r1-perspective](./eigrp-adjacency-process-r1-perspective.png)
+
+1. R1 and R2 send hello to each other
+
+2. R1 sends Update packet (Unicast), with Init Set
+
+3. R2 replies with ACK
+
+4. R1 sends Update packet (Unicast), Routes sent
+
+5. R2 replies with ACK
+
+6. R1 sends Update packet (Unicast), End of table
+
+7. R2 replies with ACK
+
+### EIGRP Configuration Modes
+
+- There are two methods for EIGRP configuration: classic mode and named mode
+
+#### Classic Configuration Mode
+
+- With Classic EIGRP Configuration mode, most of the configuration takes place in the EIGRP process, but some settings are configured under the interface configuration submode
+
+- This can add complexity for deployment and troubleshooting as users must scroll back and forth between the EIGRP process and individual network interfaces
+
+- Some of the settings that are set individually are hello advertisement interval, split-horizon, authentication, and summary-route advertisements
+
+- Classic configuration requires the initialization of the routing process with the global configuration command:
+
+```
+conf t
+ router eigrp <as-number>
+```
+
+- This is used to identify the ASN and initialize the EIGRP process
+
+- The second step is to identify the network interfaces with the following command:
+
+```
+conf t
+ router eigrp <as-number>
+  network <ip-address> <wildcard-mask>
+```
+
+- The network command is explained later
+
+#### EIGRP Named Mode
+
+- EIGRP named mode configuration was released to overcome some of the dificulties network engineers have with classic EIGRP autonomous system configuration, including scattered configurations and unclear scope of commands
+
+- EIGRP named configuration provides the following benefits:
+
+    - All the EIGRP configuration occurs in one location
+
+    - It supports current EIGRP features and future developments
+
+    - It supports multiple address families (including virtual routing and forwarding [VRF] instances)
+
+    - EIGRP named configuration is also known as multi-address family configuration mode
+
+    - Commands are clear in terms of the scope of their configuration
+
+- EIGRP named mode provides a hierarchical configuration and stores settings in three subsections:
+
+    - **Address family**: This submode contains settings that are relevant to the global EIGRP AS operations, such as selection of network interfaces, EIGRP K values, and stub settings
+
+    - **Interface**: This submode contains settings that are relevant to the interface, such as hello advertisement interval, split-horizon, authentication, and summary route advertisements
+
+    - In actuality, there are two methods of EIGRP interface section's configuration
+
+    - Commands can be assigned to a specific interface or to a `default` interface, in which case those settings are placed on all EIGRP-enabled interfaces
+
+    - If there is a conflict between the default interface and a specific interface, the specific interface takes priority over the default interface
+
+    - **Topology**: This submode contains settings regarding the EIGRP topology database and how routes are presented to the router's RIB
+
+    - This section also contains route redistribution and administrative distance settings
+
+- EIGRP named configuration makes it possible to run multiple instances under the same EIGRP process
+
+- The process for enabling EIGRP interfaces on a specific instance is as follows:
+
+1. Initialize the EIGRP process by using the following command:
+
+```
+conf t
+ router eigrp <process-name>
+```
+
+- If a number is used for process-name, the number does not correlate to the autonomous system number
+
+2. Initialize the EIGRP instance for the appropriate address family with the command:
+
+```
+conf t
+ router eigrp <process-name>
+  address-family <IPv4|IPv6> <unicast | vrf name> autonomous-system <as-number>
+```
+
+3. Enable EIGRP on interfaces using the `network` command
+
+```
+conf t
+ router eigrp <process-name>
+  address-family <IPv4|IPv6> <unicast | vrf name> autonomous-system <as-number>
+   network <network> <wildcard-mask>
+```
+
+#### EIGRP Network Statement
+
+- Both configuration modes use a `network` statement to identify the interfaces that EIGRP will use
+
+- The `network` statement use a wildcard mask, which allows the configuration to be as specific or as ambiguous as necessary
+
+- The two styles of EIGRP configuration are independent
+
+- Using the configuration options for classic EIGRP autonomous system configuration does not modify settings on a router running EIGRP named configuration
+
+- The syntax for the `network` statement, which exists under the EIGRP process, is:
+
+```
+conf t
+ router eigrp <as-number>
+  network <ip-address> [wildcard-mask]
+```
+
+- The optional wildcard-mask can be omitted to enable interfaces that fail within the classful boundaries for that `network` statement
+
+- A common misconception is that the `network` statements adds prefixes to the EIGRP topology table
+
+- In reality, the `network` statement identifies the interface to enable EIGRP on, and it adds the interface's connected network to the EIGRP topology table
+
+- EIGRP then advertises the topology table to other routers in the EIGRP autonomous system
+
+- EIGRP does not add an interface's secondary connected network to the topology table
+
+- For secondary connected networks to be installed in the EIGRP routing table, they must be redistributed into the EIGRP process
+
+- To help illustrate the concept of wildcard mask, below is provided a set of IP addresses and interfaces for a router
+
+- The examples that follow provide configurations to match specific scenarios
+
+```
+Router Interface                                                IP address
+
+Gigabit Ethernet 0/0                                            10.0.0.10/24
+
+Gigabit Ethernet 0/1                                            10.0.10.10/24
+
+Gigabit Ethernet 0/2                                            192.0.0.10/24
+
+Gigabit Ethernet 0/3                                            192.10.0.10/24
+```
+
+- The configuration from below example enables EIGRP only on interfaces that explicitly match the IP addresses from our table
+
+```
+conf t
+ router eigrp 1
+  network 10.0.0.10 0.0.0.0
+  network 10.0.10.10 0.0.0.0
+  network 192.0.0.10 0.0.0.0
+  network 192.10.0.10 0.0.0.0
+```
+
+- Below is shown the EIGRP configuration using `network` statements that match the subnets used in our table:
+
+```
+conf t
+ router eigrp 1
+  network 10.0.0.0 0.0.0.255
+  network 10.0.10.0 0.0.0.255
+  network 192.0.0.0 0.0.0.255
+  network 192.10.0.0 0.0.0.255
+```
+
+- The following example shows the EIGRP configuration using `network` statements for interfaces that are within 10.0.0.0/8 or 192.0.0.0/8
+
+```
+conf t
+ router eigrp 1
+ network 10.0.0.0 0.255.255.255
+ network 192.0.0.0 0.255.255.255
+```
+
+- The follwing snippet shows the configuration to enable all interfaces with EIGRP:
+
+```
+conf t
+ router eigrp 1
+  network 0.0.0.0 255.255.255.255
+```
+
+- A key topic with wildcard `network` statements is that large ranges simplify configuration; however they may possibly enable EIGRP on interfaces where not intended
+
+#### Sample Topology and Configuration
+
+- Below is shown a sample topology for demonstrating EIGRP configuration in classic mode for R1 and named mode for R2
+
+![eigrp-sample-topology](./eigrp-sample-topology.png)
+
+- R1 and R2 enable EIGRP on all their interfaces
+
+- R1 configures EIGRP using multiple specific interface addresses, and R2 enables EIGRP on all network interfaces with one command
+
+- Below is provided the configuration that is applied to R1 and R2
+
+- R1 - classic configuration:
+
+```
+conf t
+ interface l0
+  ip address 192.168.1.1 255.255.255.255
+
+ interface g0/1
+  ip address 10.12.1.1 255.255.255.0
+
+ interface g0/2
+  ip address 10.11.11.1 255.255.255.0
+
+ router eigrp 100
+  network 10.11.11.1 0.0.0.0
+  network 10.12.1.1 0.0.0.0
+  network 192.168.1.1 0.0.0.0
+```
+
+- R2 - named configuration mode:
+
+```
+conf t
+ interface l0
+  ip address 192.168.2.2 255.255.255.255
+
+ interface g0/1
+  ip address 10.12.1.2 255.255.255.0
+
+ interface g0/2
+  ip address 10.22.22.2 255.255.255.0
+
+ router eigrp EIGRP-NAMED
+  address-family ipv4 unicast autonomous-system 100
+   network 0.0.0.0 255.255.255.255
+```
+
+- As mentioned, EIGRP named mode has three configuration submodes
+
+- The configuration in our example uses only the EIGRP address-family submode section, which uses the `network` statement
+
+- The EIGRP topology base submode is created automatically with the command `topology base`, and exited with the command `exit-af-topology`
+
+```
+conf t
+ router eigrp EIGRP-NAMED
+  address-family ipv4 unicast autonomous-system 100
+   topology base
+   exit-af-topology
+```
+
+- Settings for the topology submode are listed between the two commands
+
+- Below is demonstrated the slight difference in how the configuration is stored on the router between EIGRP classic and named mode configurations
+
+- R1:
+
+```
+R1#sh run | s router eigrp
+router eigrp 100
+ network 10.11.11.1 0.0.0.0
+ network 10.12.1.1 0.0.0.0
+ network 192.168.1.1 0.0.0.0
+```
+
+- R2:
+
+```
+R2#sh run | s router eigrp
+router eigrp EIGRP-NAMED
+ !
+ address-family ipv4 unicast autonomous-system 100
+  !
+  topology base
+  exit-af-topology
+  network 0.0.0.0
+ exit-address-family
+```
+
+- The EIGRP interface submode configurations contains the command `af-interface <interface-id>` or `af-interface default`, with any specific commands listed immediately
+
+- The EIGRP interface submode configuration is exited with the command `exit-af-interface`
+
+```
+conf t
+ router eigrp EIGRP-NAMED
+  address-family ipv4 unicast autonomous-system 100
+   af-interface g0/1
+   exit-af-interface
+```
+
+#### Confirming Interfaces
+
+- Upon configuring EIGRP, it is a good practice to verify that only the intended interfaces are running EIGRP
+
+- The command `show ip eigrp interfaces [interface-id]| [detail] [interface-id]` shows active EIGRP interfaces
+
+- Appending the optional `detail` keyword provides additional information such as authentication, EIGRP timers, split horizon, and various packet counts
+
+- Below we can see R1's non-detailed EIGRP interface and R2's detailed information for the G0/1 interface
+
+- CML lab topology
+
+![eigrp-topology](./eigrp-topology.png)
+
+- R1:
+
+```
+R1#show ip eigrp interfaces 
+EIGRP-IPv4 Interfaces for AS(100)
+                              Xmit Queue   PeerQ        Mean   Pacing Time   Multicast    Pending
+Interface              Peers  Un/Reliable  Un/Reliable  SRTT   Un/Reliable   Flow Timer   Routes
+Gi0/2                    0        0/0       0/0           0       0/0            0           0
+Gi0/1                    1        0/0       0/0        1678       0/0         7996           0
+Lo0                      0        0/0       0/0           0       0/0            0           0
+```
+
+- R2:
+
+```
+R2#show ip eigrp interfaces detail g0/1
+EIGRP-IPv4 VR(EIGRP-NAMED) Address-Family Interfaces for AS(100)
+                              Xmit Queue   PeerQ        Mean   Pacing Time   Multicast    Pending
+Interface              Peers  Un/Reliable  Un/Reliable  SRTT   Un/Reliable   Flow Timer   Routes
+Gi0/1                    1        0/0       0/0         128       0/0          640           0
+  Hello-interval is 5, Hold-time is 15
+  Split-horizon is enabled
+  Next xmit serial <none>
+  Packetized sent/expedited: 4/0
+  Hello's sent/expedited: 380/2
+  Un/reliable mcasts: 0/4  Un/reliable ucasts: 4/2
+  Mcast exceptions: 0  CR packets: 0  ACKs suppressed: 0
+  Retransmissions sent: 1  Out-of-sequence rcvd: 0
+  Topology-ids on interface - 0 
+  Authentication mode is not set
+  Topologies advertised on this interface:  base
+  Topologies not advertised on this interface:
+
+```
+
+- R3
+
+```
+R3#show ip eigrp interfaces detail g1
+EIGRP-IPv4 VR(EIGRP-NAMED) Address-Family Interfaces for AS(100)
+                              Xmit Queue   PeerQ        Mean   Pacing Time   Multicast    Pending
+Interface              Peers  Un/Reliable  Un/Reliable  SRTT   Un/Reliable   Flow Timer   Routes
+Gi1                      1        0/0       0/0           1       0/0           50           0
+  Hello-interval is 5, Hold-time is 15
+  Split-horizon is enabled
+  Next xmit serial <none>
+  Packetized sent/expedited: 2/0
+  Hello's sent/expedited: 9/2
+  Un/reliable mcasts: 0/2  Un/reliable ucasts: 2/1
+  Mcast exceptions: 0  CR packets: 0  ACKs suppressed: 0
+  Retransmissions sent: 0  Out-of-sequence rcvd: 0
+  Topology-ids on interface - 0 
+  Authentication mode is not set
+  Topologies advertised on this interface:  base
+  Topologies not advertised on this interface:
+
+```
+
+- Below is shown a brief explanation to the key fields shown with EIGRP interfaces
+
+```
+Field                               Description
+
+Interface                           Interfaces running EIGRP
+
+Peers                               Number of peers detected on the interface
+
+XMT Queue                           Number of unreliable/reliable packets remaining in the transmit queue
+Un/Reliable                         The value 0 is an indication of a stable network
+
+Mean SRTT                           Average time for a packet to be sent to a neighbor and a reply from that neighbor to be received, in miliseconds
+
+Multicast Flow Timer                Maximum time (seconds) that the router sent multicast packets
+
+Pending Routes                      Number of routes in the transmit queue that need to be sent
+```
+
+#### Verifying EIGRP Neighbor Adjacencies
+
+- Each EIGRP process maintains a table of neighbors to ensure they are alive and processing updates properly
+
+- If EIGRP didn't keep track of neighbor states, an autonomous system could contain incorrect data and could potentially route traffic improperly
+
+- EIGRP must form a neighbor relationship before a router advertises update packets containing network prefixes
+
+- The command `show ip eigrp neighbors [interface-id]` displays the EIGRP neighbors for a router
+
+- Below is shown the EIGRP neighbor information obtained using this command
+
+```
+R1#show ip eigrp neighbors 
+EIGRP-IPv4 Neighbors for AS(100)
+H   Address                 Interface              Hold Uptime   SRTT   RTO  Q  Seq
+                                                   (sec)         (ms)       Cnt Num
+1   10.13.1.3               Gi0/0                    11 00:31:04    1   100  0  3
+0   10.12.1.2               Gi0/1                    10 00:59:28 1073  5000  0  5
+```
+
+- Below is provided a brief explanation of the key fields shown above
+
+```
+Field                               Description
+
+Address                             IP address of the EIGRP neighbor
+
+Interface                           Interface the neighor was detected on
+
+Holdtime                            Time left to receive a packet from this neighbor to ensure that it is still alive
+
+SRTT                                Time for a packet to be sent to a neighbor and a reply to be received from that neighbor, in miliseconds
+
+RTO                                 Timeout for transmission (waiting for ACK)
+
+Q cnt                               Number of packets (Update, Query, Reply) in queue for sending
+
+Seq Num                             Sequence number that was last received from this router
+```
+
+#### Displaying Installed EIGRP Routes
+
+- You can see EIGRP routes that are installed into the RIB by using the following command:
+
+```
+show ip route eigrp
+```
+
+- EIGRP routes that originate within the autonomous system have an administrative distace (AD) of 90 and are indicated in the routing table with a D
+
+- Routes that originate from outside the autonomous system are external EIGRP routes
+
+- External EIGRP routes have an AD of 170 and are indicated in the routing table with D EX
+
+- Placing external EIGRP routes into the RIB with a higher AD acts as a loop-prevention mechanism
+
+- Below are displayed the EIGRP routes from our topology
+
+- The metric for the selected route is the second number in brackets
+
+- R1:
+
+```
+R1#show ip route eigrp 
+Codes: L - local, C - connected, S - static, R - RIP, M - mobile, B - BGP
+       D - EIGRP, EX - EIGRP external, O - OSPF, IA - OSPF inter area 
+       N1 - OSPF NSSA external type 1, N2 - OSPF NSSA external type 2
+       E1 - OSPF external type 1, E2 - OSPF external type 2
+       i - IS-IS, su - IS-IS summary, L1 - IS-IS level-1, L2 - IS-IS level-2
+       ia - IS-IS inter area, * - candidate default, U - per-user static route
+       o - ODR, P - periodic downloaded static route, H - NHRP, l - LISP
+       a - application route
+       + - replicated route, % - next hop override, p - overrides from PfR
+
+Gateway of last resort is not set
+
+      10.0.0.0/8 is variably subnetted, 9 subnets, 2 masks
+D        10.22.22.0/24 [90/3072] via 10.13.1.3, 00:19:38, GigabitEthernet0/0
+                       [90/3072] via 10.12.1.2, 00:19:38, GigabitEthernet0/1
+      192.168.2.0/32 is subnetted, 1 subnets
+D        192.168.2.2 [90/2848] via 10.12.1.2, 00:18:23, GigabitEthernet0/1
+      192.168.3.0/32 is subnetted, 1 subnets
+D        192.168.3.3 [90/2848] via 10.13.1.3, 00:18:18, GigabitEthernet0/0
+```
+
+- R2:
+
+```
+R2#show ip route eigrp 
+Codes: L - local, C - connected, S - static, R - RIP, M - mobile, B - BGP
+       D - EIGRP, EX - EIGRP external, O - OSPF, IA - OSPF inter area 
+       N1 - OSPF NSSA external type 1, N2 - OSPF NSSA external type 2
+       E1 - OSPF external type 1, E2 - OSPF external type 2
+       i - IS-IS, su - IS-IS summary, L1 - IS-IS level-1, L2 - IS-IS level-2
+       ia - IS-IS inter area, * - candidate default, U - per-user static route
+       o - ODR, P - periodic downloaded static route, H - NHRP, l - LISP
+       a - application route
+       + - replicated route, % - next hop override, p - overrides from PfR
+
+Gateway of last resort is not set
+
+      10.0.0.0/8 is variably subnetted, 7 subnets, 2 masks
+D        10.11.11.0/24 [90/15360] via 10.12.1.1, 00:19:10, GigabitEthernet0/1
+D        10.13.1.0/24 [90/15360] via 10.22.22.3, 00:19:10, GigabitEthernet0/2
+                      [90/15360] via 10.12.1.1, 00:19:10, GigabitEthernet0/1
+D EX     10.111.111.0/24 
+           [170/15360] via 10.12.1.1, 00:12:32, GigabitEthernet0/1
+      192.168.1.0/32 is subnetted, 1 subnets
+D        192.168.1.1 [90/2570240] via 10.12.1.1, 00:19:10, GigabitEthernet0/1
+      192.168.3.0/32 is subnetted, 1 subnets
+D        192.168.3.3 [90/10880] via 10.22.22.3, 00:19:10, GigabitEthernet0/2
+```
+
+- R3:
+
+```
+R3#show ip route eigrp 
+Codes: L - local, C - connected, S - static, R - RIP, M - mobile, B - BGP
+       D - EIGRP, EX - EIGRP external, O - OSPF, IA - OSPF inter area 
+       N1 - OSPF NSSA external type 1, N2 - OSPF NSSA external type 2
+       E1 - OSPF external type 1, E2 - OSPF external type 2, m - OMP
+       n - NAT, Ni - NAT inside, No - NAT outside, Nd - NAT DIA
+       i - IS-IS, su - IS-IS summary, L1 - IS-IS level-1, L2 - IS-IS level-2
+       ia - IS-IS inter area, * - candidate default, U - per-user static route
+       H - NHRP, G - NHRP registered, g - NHRP registration summary
+       o - ODR, P - periodic downloaded static route, l - LISP
+       a - application route
+       + - replicated route, % - next hop override, p - overrides from PfR
+       & - replicated local route overrides by connected
+
+Gateway of last resort is not set
+
+      10.0.0.0/8 is variably subnetted, 7 subnets, 2 masks
+D        10.11.11.0/24 [90/15360] via 10.13.1.1, 00:19:48, GigabitEthernet1
+D        10.12.1.0/24 [90/15360] via 10.22.22.2, 00:19:48, GigabitEthernet2
+                      [90/15360] via 10.13.1.1, 00:19:48, GigabitEthernet1
+D EX     10.111.111.0/24 [170/15360] via 10.13.1.1, 00:13:05, GigabitEthernet1
+      192.168.1.0/32 is subnetted, 1 subnets
+D        192.168.1.1 [90/2570240] via 10.13.1.1, 00:19:48, GigabitEthernet1
+      192.168.2.0/32 is subnetted, 1 subnets
+D        192.168.2.2 [90/10880] via 10.22.22.2, 00:19:48, GigabitEthernet2
+```
+
+- The metrics from R2's routes are different from the metrics from R1's routes
+
+- This is because R1's classic EIGRP mode uses classic metrics, and R2's named mode uses wide metrics by default
+
+#### Router ID
+
+- The Router ID (RID) is a 32-bit number that uniquely identifies an EIGRP router and is used as a loop-prevention mechanism
+
+- The RID can be set dynamically, which is the default or manually
+
+- The algorithm for dynamically choosing the EIGRP RID uses the highest IPv4 address of any up loopback interfaces
+
+- If there are not any up loopback interfaces, the highest IPv4 address of any active up physical interfaces becomes the RID when the EIGRP process initializes
+
+- IPv4 addresses are commonly used for the RID because they are 32-bits and are maintained in dotted-decimal format
+
+- Use the following command to set the RID of the EIGRP process
+
+```
+eigrp router-id <router-id>
+```
+
+- Classic configuration mode (R1):
+
+```
+conf t
+ router eigrp 100
+  eigrp router-id 192.168.1.1
+```
+
+- Named mode (R2):
+
+```
+conf t
+ router eigrp EIGRP-NAMED
+  address-family ipv4 unicast autonomous-system 100
+   eigrp router-id 192.168.2.2
+```
+
+- R1:
+
+```
+R1(config-router)#do sh run | s router eigrp
+router eigrp 100
+ network 10.11.11.1 0.0.0.0
+ network 10.12.1.1 0.0.0.0
+ network 10.13.1.1 0.0.0.0
+ network 10.112.1.0 0.0.0.255
+ network 192.168.1.1 0.0.0.0
+ redistribute rip metric 1000000 1 255 1 1500
+ eigrp router-id 192.168.1.1
+```
+
+- R2:
+
+```
+R2(config-router-af)#do sh run | s router eigrp
+router eigrp EIGRP-NAMED
+ !
+ address-family ipv4 unicast autonomous-system 100
+  !
+  topology base
+  exit-af-topology
+  network 0.0.0.0
+  eigrp router-id 192.168.2.2
+ exit-address-family
+```
+
+#### Passive Interfaces
+
