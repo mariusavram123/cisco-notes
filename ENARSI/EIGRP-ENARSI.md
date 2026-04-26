@@ -892,3 +892,1030 @@ router eigrp EIGRP-NAMED
 
 #### Passive Interfaces
 
+- Some network segments must advertise a network segment into EIGRP but need to prevent neighbors from forming adjacencies with other routers on that segment
+
+- This might be the case, for example, when advertising access layer networks in a campus topology
+
+- In such a scenario, you need to put the EIGRP interface in a passive state
+
+- Passive EIGRP interfaces do not send out or process EIGRP hellos, which prevents EIGRP from forming adjacencies on these interfaces
+
+- To configure an EIGRP interface as passive, you use the following command, under the EIGRP process for classic configuration:
+
+```
+conf t
+ router eigrp 100
+  passive-interface <interface-id>
+```
+
+- Another option is to configure all interfaces as passive by default, and then allow an interface to process EIGRP packets, preempting the global `passive-interface default` configuration
+
+```
+conf t
+ router eigrp 100
+  passive-interface default
+  no passive-interface g0/2
+```
+
+- R1:
+
+```
+R1(config-router)#do sh run | s router eigrp
+router eigrp 100
+ network 10.11.11.1 0.0.0.0
+ network 10.12.1.1 0.0.0.0
+ network 10.13.1.1 0.0.0.0
+ network 192.168.1.1 0.0.0.0
+ redistribute rip metric 100000 1 255 1 1500
+ passive-interface default
+ no passive-interface Ethernet0/1
+ no passive-interface Ethernet0/0
+```
+
+- For a named mode configuration, you place the `passive-interface` state on an `af-interface default` for all EIGRP interfaces or on a specific interface with the `af-interface <interface-id>` section
+
+- Below is shown how to make g0/2 interface as passive while allowing the g0/1 interface to be active, using both configuration strategies
+
+- R2:
+
+```
+router eigrp EIGRP-NAMED
+ address-family ipv4 unicast autonomous-system 100
+  af-interface g0/2
+   passive-interface
+```
+
+```
+router eigrp EIGRP-NAMED
+ address-family ipv4 unicast autonomous-system 100
+  af-interface default
+   passive-interface
+  af-interface g0/1
+   no passive-interface
+```
+
+- Below is shown what the named mode configuration looks like with some settings (that is, passive-interface, and no passive-interface) placed under the `af-interface default` and `af-interface <interface-id>` settings
+
+```
+R2(config-router-af-interface)#do sh run | s router eigrp
+router eigrp EIGRP-NAMED
+ !
+ address-family ipv4 unicast autonomous-system 100
+  !
+  af-interface default
+   passive-interface
+  exit-af-interface
+  !
+  af-interface Ethernet0/1
+   no passive-interface
+  exit-af-interface
+  !
+  topology base
+  exit-af-topology
+  network 0.0.0.0
+ exit-address-family
+```
+
+- A passive interface do not appear in the output of `show ip eigrp interfaces` even though it was enabled
+
+- Connected networks for passive interfaces are still added to the EIGRP topology table so that they are advertised to neighbors
+
+- Below is shown that the g0/2 interface on R1 no longer appears, compared with previous output
+
+```
+R1#show ip eigrp interfaces 
+EIGRP-IPv4 Interfaces for AS(100)
+                              Xmit Queue   PeerQ        Mean   Pacing Time   Multicast    Pending
+Interface              Peers  Un/Reliable  Un/Reliable  SRTT   Un/Reliable   Flow Timer   Routes
+Et0/1                    1        0/0       0/0           2       0/2           50           0
+Et0/0                    1        0/0       0/0           1       0/2           50           0
+```
+
+- To accelerate troubleshooting of passive interfaces, as well as other settings, use the command `show ip protocols` which provides a lot of valuable information about all the routing protocols
+
+- With EIGRP, it displays the EIGRP process identifier, the ASN, K values, that are used for path calculation, RID, neighbors, AD settings, and all passive interfaces
+
+- Below is the output for both R1 and R2, for classic and named mode
+
+- R1:
+
+```
+R1#show ip protocols 
+*** IP Routing is NSF aware ***
+
+Routing Protocol is "application"
+  Sending updates every 0 seconds
+  Invalid after 0 seconds, hold down 0, flushed after 0
+  Outgoing update filter list for all interfaces is not set
+  Incoming update filter list for all interfaces is not set
+  Maximum path: 32
+  Routing for Networks:
+  Routing Information Sources:
+    Gateway         Distance      Last Update
+  Distance: (default is 4)
+
+Routing Protocol is "eigrp 100"
+  Outgoing update filter list for all interfaces is not set
+  Incoming update filter list for all interfaces is not set
+  Default networks flagged in outgoing updates
+  Default networks accepted from incoming updates
+  Redistributing: rip
+  EIGRP-IPv4 Protocol for AS(100)
+    Metric weight K1=1, K2=0, K3=1, K4=0, K5=0
+    Soft SIA disabled
+    NSF-aware route hold timer is 240
+  Passive Interface(s):
+    Router-ID: 192.168.1.1
+    Topology : 0 (base) 
+      Active Timer: 3 min
+      Distance: internal 90 external 170
+      Maximum path: 4
+      Maximum hopcount 100
+      Maximum metric variance 1
+      Total Prefix Count: 8
+      Total Redist Count: 1
+
+  Automatic Summarization: disabled
+  Maximum path: 4
+  Routing for Networks:
+    10.11.11.1/32
+    10.12.1.1/32
+    10.13.1.1/32
+    192.168.1.1/32
+  Passive Interface(s):
+    Ethernet0/2
+    Loopback0
+  Routing Information Sources:
+    Gateway         Distance      Last Update
+    10.13.1.3             90      00:31:53
+  Passive Interface(s):
+    10.12.1.2             90      00:31:53
+  Distance: internal 90 external 170
+
+Routing Protocol is "rip"
+  Outgoing update filter list for all interfaces is not set
+  Incoming update filter list for all interfaces is not set
+  Sending updates every 30 seconds, next due in 25 seconds
+  Invalid after 180 seconds, hold down 180, flushed after 240
+  Redistributing: eigrp 100, rip
+  Default version control: send version 2, receive version 2
+    Interface                           Send  Recv  Triggered RIP  Key-chain
+    Ethernet0/0                         2     2          No        none            
+    Ethernet0/1                         2     2          No        none            
+    Ethernet0/2                         2     2          No        none            
+    Loopback3                           2     2          No        none            
+  Automatic network summarization is not in effect
+  Maximum path: 4
+  Routing for Networks:
+    10.0.0.0
+  Passive Interface(s):
+  Routing Information Sources:
+    Gateway         Distance      Last Update
+  Distance: (default is 120)
+
+```
+
+- R2:
+
+```
+R2#show ip protocols 
+*** IP Routing is NSF aware ***
+
+Routing Protocol is "application"
+  Sending updates every 0 seconds
+  Invalid after 0 seconds, hold down 0, flushed after 0
+  Outgoing update filter list for all interfaces is not set
+  Incoming update filter list for all interfaces is not set
+  Maximum path: 32
+  Routing for Networks:
+  Routing Information Sources:
+    Gateway         Distance      Last Update
+  Distance: (default is 4)
+
+Routing Protocol is "eigrp 100"
+  Outgoing update filter list for all interfaces is not set
+  Incoming update filter list for all interfaces is not set
+  Default networks flagged in outgoing updates
+  Default networks accepted from incoming updates
+  EIGRP-IPv4 VR(EIGRP-NAMED) Address-Family Protocol for AS(100)
+    Metric weight K1=1, K2=0, K3=1, K4=0, K5=0 K6=0
+    Metric rib-scale 128
+    Metric version 64bit
+    Soft SIA disabled
+  Passive Interface(s):
+    NSF-aware route hold timer is 240
+    Router-ID: 192.168.2.2
+    Topology : 0 (base) 
+      Active Timer: 3 min
+      Distance: internal 90 external 170
+      Maximum path: 4
+      Maximum hopcount 100
+      Maximum metric variance 1
+      Total Prefix Count: 8
+      Total Redist Count: 0
+
+  Automatic Summarization: disabled
+  Maximum path: 4
+  Routing for Networks:
+    0.0.0.0
+  Passive Interface(s):
+    Loopback0
+  Routing Information Sources:
+    Gateway         Distance      Last Update
+    10.12.1.1             90      00:32:31
+    10.22.22.3            90      00:32:31
+  Distance: internal 90 external 170
+
+```
+
+- Set metric version to 32-bit value for R2 - named mode:
+
+```
+conf t
+ router eigrp EIGRP-named
+  address-family ipv4 unicast autonomous-system 100
+   metric version 32-bit
+```
+
+- R1:
+
+```
+R1(config-router)#do sh ip eigrp interf
+EIGRP-IPv4 Interfaces for AS(100)
+                              Xmit Queue   PeerQ        Mean   Pacing Time   Multicast    Pending
+Interface              Peers  Un/Reliable  Un/Reliable  SRTT   Un/Reliable   Flow Timer   Routes
+Gi0/1                    1        0/0       0/0           1       0/0           50           0
+Gi0/0                    1        0/0       0/0           1       0/0           50           0
+```
+
+```
+R1(config-router)#do sh ip proto
+*** IP Routing is NSF aware ***
+
+Routing Protocol is "application"
+  Sending updates every 0 seconds
+  Invalid after 0 seconds, hold down 0, flushed after 0
+  Outgoing update filter list for all interfaces is not set
+  Incoming update filter list for all interfaces is not set
+  Maximum path: 32
+  Routing for Networks:
+  Routing Information Sources:
+    Gateway         Distance      Last Update
+  Distance: (default is 4)
+
+Routing Protocol is "eigrp 100"
+  Outgoing update filter list for all interfaces is not set
+  Incoming update filter list for all interfaces is not set
+  Default networks flagged in outgoing updates
+  Default networks accepted from incoming updates
+  Redistributing: rip
+  EIGRP-IPv4 Protocol for AS(100)
+    Metric weight K1=1, K2=0, K3=1, K4=0, K5=0
+    Soft SIA disabled
+    NSF-aware route hold timer is 240
+    Router-ID: 192.168.1.1
+    Topology : 0 (base) 
+      Active Timer: 3 min
+      Distance: internal 90 external 170
+      Maximum path: 4
+      Maximum hopcount 100
+      Maximum metric variance 1
+
+  Automatic Summarization: disabled
+  Maximum path: 4
+  Routing for Networks:
+    10.11.11.1/32
+    10.12.1.1/32
+    10.13.1.1/32
+    10.112.1.0/24
+    192.168.1.1/32
+  Passive Interface(s):
+    GigabitEthernet0/2
+    Loopback0
+  Routing Information Sources:
+    Gateway         Distance      Last Update
+    10.13.1.3             90      00:01:24
+    10.12.1.2             90      00:01:24
+  Distance: internal 90 external 170
+
+Routing Protocol is "rip"
+  Outgoing update filter list for all interfaces is not set
+  Incoming update filter list for all interfaces is not set
+  Sending updates every 30 seconds, next due in 27 seconds
+  Invalid after 180 seconds, hold down 180, flushed after 240
+  Redistributing: eigrp 100, rip
+  Default version control: send version 2, receive version 2
+    Interface                           Send  Recv  Triggered RIP  Key-chain
+    GigabitEthernet0/0                  2     2          No        none            
+    GigabitEthernet0/1                  2     2          No        none            
+    GigabitEthernet0/2                  2     2          No        none            
+    Loopback1                           2     2          No        none            
+  Automatic network summarization is not in effect
+  Maximum path: 4
+  Routing for Networks:
+    10.0.0.0
+  Routing Information Sources:
+    Gateway         Distance      Last Update
+  Distance: (default is 120)
+
+```
+
+- R3:
+
+```
+R3#sh run | s router eigrp
+router eigrp EIGRP-NAMED
+ !
+ address-family ipv4 unicast autonomous-system 100
+  !
+  af-interface default
+   passive-interface
+  exit-af-interface
+  !
+  af-interface GigabitEthernet1
+   no passive-interface
+  exit-af-interface
+  !
+  af-interface GigabitEthernet2
+   no passive-interface
+  exit-af-interface
+  !
+  topology base
+  exit-af-topology
+  network 0.0.0.0
+  metric version 32bit
+ exit-address-family
+```
+
+```
+R3#sh ip eigrp interfaces 
+EIGRP-IPv4 VR(EIGRP-NAMED) Address-Family Interfaces for AS(100)
+                              Xmit Queue   PeerQ        Mean   Pacing Time   Multicast    Pending
+Interface              Peers  Un/Reliable  Un/Reliable  SRTT   Un/Reliable   Flow Timer   Routes
+Gi1                      1        0/0       0/0           1       0/0           50           0
+Gi2                      1        0/0       0/0           3       0/0           50           0
+```
+
+```
+R3#sh ip proto
+*** IP Routing is NSF aware ***
+
+Routing Protocol is "application"
+  Sending updates every 0 seconds
+  Invalid after 0 seconds, hold down 0, flushed after 0
+  Outgoing update filter list for all interfaces is not set
+  Incoming update filter list for all interfaces is not set
+  Maximum path: 32
+  Routing for Networks:
+  Routing Information Sources:
+    Gateway         Distance      Last Update
+  Distance: (default is 4)
+
+Routing Protocol is "eigrp 100"
+  Outgoing update filter list for all interfaces is not set
+  Incoming update filter list for all interfaces is not set
+  Default networks flagged in outgoing updates
+  Default networks accepted from incoming updates
+  EIGRP-IPv4 VR(EIGRP-NAMED) Address-Family Protocol for AS(100)
+    Metric weight K1=1, K2=0, K3=1, K4=0, K5=0 K6=0
+    Metric rib-scale 1
+    Metric version 32bit
+    Soft SIA disabled
+    NSF-aware route hold timer is 240
+  EIGRP NSF disabled
+     NSF signal timer is 20s
+     NSF converge timer is 120s
+    Router-ID: 192.168.3.3
+    Topology : 0 (base) 
+      Active Timer: 3 min
+      Distance: internal 90 external 170
+      Maximum path: 4
+      Maximum hopcount 100
+      Maximum metric variance 1
+      Total Prefix Count: 9
+      Total Redist Count: 0
+
+  Automatic Summarization: disabled
+  Maximum path: 4
+  Routing for Networks:
+    0.0.0.0
+  Passive Interface(s):
+    Loopback0
+  Routing Information Sources:
+    Gateway         Distance      Last Update
+    10.13.1.1             90      00:17:56
+    Gateway         Distance      Last Update
+    10.22.22.2            90      00:17:57
+  Distance: internal 90 external 170
+```
+
+#### Authentication
+
+- Authentication is a mechanism for ensuring that only authorized routers are eligible to become EIGRP neighbors
+
+- It is possible for someone to add a router to a network and introduce invalid routes accidentally or maliciously
+
+- Authentication prevents such scenarios from happening
+
+- A precomputed password hash is included with all EIGRP packets, and the receiving router decrypts the hash
+
+- If the password do not match for a packet, the router discards the packet
+
+- EIGRP encrypts the password using Message Digest 5 (MD5) authentication and the hash function
+
+- The hash consists of the key number and the password
+
+- EIGRP authentication encrypts just the password rather than entire EIGRP packet
+
+- Keychain functionality allows a password to be valid for a specific time, so passwords can change at preconfigured times
+
+- To configure EIGRP authentication, you need to create a key chain and then enable EIGRP authentication on the interface
+
+##### Keychain Configuration
+
+- Keychain creation is accomplished in the following steps:
+
+    1. Create the keychain using the command: `key chain <key-chain-name>`
+
+    2. Identify the key sequence by using the command `key <key-number>`, where key number can be anything from 0 to 2147483647
+
+    3. Specify the preshared password by using the command `key-string <password>`
+
+```
+conf t
+ key chain <key-chain-name>
+  key 1
+   key-string <password>
+```
+
+- Be careful to not use a space after the password because the password, including any trailing space, will be used for computing the hash
+
+##### Enabling Authentication on the Interface
+
+- When using classic configuration, authentication must be enabled on the interface under the interface configuration submode
+
+- The following commands are used in the interface configuration submode
+
+```
+conf t
+ interface <name>
+  ip authentication key-chain eigrp <as-number> <key-chain-name>
+  ip authentication mode eigrp <as-number> md5
+```
+
+- R1:
+
+```
+conf t
+ key chain EIGRP-CHAIN
+  key 1
+   key-string MARIUS12345
+
+ interface range g0/0-1
+  ip authentication key-chain eigrp 100 EIGRP-CHAIN
+  ip authentication mode eigrp 100 md5
+```
+
+- The named mode configuration places the configurations under the EIGRP interface submode, under `af-interface default` or `af-interface <interface-name>`
+
+- Named mode configuration supports MD5 or *Hashed Message Authentication Code-Secure Hash Algorithm-256* (HMAC-SHA-256) authentication
+
+- MD5 authentication involves the following commands:
+
+```
+ af-interface <interface|default>
+  authentication key-chain <key-chain-name>
+  authentication mode md5
+```
+
+- HMAC-SHA-256 authentication involves the following command:
+
+```
+ af-interface <interface|default>
+  authentication mode hmac-sha-256 <password>
+```
+
+- R2:
+
+```
+conf t
+ key-chain EIGRP-CHAIN
+  key 1
+   key-string MARIUS12345
+
+ router eigrp EIGRP-NAMED
+  address-family ipv4 unicast autonomous-system 100
+   af-interface g0/1
+    authentication key-chain EIGRP-CHAIN
+    authentication mode md5
+   af-interface g0/2
+    authentication key-chain EIGRP-CHAIN
+    authentication mode hmac-sha-256 MARIUS12345
+```
+
+- R3:
+
+```
+conf t
+ key chain EIGRP-CHAIN
+  key 1
+   key-string MARIUS12345
+
+ router eigrp EIGRP-NAMED
+  address-family ipv4 unicast autonomous-system 100
+   af-interface g1
+    authentication mode md5
+    authentication key-chain EIGRP-CHAIN
+
+   af-interface GigabitEthernet2
+    authentication mode hmac-sha-256 MARIUS12345
+    authentication key-chain EIGRP-CHAIN
+```
+
+- R1:
+
+```
+R1(config)#do sh run | s key chain|router eigrp
+key chain EIGRP-CHAIN
+ key 1
+  key-string MARIUS12345
+router eigrp 100
+ network 10.11.11.1 0.0.0.0
+ network 10.12.1.1 0.0.0.0
+ network 10.13.1.1 0.0.0.0
+ network 10.112.1.0 0.0.0.255
+ network 192.168.1.1 0.0.0.0
+ redistribute rip metric 1000000 1 255 1 1500
+ passive-interface GigabitEthernet0/2
+ passive-interface Loopback0
+```
+
+- R2:
+
+```
+R2(config)#do sh run | s key chain|router eigrp
+key chain EIGRP-CHAIN
+ key 1
+  key-string MARIUS12345
+router eigrp EIGRP-NAMED
+ !
+ address-family ipv4 unicast autonomous-system 100
+  !
+  af-interface default
+   passive-interface
+  exit-af-interface
+  !
+  af-interface GigabitEthernet0/1
+   authentication mode md5
+   authentication key-chain EIGRP-CHAIN
+   no passive-interface
+  exit-af-interface
+  !
+  af-interface GigabitEthernet0/2
+   authentication mode hmac-sha-256 MARIUS12345
+   authentication key-chain EIGRP-CHAIN
+   no passive-interface
+  exit-af-interface
+  !
+  topology base
+  exit-af-topology
+  network 0.0.0.0
+  metric rib-scale 1
+ exit-address-family
+```
+
+- R3:
+
+```
+R3#sh run | s key chain|router eigrp
+key chain EIGRP-CHAIN
+ key 1
+  key-string MARIUS12345
+router eigrp EIGRP-NAMED
+ !
+ address-family ipv4 unicast autonomous-system 100
+  !
+  af-interface default
+   passive-interface
+  exit-af-interface
+  !
+  af-interface GigabitEthernet1
+   authentication mode md5
+   authentication key-chain EIGRP-CHAIN
+   no passive-interface
+  exit-af-interface
+  !
+  af-interface GigabitEthernet2
+   authentication mode hmac-sha-256 MARIUS12345
+   authentication key-chain EIGRP-CHAIN
+   no passive-interface
+  exit-af-interface
+  !
+  topology base
+  exit-af-topology
+  network 0.0.0.0
+  metric rib-scale 1
+ exit-address-family
+```
+
+- Remember that the hash is computed using the key sequence number and the key string, which must match on the two nodes
+
+- The command `show key chain` provides verification of the key chain. Each key sequence provides the lifetime and password
+
+```
+R1#show key chain 
+Key-chain EIGRP-AUTH:
+Key-chain EIGRP-CHAIN:
+    key 1 -- text "MARIUS12345"
+        accept lifetime (always valid) - (always valid) [valid now]
+        send lifetime (always valid) - (always valid) [valid now]
+```
+
+- The EIGRP interface detail view provides verification of EIGRP authentication on a specific interface
+
+- Below is shown the detailed EIGRP interface output
+
+```
+R1#sh ip eigrp interfaces detail 
+EIGRP-IPv4 Interfaces for AS(100)
+                              Xmit Queue   PeerQ        Mean   Pacing Time   Multicast    Pending
+Interface              Peers  Un/Reliable  Un/Reliable  SRTT   Un/Reliable   Flow Timer   Routes
+Gi0/1                    1        0/0       0/0           1       0/0           50           0
+  Hello-interval is 5, Hold-time is 15
+  Split-horizon is enabled
+  Next xmit serial <none>
+  Packetized sent/expedited: 21/2
+  Hello's sent/expedited: 1925/5
+  Un/reliable mcasts: 0/19  Un/reliable ucasts: 28/9
+  Mcast exceptions: 0  CR packets: 0  ACKs suppressed: 1
+  Retransmissions sent: 3  Out-of-sequence rcvd: 0
+  Topology-ids on interface - 0 
+  Authentication mode is md5,  key-chain is "EIGRP-CHAIN"
+  Topologies advertised on this interface:  base
+  Topologies not advertised on this interface:
+
+Gi0/0                    1        0/0       0/0           1       0/0           50           0
+  Hello-interval is 5, Hold-time is 15
+  Split-horizon is enabled
+  Next xmit serial <none>
+  Packetized sent/expedited: 21/1
+  Hello's sent/expedited: 1925/5
+  Un/reliable mcasts: 0/16  Un/reliable ucasts: 26/11
+  Mcast exceptions: 0  CR packets: 0  ACKs suppressed: 2
+  Retransmissions sent: 2  Out-of-sequence rcvd: 0
+  Topology-ids on interface - 0 
+  Authentication mode is md5,  key-chain is "EIGRP-CHAIN"
+  Topologies advertised on this interface:  base
+  Topologies not advertised on this interface:
+
+```
+
+### Path Metric Calculation
+
+- Metric calculation is a critical component for any routing protocol
+
+- EIGRP uses multiple factors to calculate the metric for a path
+
+- Metric calculation uses *bandwidth* and *delay* by default but can include interface load and reliability, too
+
+- Below is shown the EIGRP classic metric formula
+
+```
+Metric = 256 x [(K1 x Bandwidth + (K2 x Bandwidth) / (256 - Load) + K3 x Delay + K5 / (K4 + Reliability ))]
+```
+
+- EIGRP uses K values to define which factors the formula uses and the impact associated with a factor when calculating the metric
+
+- A common misconception is that the K values directly apply to bandwidth, load, delay, or reliability; this is not accurate
+
+- For example, K1 and K2 both reference bandwidth (BW)
+
+- BW represents the slowest link in the path, scaled to a 10 Gbps link (10 ^ 7)
+
+- Link speed correlates with the configured interface bandwidth on an interface and is measured in kilobits per second (Kbps)
+
+- Delay is the total measure of delay in the path, measured in tens of microseconds (us)
+
+- Taking these definitions into consideration, look at the formula for classic EIGRP metrics below
+
+```
+Metric = 256 * [(K1 x 10 ^ 7 / Min_bandwidth + (10 ^ 7 / K2 * Min_bandwidth)/ (256 - Load) + (K3 * Total_delay) / 10) * K5 / (K4 + Reliability)]
+```
+
+![eigrp-classic-metric-formula-definitions](./eigrp-classic-metric-formula-definitions.png)
+
+- RFC 7868 states that if K5 = 0, then the reliability quotient is defined to be 1
+
+- This is demonstrated in the figure below
+
+- By default, K1 and K3 each has a value of 1, and K2, K4 and K5 are all set to 0
+
+- Below the default K values are placed into the formula and is shown a streamlined version of the formula
+
+- The EIGRP Update packet includes path attributes associated with each prefix
+
+- The EIGRP path attributes can include hop count, cummulative delay, minimum bandwidth link speed, and RD
+
+- These attributes are updated each hop along the way, allowing each router to independently identify the shortest path
+
+```
+Metric = 256 * [(1 x 10 ^ 7 / Min_bandwidth + (10 ^ 7) / (0 x Min_bandwidth)/ 256 - Load + 1 x Total_delay / 10) * 0 / 0 + Reliability]
+
+
+Metric = 256 * (10 ^ 7 / Min_bandwidth + Total_delay / 10)
+```
+
+![eigrp-formula-default-k-values](./eigrp-formula-default-k-values.png)
+
+- Below is shown the information in the EIGRP update packets for the 10.1.1.0/24 network propagating through the autonomous system
+
+- Notice that the hop count increments, minimum bandwidth decreases, and the RD changes with each EIGRP update
+
+![eigrp-attribute-propagation](./eigrp-attribute-propagation.png)
+
+- Below are shown some common network types, the link speed, delay and EIGRP metric, based on the streamlined formula
+
+- Default EIGRP interface metrics for classic metrics
+
+```
+Interface Type                  Link speed (Kbps)                   Delay                   Metric
+
+Serial                          64                                  20.000 us               40.512.000
+
+T1                              1544                                20.000 us               2.170.031
+
+Ethernet                        10000                               1000 us                 281.600
+
+FastEthernet                    100000                              100 us                  28.160
+
+GigabitEthernet                 1000000                             10 us                   2816
+
+TenGigabitEthernet              10000000                            10 us                   512
+```
+
+- Using our original topology, the metrics from R1 and R2 for the 10.4.4.0/24 network are calculated using our formula
+
+- The link speed for both routers is 1 Gbps, and the total delay is 30 us (10 us for the 10.4.4.0/24, 10 us for the 10.34.1.0/24 link, and 10 us for the 10.13.1.1/24 link).
+
+```
+Metric = 256 x (10 ^ 7 / 1000000 + 30 / 10) = 3328
+```
+
+- If you are unsure of the EIGRP metrics, you can query the parameters from the formula directly from the EIGRP topology table, by using the command `show ip eigrp topology <prefix/length>`
+
+- Below is shown R1's topology table output for the 10.4.4.0/24 network
+
+- Notice that the output includes the successor route, any feasible successor paths, and the EIGRP state for the prefix
+
+- Each path contains the EIGRP attributes minimum bandwidth, total delay, interface reliability, load and hop count
+
+```
+R3#show ip eigrp topology 10.12.1.0/24
+EIGRP-IPv4 VR(EIGRP-NAMED) Topology Entry for AS(100)/ID(192.168.3.3) for 10.12.1.0/24
+  State is Passive, Query origin flag is 1, 2 Successor(s), FD is 196608000, RIB is 1536000
+  Descriptor Blocks:
+  10.13.1.1 (Ethernet0/0), from 10.13.1.1, Send flag is 0x0
+      Composite metric is (196608000/131072000), route is Internal
+      Vector metric:
+        Minimum bandwidth is 10000 Kbit
+        Total delay is 2000000000 picoseconds
+        Reliability is 255/255
+        Load is 1/255
+        Minimum MTU is 1500
+        Hop count is 1
+        Originating router is 192.168.1.1
+  10.22.22.2 (Ethernet0/1), from 10.22.22.2, Send flag is 0x0
+      Composite metric is (196608000/131072000), route is Internal
+      Vector metric:
+        Minimum bandwidth is 10000 Kbit
+        Total delay is 2000000000 picoseconds
+        Reliability is 255/255
+        Load is 1/255
+        Minimum MTU is 1500
+        Hop count is 1
+        Originating router is 192.168.2.2
+```
+
+#### Wide Metrics
+
+- The original EIGRP specification measured delay in 10-microsecond delay (us) units and bandwidth in kilobites per second, which did not scale very well with higher speed interfaces
+
+- In the below table, notice that the delay is the same for the GigabitEthernet and TenGigabitEthernet interfaces
+
+- Below is provided some metric calculations for common LAN interface speeds
+
+- Notice that there is not a differenciation between an 11 Gbps interface and a 20 Gbps interface
+
+- The composite metric stays at 256, despite the different bandwidth rates
+
+```
+GigabitEthernet:
+
+Scaled Bandwidth =  10 000 000 / 1 000 000
+
+Scaled Delay = 10 / 10
+
+Composite metric = 10 + 1 * 256 = 2816
+
+---
+
+10 GigabitEthernet:
+
+Scaled Bandwidth = 10 000 000 / 10 000 000
+
+Scaled Delay = 10 / 10
+
+Composite Metric = 1 + 1 * 256 = 512
+
+---
+
+11 GigabitEthernet:
+
+Scaled Bandwidth = 10 000 000 / 11 000 000
+
+Scaled Delay = 10 / 10
+
+Composite Metric = 0 + 1 * 256 = 256
+
+---
+
+20 GigabitEthernet:
+
+Scaled Bandwidth = 10 000 000 / 20 000 000
+
+Scaled Delay = 10 / 10
+
+Composite Metric = 0 + 1 * 256 = 256
+```
+
+- EIGRP includes support for a second set of metrics, known as wide metrics, that addresses the issue of scalability with higher-capacity interfaces
+
+- Just as EIGRP scaled by 256 to accomodate IGRP, EIGRP wide metrics scale by 65536 to accomodate higher speed links
+
+- This provides support for interface speeds up to 655 Tbps (65536 * 10 ^ 7) without any scalability issues
+
+- Below is shown the explicit EIGRP wide metrics formula
+
+- Notice that an additional K value (K6) is included that adds an extended attribute to measure jitter, energy, or other future attributes
+
+```
+Wide metric = 65536 * [ (K1 * BW) + (K2 * BW) / (256 - load) + (K3 * latency) + (K6 * extended)] * K5 / (K4 + Reliability)
+```
+
+![eigrp-wide-metrics-formula](./eigrp-wide-metrics-formula.png)
+
+- Latency is the total interface delay measured in picoseconds (10 ^ 12) in place of 10 ^ 6
+
+- Below is shown an updated formula that takes into account the conversions in latency and scalability
+
+```
+Wide metric = 65536 * [ (K1 * 10 ^ 7) / min_bandwidth + ((K2 * 10 ^ 7) / min_bandwidth) / 256 - load + (K3 * Latency) / 10 ^ 6 + (K6 * Extended)] * K5 / (K4 + reliability)
+```
+
+![wide-metric-calculation1](./wide-metric-calculation1.png)
+
+- The interface delay varies from router to router, depending on the following logic:
+
+    - If the interface's delay was specifically set, the value is converted to picoseconds. Interface delay is always configured in tens of microseconds and is multiplied by 10 ^ 7 for picosecond conversion
+
+    - If the interface's bandwidth was specifically set, the interface delay is configured using the classic default delay, converted to picoseconds. The configured bandwidth is not considered when determining the interface delay. If the delay is configured this step is ignored
+
+    - If the interface supports speeds of 1 Gbps or less and does not contain bandwidth or delay configuration, the delay is the classic default delay, converted to picoseconds
+
+    - If the interface supports speeds over 1 Gbps and does not contain bandwidth and delay configuration, the interface delay is calculated by 10 ^ 13 / interface bandwidth
+
+- The EIGRP classic metric exist only with EIGRP classic configuration, and EIGRP wide metrics exist only in EIGRP named mode
+
+- The metric style used by a router is identified with the command `show ip protocols`. If a K6 metric is present, the router is using wide-style metrics
+
+- R1:
+
+```
+R1#show ip protocols 
+*** IP Routing is NSF aware ***
+
+Routing Protocol is "application"
+  Sending updates every 0 seconds
+  Invalid after 0 seconds, hold down 0, flushed after 0
+  Outgoing update filter list for all interfaces is not set
+  Incoming update filter list for all interfaces is not set
+  Maximum path: 32
+  Routing for Networks:
+  Routing Information Sources:
+    Gateway         Distance      Last Update
+  Distance: (default is 4)
+
+Routing Protocol is "eigrp 100"
+  Outgoing update filter list for all interfaces is not set
+  Incoming update filter list for all interfaces is not set
+  Default networks flagged in outgoing updates
+  Default networks accepted from incoming updates
+  Redistributing: rip
+  EIGRP-IPv4 Protocol for AS(100)
+    Metric weight K1=1, K2=0, K3=1, K4=0, K5=0
+    Soft SIA disabled
+    NSF-aware route hold timer is 240
+    Router-ID: 192.168.1.1
+    Topology : 0 (base) 
+      Active Timer: 3 min
+      Distance: internal 90 external 170
+      Maximum path: 4
+      Maximum hopcount 100
+      Maximum metric variance 1
+
+  Automatic Summarization: disabled
+  Maximum path: 4
+  Routing for Networks:
+    10.11.11.1/32
+    10.12.1.1/32
+    10.13.1.1/32
+    10.112.1.0/24
+    192.168.1.1/32
+  Passive Interface(s):
+    GigabitEthernet0/2
+    Loopback0
+  Routing Information Sources:
+    Gateway         Distance      Last Update
+    10.13.1.3             90      01:32:16
+    10.12.1.2             90      01:32:16
+  Distance: internal 90 external 170
+
+```
+
+- R2:
+
+```
+R2(config-router-af)#do sh ip proto
+*** IP Routing is NSF aware ***
+
+Routing Protocol is "application"
+  Sending updates every 0 seconds
+  Invalid after 0 seconds, hold down 0, flushed after 0
+  Outgoing update filter list for all interfaces is not set
+  Incoming update filter list for all interfaces is not set
+  Maximum path: 32
+  Routing for Networks:
+  Routing Information Sources:
+    Gateway         Distance      Last Update
+  Distance: (default is 4)
+
+Routing Protocol is "eigrp 100"
+  Outgoing update filter list for all interfaces is not set
+  Incoming update filter list for all interfaces is not set
+  Default networks flagged in outgoing updates
+  Default networks accepted from incoming updates
+  EIGRP-IPv4 VR(EIGRP-NAMED) Address-Family Protocol for AS(100)
+    Metric weight K1=1, K2=0, K3=1, K4=0, K5=0 K6=0
+    Metric rib-scale 128
+    Metric version 64bit
+    Soft SIA disabled
+    NSF-aware route hold timer is 240
+    Router-ID: 192.168.2.2
+    Topology : 0 (base) 
+      Active Timer: 3 min
+      Distance: internal 90 external 170
+      Maximum path: 4
+      Maximum hopcount 100
+      Maximum metric variance 1
+      Total Prefix Count: 9
+      Total Redist Count: 0
+
+  Automatic Summarization: disabled
+  Maximum path: 4
+  Routing for Networks:
+    0.0.0.0
+  Routing Information Sources:
+    Gateway         Distance      Last Update
+    10.12.1.1             90      00:00:21
+    10.22.22.3            90      00:00:21
+  Distance: internal 90 external 170
+
+```
+
+- Above we can see that R1 does not have a K6 metric and is using EIGRP classic metrics
+
+- R2 has a K6 metric and is using EIGRP wide metrics
+
+#### Metric Backward Compatibility
+
+- EIGRP wide metrics were designed with backward compatibility in mind
+
+- EIGRP wide metrics set K1 and K3 to a value of 1 and set K2, K4, K5, K6 to 0, which allows backward compatibility because the K value metrics match with classic metrics
+
+- As long as K1 through K5 are the same and K6 is not set, the two metric styles allow adjacency between routers
+
+- EIGRP is able to detect when peering with a router is using classic metrics, and it unscales the metric by using the formula below
+
+```
+Unscaled bandwidth = (EIGRP bandwidth + EIGRP classic scale) / Scaled bandwidth
+```
+
+- This conversion results in loss of clarity if routes pass through a mixture of classic metric and wide metric devices
+
+- An end result of this intended behavior is that paths learned from wide metric peers always look better than paths learned from classic peers
+
+- Using a mixture of classic metric and wide metric devices could lead to suboptimal routing, so it's best to keep all devices operating with the same metric style
+
+#### Interface Delay Settings
+
+- 
