@@ -1918,4 +1918,310 @@ Unscaled bandwidth = (EIGRP bandwidth + EIGRP classic scale) / Scaled bandwidth
 
 #### Interface Delay Settings
 
-- 
+- If you do not remember the delay of an interface, you can query the values dynamically by using the command `show interface <interface_id>`
+
+- The output displays the EIGRP interface delay, in microseconds after the DLY field
+
+- Below is provided the example output of the command on R1 and R2
+
+```
+R1#sh interfaces g0/1 | i DLY
+  MTU 1500 bytes, BW 1000000 Kbit/sec, DLY 10 usec, 
+```
+
+```
+R2#sh int g0/1 | i DLY
+  MTU 1500 bytes, BW 1000000 Kbit/sec, DLY 10 usec, 
+```
+
+- Delay is set on an interface-by-interface basis, allowing for manipulation of traffic patterns flowing through a specific interface on a router
+
+- Delay is configured with the interface parameter command `delay <tens-of-microseconds>`
+
+```
+conf t
+ interface g0/1
+  delay 10 # means 10 * 10 microseconds = 100 microseconds
+```
+
+- Below we can see the modification of delay on R1 to 100, increasing the delay to 1000 us on the link between R1 and R2
+
+```
+conf t
+ interface g0/1
+  delay 100
+```
+
+```
+R1(config-if)#do sh int g0/1 | i DLY
+  MTU 1500 bytes, BW 1000000 Kbit/sec, DLY 1000 usec, 
+```
+
+- To ensure consistent routing, modify the delay on R2's G0/1 interface as well. Afterwards you can verify the change
+
+```
+R2(config-if)#do sh int g0/1 | i DLY      
+  MTU 1500 bytes, BW 1000000 Kbit/sec, DLY 1000 usec, 
+```
+
+- Bandwidth modification with the interface parameter command `bandwidth <bandwidth>` has a similar effect on the metric calculation formula but can impact other routing protocols, such as OSPF, at the same time
+
+- Modifying the interface delay only impacts EIGRP
+
+#### Custom K Values
+
+- If the default metric calculations are insufficient, you can change them to modify the path metric formula
+
+- K values for the path metric are set with the following command under the EIGRP process:
+
+```
+conf t
+ router eigrp 100
+  metric weights TOS K1 K2 K3 K4 K5 [K6]
+```
+
+- R1:
+
+```
+conf t
+ router eigrp 100
+  metric weights 0 1 1 1 0 1
+```
+
+- R2/ R3:
+
+```
+conf t
+ router eigrp EIGRP-NAMED
+  address-family ipv4 unicast autonomous-system 100
+   metric weights 0 1 1 1 0 1 0
+```
+
+- TOS always has a value of 0, and K6 is used for named mode configurations
+
+- To ensure consistent routing logic in an EIGRP autonomous system, the K values must match between EIGRP neighbors to form an adjacency and exchange routes
+
+- The K values are included as part of the EIGRP Hello Packet
+
+- The K values are displayed with the command `show ip protocols`
+
+- Notice that in our topology both routers are using the default K values, R1 with classic metrics, and R2 using wide metrics
+
+#### Load Balancing
+
+- EIGRP allows multiple successor routes (with the same metric) to be installed into the RIB
+
+- Installing multiple paths into the RIB for the same prefix is called *equal-cost multipathing* (ECMP)
+
+- The default maximum ECMP setting is 4
+
+- You can change the default ECMP setting with the command `maximum-paths <maximum-paths>` under the EIGRP process in classic mode and under the topology base submode in named mode
+
+- Below is shown how to change the maximum paths on classic and named EIGRP mode, on R1 and R2
+
+- R1:
+
+```
+conf t
+ router eigrp 100
+  maximum-paths 6
+```
+
+- R2:
+
+```
+conf t
+ router eigrp EIGRP-NAMED
+  address-family ipv4 unicast autonomous-system 100
+   topology base
+    maximum-paths 6
+```
+
+- R1:
+
+```
+R1(config-router)#do sh run | s router eigrp
+router eigrp 100
+ metric weights 0 1 1 1 0 1
+ maximum-paths 6
+ network 10.11.11.1 0.0.0.0
+ network 10.12.1.1 0.0.0.0
+ network 10.13.1.1 0.0.0.0
+ network 10.112.1.0 0.0.0.255
+ network 192.168.1.1 0.0.0.0
+ redistribute rip metric 1000000 1 255 1 1500
+ passive-interface GigabitEthernet0/2
+ passive-interface Loopback0
+```
+
+- R2:
+
+```
+R2(config-router-af-topology)#do sh run | s router eigrp
+router eigrp EIGRP-NAMED
+ !
+ address-family ipv4 unicast autonomous-system 100
+  !
+  af-interface default
+   passive-interface
+  exit-af-interface
+  !
+  af-interface GigabitEthernet0/1
+   authentication mode md5
+   authentication key-chain EIGRP-CHAIN
+   no passive-interface
+  exit-af-interface
+  !
+  af-interface GigabitEthernet0/2
+   authentication mode hmac-sha-256 MARIUS12345
+   authentication key-chain EIGRP-CHAIN
+   no passive-interface
+  exit-af-interface
+  !
+  topology base
+   maximum-paths 6
+  exit-af-topology
+  network 0.0.0.0
+  metric weights 0 1 1 1 0 1 0
+ exit-address-family
+```
+
+- EIGRP supports unequal-cost load balancing, which allows installation of both successor routes and feasible successors into the EIGRP RIB
+
+- To use unequal-cost load balancing with EIGRP, use EIGRP's variance multiplier
+
+- The EIGRP variance value is the feasible distance (FD) for a route multiplied by the EIGRP variance multiplier
+
+- Any feasible successor's FD with a metric below the EIGRP variance value is installed into the RIB
+
+- EIGRP installs multiple routes where the FD for the routes is less than the EIGRP variance value up to the maximum number of ECMP routes
+
+- Dividing the feasible successor metric by the successor route metric provides the variance multiplier
+
+- The variance multiplier is a whole number, and any remainders should always round up
+
+- Using our initial topology and the output from the EIGRP topology table, the minimum variance multiplier can be calculated so that the direct path from R1 to R4 can be installed into the RIB
+
+- The FD for the successor route is 3328, and the FD for the feasible successor is 5376
+
+- The formula provides a value of about 1.6 and is always rounded up to the nearest whole number to provide an EIGRP variance multiplier of 2
+
+![eigrp-variance-multiplier-formula](./eigrp-variance-multiplier-formula.png)
+
+- The command `variance <multiplier>` configures the variance under the EIGRP process for classic configuration and under the topology base submode in named mode
+
+- Below is provided the sample configuration for each configuration mode
+
+- R1:
+
+```
+conf t
+ router eigrp 100
+  variance 3
+```
+
+- R2:
+
+```
+conf t
+ router eigrp EIGRP-NAMED
+  address-family ipv4 autonomous-system 100
+   topology base
+    variance 3
+```
+
+- R1:
+
+```
+R1(config-router)#do sh run | s router eigrp
+router eigrp 100
+ metric weights 0 1 1 1 0 1
+ maximum-paths 6
+ variance 3
+ network 10.11.11.1 0.0.0.0
+ network 10.12.1.1 0.0.0.0
+ network 10.13.1.1 0.0.0.0
+ network 10.112.1.0 0.0.0.255
+ network 192.168.1.1 0.0.0.0
+ redistribute rip metric 1000000 1 255 1 1500
+ passive-interface GigabitEthernet0/2
+ passive-interface Loopback0
+```
+
+- R2:
+
+```
+R2(config-router-af-topology)#do sh run | s router eigrp
+router eigrp EIGRP-NAMED
+ !
+ address-family ipv4 unicast autonomous-system 100
+  !
+  af-interface default
+   passive-interface
+  exit-af-interface
+  !
+  af-interface GigabitEthernet0/1
+   authentication mode md5
+   authentication key-chain EIGRP-CHAIN
+   no passive-interface
+  exit-af-interface
+  !
+  af-interface GigabitEthernet0/2
+   authentication mode hmac-sha-256 MARIUS12345
+   authentication key-chain EIGRP-CHAIN
+   no passive-interface
+  exit-af-interface
+  !
+  topology base
+   maximum-paths 6
+   variance 3
+  exit-af-topology
+  network 0.0.0.0
+  metric weights 0 1 1 1 0 1 0
+ exit-address-family
+```
+
+- Below is shown how to verify that both paths were installed into the RIB
+
+- Notice that the metrics for the paths are different
+
+- One path metric is 3328 and the other path metric is 5376
+
+- To see the traffic load-balancing ratios, you use the command `show ip route <network>`
+
+- The load balancing traffic share is highlighted
+
+```
+R1(config-if)#do sh ip ro 192.168.3.3
+Routing entry for 192.168.3.3/32
+  Known via "eigrp 100", distance 90, metric 3104, type internal
+  Redistributing via eigrp 100, rip
+  Advertised by rip metric 10
+  Last update from 10.12.1.2 on GigabitEthernet0/1, 00:02:54 ago
+  Routing Descriptor Blocks:
+  * 10.13.1.3, from 10.13.1.3, 00:02:54 ago, via GigabitEthernet0/0
+      Route metric is 5152, *traffic share count is 29*
+      Total delay is 102 microseconds, minimum bandwidth is 1000000 Kbit
+      Reliability 255/255, minimum MTU 1500 bytes
+      Loading 1/255, Hops 1
+    10.12.1.2, from 10.12.1.2, 00:02:54 ago, via GigabitEthernet0/1
+      Route metric is 3104, *traffic share count is 48*
+      Total delay is 22 microseconds, minimum bandwidth is 1000000 Kbit
+      Reliability 255/255, minimum MTU 1500 bytes
+      Loading 1/255, Hops 2
+```
+
+```
+1#show ip route eigrp | b Gate 
+Gateway of last resort is not set
+
+      10.0.0.0/8 is variably subnetted, 11 subnets, 2 masks
+D        10.22.22.0/24 [90/5376] via 10.13.1.3, 00:04:14, GigabitEthernet0/0
+                       [90/3072] via 10.12.1.2, 00:04:14, GigabitEthernet0/1
+      192.168.2.0/32 is subnetted, 1 subnets
+D        192.168.2.2 [90/2848] via 10.12.1.2, 00:04:14, GigabitEthernet0/1
+      192.168.3.0/32 is subnetted, 1 subnets
+D        192.168.3.3 [90/5152] via 10.13.1.3, 00:04:14, GigabitEthernet0/0
+                     [90/3104] via 10.12.1.2, 00:04:14, GigabitEthernet0/1
+```
+
