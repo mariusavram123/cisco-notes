@@ -223,4 +223,447 @@ EIGRP-IPv4 VR(EIGRP-NAMED) Topology Entry for AS(100)/ID(192.168.2.2) for 10.1.1
 
 ![eigrp-sia-topology](./eigrp-sia-topology.png)
 
+![eigrp-sia-reply-r2](./eigrp-sia-reply-r2.png)
+
+- The active timer is set to 3 minutes by default
+
+- The active timer can be disabled or modified with the following command under the EIGRP process:
+
+```
+conf t
+ router eigrp 100
+  timers active-time <disabled| 0-65535 minutes>
+```
+
+- With classic configuration mode the command runs directly under the EIGRP process, and with named mode configuration, the command runs under the topology base
+
+- R1:
+
+```
+conf t
+ router eigrp 100
+  timers active-time 2
+```
+
+- R2:
+
+```
+conf t
+ router eigrp eigrp-named
+  address-family ipv4 unicast autonomous-system 100
+   topology base
+    timers active-time 2
+```
+
+- You can see the active timer by examining the IP protocols on a router with the command `show ip protocols`
+
+- Filtering with the keyword Active, streamlines the information
+
+- Below is the output on R2:
+
+```
+R2(config-router-af-topology)#do sh ip proto | i Active
+      Active Timer: 2 min
+```
+
+- The SIA query now occurs after 1 minute, which is half of the configured SIA timer
+
+### Route Summarization
+
+- EIGRP works well with minimal optimization
+
+- Scalability on an EIGRP autonomous system depends on route summarization
+
+- As the size of an EIGRP autonomous system increases, convergence may take longer
+
+- Scaling an EIGRP topology depends on summarizing routes in a hierarchical fashion
+
+- Below is shown summarization occuring on the access, distribution and core layers of the network topology
+
+- In addition to shrinking the routing tables of all the routers, route summarization creates a query boundary and shrinks the query domain when a route goes active during convergence, thereby reducing CIA scenarios
+
+![eigrp-hierarchical-summarization](./eigrp-hierarchical-summarization.png)
+
+- Route summarization on this scale requires hierarchical deployment of an IP addressing scheme
+
+#### Interface-specific summarization
+
+- EIGRP summarizes routes on a per-interface basis
+
+- Summarization is enabled by configuring a summary route address range under the EIGRP interface, where all routes that fall within the summary address range are referred to as component routes
+
+- With summarization enabled, the component routes are suppressed (that is, not advertised), and only the summary route is advertised
+
+- The summary route is not advertised until a component route matches it
+
+- Interface-specific summarization can be performed in any portion of the network topology
+
+- Below is illustrated the concept of EIGRP summarization
+
+- Without summarization, R2 advertises the 172.16.1.0/24, 172.16.3.0/24, 172.16.12.0/24 and 172.16.23.0/24 routes toward R4
+
+- R2 summarizes these network prefixes to the 172.16.0.0/16 summary route so that only one advertisement is sent to R4
+
+![eigrp-summarization](./eigrp-summarization.png)
+
+- For classic EIGRP configuration mode, the following interface parameter command can be used to place an EIGRP summary route on an interface:
+
+```
+conf t
+ interface <type/number>
+  ip summary-address eigrp <as-nr> <network> <subnet-mask> [leak-map <route-map-name>]
+```
+
+![eigrp-summary-topology](./eigrp-summary-topology.png)
+
+- R2 - G0/2
+
+```
+conf t
+ ip prefix-list EIGRP-SUMM seq 10 permit 172.16.1.0/24 
+ ip prefix-list EIGRP-SUMM seq 20 permit 172.16.3.0/24
+ ip prefix-list EIGRP-SUMM seq 30 permit 172.16.12.0/24
+ ip prefix-list EIGRP-SUMM seq 40 permit 172.16.23.0/24
+
+ route-map EIGRP-SUMM permit 10
+  match ip address prefix-list EIGRP-SUMM
+  set tag 10
+
+ interface g0/2
+  ip summary-address eigrp 100 172.16.0.0/16 leak-map EIGRP-SUMM
+
+```
+
+- Using the leak-map on the summary-address command, the parts of the leak-map are also present into the routing table on R4
+
+```
+R4#show ip route | b Gate
+Gateway of last resort is not set
+
+      172.16.0.0/16 is variably subnetted, 7 subnets, 3 masks
+D        172.16.0.0/16 [90/3072] via 172.16.24.2, 00:02:03, GigabitEthernet0/0
+D        172.16.1.0/24 [90/3328] via 172.16.24.2, 00:02:22, GigabitEthernet0/0
+D        172.16.3.0/24 [90/3328] via 172.16.24.2, 00:02:22, GigabitEthernet0/0
+D        172.16.12.0/24 
+           [90/3072] via 172.16.24.2, 00:02:22, GigabitEthernet0/0
+D        172.16.23.0/24 
+           [90/3072] via 172.16.24.2, 00:02:22, GigabitEthernet0/0
+C        172.16.24.0/24 is directly connected, GigabitEthernet0/0
+L        172.16.24.4/32 is directly connected, GigabitEthernet0/0
+```
+
+- R2 - summary without leak-map:
+
+```
+conf t
+ int g0/2
+  ip summary-address eigrp 100 172.16.0.0/16
+```
+
+- R4 - viewing the routing table now:
+
+```
+R4#show ip route | b Gate
+Gateway of last resort is not set
+
+      172.16.0.0/16 is variably subnetted, 3 subnets, 3 masks
+D        172.16.0.0/16 [90/3072] via 172.16.24.2, 00:00:08, GigabitEthernet0/0
+C        172.16.24.0/24 is directly connected, GigabitEthernet0/0
+L        172.16.24.4/32 is directly connected, GigabitEthernet0/0
+```
+
+- You perform summary-route configuration for named mode under af-interface <interface-id>, using the following command:
+
+```
+conf t 
+ router eigrp <name>
+  address-family ipv4 autonomous-system <number>
+   af-interface <interface-id>
+    summary-address <network> <subnet-mask> [leak-map <route-map-name>]
+```
+
+- The `leak-map` option allows the advertisement of the routes identified in the route-map
+
+- Because suppression is avoided, the routes are considered leaked because they are advertised along with the summary route
+
+- This allows for the use of longest-match routing to influence traffic patterns while suppressing most of the prefixes
+
+- Below is shown R4's routing table before summarization is configured on R2
+
+- Notice that only /24 networks exist in the routing table
+
+- R4 routing table before summarization:
+
+```
+R4#show ip route | b Gate
+Gateway of last resort is not set
+
+      172.16.0.0/16 is variably subnetted, 6 subnets, 2 masks
+D        172.16.1.0/24 [90/3328] via 172.16.24.2, 00:00:25, GigabitEthernet0/0
+D        172.16.3.0/24 [90/3328] via 172.16.24.2, 00:00:25, GigabitEthernet0/0
+D        172.16.12.0/24 
+           [90/3072] via 172.16.24.2, 00:00:25, GigabitEthernet0/0
+D        172.16.23.0/24 
+           [90/3072] via 172.16.24.2, 00:00:25, GigabitEthernet0/0
+C        172.16.24.0/24 is directly connected, GigabitEthernet0/0
+L        172.16.24.4/32 is directly connected, GigabitEthernet0/0
+```
+
+- R2 - configuration of summary route for named mode:
+
+```
+router eigrp EIGRP-NAMED
+ !
+ address-family ipv4 unicast autonomous-system 200
+  !
+  af-interface GigabitEthernet0/2
+   summary-address 172.16.0.0 255.255.0.0
+  exit-af-interface
+  !
+  topology base
+  exit-af-topology
+ exit-address-family
+```
+
+- Summary routes are always advertised based on the outgoing interface
+
+- The `af-interface default` command cannot be used with the `summary-address` command. It requires the use fo a specific interface
+
+- Below is shown the R4's routing table after summarization is enabled on R2
+
+```
+R4#show ip ro | b Gate
+Gateway of last resort is not set
+
+      172.16.0.0/16 is variably subnetted, 3 subnets, 3 masks
+D        172.16.0.0/16 [90/3072] via 172.16.24.2, 00:08:50, GigabitEthernet0/0
+C        172.16.24.0/24 is directly connected, GigabitEthernet0/0
+L        172.16.24.4/32 is directly connected, GigabitEthernet0/0
+```
+
+- The number of EIGRP routes has been drastically reduced, thereby reducing consumption of CPU and memory resources
+
+- Notice that all the component routes are condensed into the 172.16.0.0/16 summary route
+
+- Advertising a default route into EIGRP requires the summaryzation syntax described earlier, except that the network and subnet-mask uses 0.0.0.0 0.0.0.0, commonly referred to as `double-quad zeros`
+
+```
+conf t
+ interface g0/2
+  ip summary-address eigrp 100 0.0.0.0 0.0.0.0
+```
+
+#### Summary Discard Routes
+
+- EIGRP installs a discard route on the summarizing routers as a loop-prevention mechanism
+
+- A discard route is a route that matches the summary route with the destination to Null0
+
+- This prevents routing loops where portions of the summarized network range do not have a more specific entry in the Routing Information Base (RIB) on the summarizing router
+
+- The AD for the Null0 route is 5 by default
+
+- We can view the discard route with the command `show ip route <network> <subnet-mask>` on the summarizing router
+
+```
+R2#show ip route 172.16.0.0 255.255.0.0
+Routing entry for 172.16.0.0/16
+  Known via "eigrp 100", distance 5, metric 2816, type internal
+  Redistributing via eigrp 100
+  Routing Descriptor Blocks:
+  * directly connected, via Null0
+      Route metric is 2816, traffic share count is 1
+      Total delay is 10 microseconds, minimum bandwidth is 1000000 Kbit
+      Reliability 255/255, minimum MTU 1500 bytes
+      Loading 1/255, Hops 0
+```
+
+- Notice that the AD is set to 5, and is connected to Null0, which means the packets are discarded if a longer match is not made
+
+#### Summarization Metrics
+
+- The summarizing router uses the lowest metric of the component routes in the summary route
+
+- The path metric for the summary route is based of the path attributes of the path with the lowest metric
+
+- EIGRP path attributes such as total delay and minimum bandwidth are inserted into the summary route so that downstream routers can calculate the correct path metric for the summary route
+
+- Below R2 has a path metric of 3072 for the 172.16.1.0/24 route and a path metric of 3328 for the 172.16.3.0/24 route
+
+- The summary route 172.16.0.0/16 is advertised with the path metric 3072 and the EIGRP path attributes received by R2 from R1
+
+![eigrp-summarization-metrics](./eigrp-summarization-metrics.png)
+
+- Every time a matching component route for the summary route is added or removed, EIGRP must verify that the summary route is still using the attributes for the path with the lowest metric
+
+- If it is not, a new summary route is advertised with updated EIGRP attributes, and downstream routes must run the DUAL again
+
+- The summary route hides the smaller prefixes from downstream routers, but downstream routers are still burdened with processing updates to the summary route
+
+- The fluctuation in the path metric is resolved by statically setting the metric on the summary route with the command:
+
+```
+conf t 
+ router eigrp <as-nr>
+  summary-metric <network> </prefix-len|subnet-mask> <bandwidth> <delay> <reliability> <load> <mtu> [distance <distance>]
+```
+
+- R2:
+
+```
+conf t
+ router eigrp 100
+  summary-metric 172.16.0.0 255.255.0.0 1000000 1 255 1 1500 distance 50
+```
+
+```
+R2(config-router)#do sh ip route 172.16.0.0 255.255.0.0
+Routing entry for 172.16.0.0/16
+  Known via "eigrp 100", distance 50, metric 2816, type internal
+  Redistributing via eigrp 100
+  Routing Descriptor Blocks:
+  * directly connected, via Null0
+      Route metric is 2816, traffic share count is 1
+      Total delay is 10 microseconds, minimum bandwidth is 1000000 Kbit
+      Reliability 255/255, minimum MTU 1500 bytes
+      Loading 1/255, Hops 0
+```
+
+- Using `distance` also sets the AD of the summary route
+
+- Bandwidth is in kilobits per second (Kbps), delay is in 10-microsecond us units, reliability and load are values between 1 and 255, and the MTU is the maximum transmission unit (MTU) for an interface
+
+- Set summary metric for EIGRP named mode:
+
+```
+conf t
+ router eigrp EIGRP-NAMED
+  address-family ipv4 autonomous-system 100
+   topology base
+    summary-metric 172.16.0.0 255.255.0.0 1000000 1 255 1 1500 distance 50
+```
+
+#### Automatic Summarization
+
+- EIGRP supports automatic summarization, automatically summarizing network advertisements when they cross a classful network boundary
+
+- Below is shown the automatic summarization for the 10.1.1.0 network on R2 and the 10.5.5.0/24 network on R4
+
+- R2 and R4 only advertise the classful network 10.0.0.0/8 toward R3
+
+![problems-eigrp-summarization](./problems-eigrp-summarization.png)
+
+- Below is shown the routing table for R3
+
+- Notice that there are no routes for the 10.1.1.0/24 or 10.5.5.0/24 networks; there is only a route for 10.0.0.0/8 with next hops of R2 and R4
+
+- Traffic sent to either network could be sent to the wrong interface
+
+- This problem affects network traffic traveling across the network in addition to traffic originating from R3
+
+```
+R3(config-router)#do sh ip ro | b Gate
+Gateway of last resort is not set
+
+D     10.0.0.0/8 [90/3072] via 172.16.34.4, 00:00:27, GigabitEthernet0/1
+                 [90/3072] via 172.16.23.2, 00:00:27, GigabitEthernet0/0
+      172.16.0.0/16 is variably subnetted, 4 subnets, 2 masks
+C        172.16.23.0/24 is directly connected, GigabitEthernet0/0
+L        172.16.23.3/32 is directly connected, GigabitEthernet0/0
+C        172.16.34.0/24 is directly connected, GigabitEthernet0/1
+L        172.16.34.3/32 is directly connected, GigabitEthernet0/1
+```
+
+- Below is displayed a similar behaviour for the 172.16.23.0/24 and 172.16.24.0/24 networks, as they are advertised as 172.16.0.0/16 networks from R1 and R2
+
+```
+R1(config-router)#do sh ip ro | b Gate
+Gateway of last resort is not set
+
+      10.0.0.0/8 is variably subnetted, 4 subnets, 2 masks
+C        10.1.1.0/24 is directly connected, Loopback0
+L        10.1.1.1/32 is directly connected, Loopback0
+C        10.12.1.0/24 is directly connected, GigabitEthernet0/0
+L        10.12.1.1/32 is directly connected, GigabitEthernet0/0
+D     172.16.0.0/16 [90/3072] via 10.12.1.2, 00:02:51, GigabitEthernet0/0
+```
+
+```
+R5(config-router)#do sh ip ro | b Gate
+Gateway of last resort is not set
+
+      10.0.0.0/8 is variably subnetted, 4 subnets, 2 masks
+C        10.5.5.0/24 is directly connected, Loopback0
+L        10.5.5.5/32 is directly connected, Loopback0
+C        10.45.4.0/24 is directly connected, GigabitEthernet0/0
+L        10.45.4.5/32 is directly connected, GigabitEthernet0/0
+D     172.16.0.0/16 [90/3072] via 10.45.4.4, 00:03:18, GigabitEthernet0/0
+```
+
+- Current releases or IOS-XE disables EIGRP classful network automatic summarization by default
+
+- You enable automatic summarization as follows:
+
+- Classic mode:
+
+```
+conf t
+ router eigrp 100
+  auto-summary
+```
+
+- Named mode:
+
+```
+conf t
+ router eigrp EIGRP-NAMED
+  address-family ipv4 autonomous-system 100
+   topology base
+    auto-summary
+```
+
+- Disabling automatic summarization:
+
+```
+conf t
+ router eigrp 100
+  no auto-summary
+```
+
+```
+conf t
+ router eigrp EIGRP-NAMED
+  address-family ipv4 autonomous-system 100
+   topology base
+    no auto-summary
+```
+
+## WAN considerations
+
+- EIGRP does not change behavior based on the media type of an interface
+
+- Serial and Ethernet interfaces are treated the same
+
+- Some WAN topologies may require special consideration for bandwidth utilization, split horizon, or next-hop-self
+
+### EIGRP Stub Router
+
+- A proper network design provides redundancy where dictated by business requirements to ensure that a remote location always maintains network connectivity
+
+- To overcome single points of failure, you can add additional routers at each site, add redundant circuits (possibly with different service providers), use different routing protocols, or use virtual private network (VPN) tunnels across the Internet for backup transport
+
+- Below is shown a topology with R1 and R2 providing connectivity at two key data center locations
+
+- R1 and R2 have three WAN circuits and a LAN interface
+
+- The first circuit is a 10 Gbps dedicated point-to-point circuit (10.12.1.0/24), the second circuit is a T1 (1.5Mbps) serial link to R3, and the third circuit is an Internet connection that R1 and R2 use to maintain backup connectivity to each other through a backup VPN tunnel
+
+- EIGRP is not enabled across the VPN tunnel, and traffic should be routed across the backup VPN tunnel using a simple static route for the 10.0.0.0/8 route if the 10Gbps circuit fails
+
+- R1 advertises the 10.1.1.0/24 prefix directly to R2 and R3, and R2 advertises the 10.2.2.0/24 prefix to R1 and R3
+
+![wan-connectivity-two-data-centers](./eigrp-wan-connectivity-two-data-centers.png)
+
+- For the 10.1.1.0/24 and 10.2.2.0/24 the networks are not shown in the following snippets as they are advertised over the 10Gbps link
+
 - 
