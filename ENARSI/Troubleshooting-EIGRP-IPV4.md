@@ -983,4 +983,935 @@ R2#
 
 - The reasons EIGRP routes might be missing and how to determine why they are missing
 
-- 
+- EIGRP only learns from directly connected neighbors, which makes it easy to follow the path of routes when troubleshooting
+
+- For example, if R1 does not known about a route but it's neighbor does, it is probably something wrong between the neighbors
+
+- However, if the neighbor does not have it either, you can focus on the neighbor's neighbor and so on
+
+- Neighbor relationships are foundation of EIGRP information sharing
+
+- If there are no neighbors, you do not learn any routes
+
+- So, besides the lack of a neighbor, what would be the reasons for missing routes in an EIGRP network?
+
+- The following are some common reasons EIGRP routes might be missing from either the topology table or the routing table:
+
+    1. **Bad or missing network command**: The `network` command enables the EIGRP process on an interface and injects the prefix of the network the interface is part of into the EIGRP process
+
+    2. **Better source of information**: If exactly the same network prefix is learned from a more reliable source, it is used instead of the EIGRP learned prefix
+
+    3. **Route filtering**: A filter might be preventing a network prefix from being advertised or learned
+
+    4. **Stub configuration**: If the wrong setting is chosen during the stub router configuration, or if the wrong router is chosen as the stub router, it might prevent a network prefix from being advertised
+
+    5. **Interface is shut down**: The EIGRP-enabled interface must be up/up for the network associated with the interface to be advertised
+
+    6. **Split horizon**: A loop-prevention feature that keeps a router from advertising routes out the same interface on which they were learned might be enab;ed
+
+- A look on each of these reasons individually and explores how to recognize them during troubleshooting process
+
+#### Bad or Missing network Command
+
+- When you use the `network` command, the EIGRP process is enabled on the interfaces that fall within the range of IP addresses identified by the command
+
+- EIGRP then takes the network/subnet the interface is part of and injects it into the topology table so that it can be advertised to other routers in the autonomous system
+
+- Therefore, even the interfaces that do not form neighbor relationships with other routers need a valid `network` statement that enables EIGRP on these interfaces so the networks the interface belongs to are injected into the EIGRP process and advertised
+
+- If the `network` statement is missing or is configured incorrectly, EIGRP is not enabled on the interface, and the network the interface belongs to is never advertised and is therefore unreachable by other routers
+
+- As seen before, the output of `show ip protocols` displays the `network` statements in a nonintuitive way
+
+```
+R1#show ip protocols 
+*** IP Routing is NSF aware ***
+
+Routing Protocol is "application"
+  Sending updates every 0 seconds
+  Invalid after 0 seconds, hold down 0, flushed after 0
+  Outgoing update filter list for all interfaces is not set
+  Incoming update filter list for all interfaces is not set
+  Maximum path: 32
+  Routing for Networks:
+  Routing Information Sources:
+    Gateway         Distance      Last Update
+  Distance: (default is 4)
+
+Routing Protocol is "eigrp 65001"
+  Outgoing update filter list for all interfaces is not set
+  Incoming update filter list for all interfaces is not set
+  Default networks flagged in outgoing updates
+  Default networks accepted from incoming updates
+  EIGRP-IPv4 Protocol for AS(65001)
+    Metric weight K1=1, K2=0, K3=1, K4=0, K5=0
+    Soft SIA disabled
+    NSF-aware route hold timer is 240
+    Router-ID: 1.1.1.1
+    Topology : 0 (base) 
+      Active Timer: 3 min
+      Distance: internal 90 external 170
+      Maximum path: 4
+      Maximum hopcount 100
+      Maximum metric variance 1
+
+  Automatic Summarization: disabled
+  Address Summarization:
+    0.0.0.0/0 for Gi0/0
+      Summarizing 5 components with metric 2816
+  Maximum path: 4
+  Routing for Networks:
+    1.1.1.1/32
+    10.1.1.1/32
+    10.1.12.1/32
+    10.250.1.0/24
+  Passive Interface(s):
+    Loopback1
+  Routing Information Sources:
+    Gateway         Distance      Last Update
+    10.1.12.2             90      00:01:01
+    10.1.1.2              90      00:01:01
+  Distance: internal 90 external 170
+
+```
+
+- Focus on "Routing for Networks" section
+
+- These are not the networks you are routing for
+
+- You are routing for the networks associated with the interface on which EIGRP will be enabled, based on the network statement
+
+- In this case, 10.1.1.1/32 really means network 10.1.1.1 0.0.0.0, and 10.1.12.1/32 really means network 10.1.12.1 0.0.0.0
+
+- So what networks are you actually routing for?
+
+- You are routing for the networks associated with the interfaces that are now enabled for EIGRP
+
+- Below you can see the output of `show ip interfaces` command on R1 for G0/1 and G0/2, which was piped to include only the Internet address
+
+- Notice that these two interfaces are in a /24 network
+
+- As a result, the network IDs would be 10.1.1.0/24 and 10.1.12.0/24
+
+- Those are the networks you are routing for
+
+```
+R1#show ip int g0/0 | i Internet
+  Internet address is 10.1.1.1/24
+
+R1#show ip int g0/1 | i Internet
+  Internet address is 10.1.12.1/24
+```
+
+- Therefore, if you expect to route for the network 10.1.1.0/24 or 10.1.12.0/24, as in this case, you better have a `network` statement that enables the EIGRP process on the router interfaces in those networks
+
+- You can confirm which interfaces are participating in the EIGRP process by using the `show ip eigrp interfaces` command
+
+```
+R1#show ip eigrp interfaces 
+EIGRP-IPv4 Interfaces for AS(65001)
+                              Xmit Queue   PeerQ        Mean   Pacing Time   Multicast    Pending
+Interface              Peers  Un/Reliable  Un/Reliable  SRTT   Un/Reliable   Flow Timer   Routes
+Gi0/0                    1        0/0       0/0           1       0/0           50           0
+Gi0/1                    1        0/0       0/0           1       0/0           50           0
+```
+
+#### Better Source of Information
+
+- For an EIGRP-learned route to be installed into the routing table, it must be the most trusted routing source
+
+- Recall that the trustworthiness of a source is based on administrative distance (AD)
+
+- EIGRP's AD is 90 for internally learned routes (networks outside the autonomous system) and 170 for externally learned routes (routes outside the autonomous system)
+
+- Therefore, if there is another source has a better AD, the source with the better AD wins, and it's information is installed into the routing table
+
+- Compare the below pictures, the EIGRP topology table and the routing table displaying only the EIGRP installed routes on the router
+
+```
+R1(config-router)#do sh ip eigrp topology
+EIGRP-IPv4 Topology Table for AS(65001)/ID(1.1.1.1)
+Codes: P - Passive, A - Active, U - Update, Q - Query, R - Reply,
+       r - reply Status, s - sia Status 
+
+P 10.250.3.1/32, 1 successors, FD is 2816
+        via Redistributed (2816/0)
+P 10.1.12.0/24, 1 successors, FD is 2816
+        via Connected, GigabitEthernet0/1
+P 0.0.0.0/0, 1 successors, FD is 2816
+        via Rstatic (2816/0)
+P 10.250.2.1/32, 1 successors, FD is 2816
+        via Redistributed (2816/0)
+P 2.2.2.2/32, 2 successors, FD is 130816
+        via 10.1.1.2 (130816/128256), GigabitEthernet0/0
+        via 10.1.12.2 (130816/128256), GigabitEthernet0/1
+P 10.250.1.0/24, 1 successors, FD is 2816
+        via Connected, GigabitEthernet0/2
+P 10.1.1.0/24, 1 successors, FD is 2816
+        via Connected, GigabitEthernet0/0
+P 1.1.1.1/32, 1 successors, FD is 128256
+        via Connected, Loopback1
+
+```
+
+```
+R1#show ip route eigrp
+Codes: L - local, C - connected, S - static, R - RIP, M - mobile, B - BGP
+       D - EIGRP, EX - EIGRP external, O - OSPF, IA - OSPF inter area 
+       N1 - OSPF NSSA external type 1, N2 - OSPF NSSA external type 2
+       E1 - OSPF external type 1, E2 - OSPF external type 2
+       i - IS-IS, su - IS-IS summary, L1 - IS-IS level-1, L2 - IS-IS level-2
+       ia - IS-IS inter area, * - candidate default, U - per-user static route
+       o - ODR, P - periodic downloaded static route, H - NHRP, l - LISP
+       a - application route
+       + - replicated route, % - next hop override, p - overrides from PfR
+
+Gateway of last resort is not set
+
+      2.0.0.0/32 is subnetted, 1 subnets
+D        2.2.2.2 [90/130816] via 10.1.12.2, 01:01:49, GigabitEthernet0/1
+                 [90/130816] via 10.1.1.2, 01:01:49, GigabitEthernet0/0
+```
+
+- As you can see some networks are listed in the EIGRP topology table but are not part of the routing table as EIGRP routes (10.250.3.1/32, 10.250.2.1/32, 10.250.1.0/24, 10.1.1.0/24, 1.1.1.1/32)
+
+- In this casem there is a better source for the same information
+
+- Below we can see the output of `show ip route 10.250.1.0 255.255.255.0` command identifies that this network is directly connected and has an AD of 0
+
+```
+R1#show ip route 10.250.1.0 255.255.255.0
+Routing entry for 10.250.1.0/24
+  Known via "connected", distance 0, metric 0 (connected, via interface)
+  Redistributing via eigrp 65001, ospf 1
+  Routing Descriptor Blocks:
+  * directly connected, via GigabitEthernet0/2
+      Route metric is 0, traffic share count is 1
+```
+
+- Because a directly connected route has an AD of 0, and an internal EIGRP route has an AD of 90, the directly connected source is installed in the routing table
+
+- Now focus on 0.0.0.0/0 route from the topology table
+
+- Notice that it says Rstatic, which means that the route was redistributed from a static route on this router
+
+- Therefore, there is a static default route on the local router with a better AD than the EIGRP default route, which would have an AD of 170
+
+- As a result, the EIGRP 0.0.0.0/0 route would not be installed in the routing table, and the static default route would be
+
+- Using a suboptimal source of routing information may not cause users to to complain or submit a trouble ticket because they will probably still be able to access the resources they need
+
+- However, it may cause suboptimal routing in their network
+
+- Below is shown a network with 2 different routing protocols
+
+- In this case which path will be used to send traffic from PC1 to 10.1.1.0/24?
+
+- If you said the longer EIGRP path, you are correct
+
+- Even though it is quicker to use the Open Shortest Path First (OSPF) path, EIGRP wins by default because it has the lower AD, and suboptimal routing occurs
+
+![suboptimal-routing-path](./suboptimal-routing-path.png)
+
+- Being able to recognize when a certain routing source should be used or when it should not be used is key to optimizing your network and reducing the number of troubleshooting instances related to the network being perceived as low
+
+- In this case you might want to consider increasing the AD of EIGRP or lowering the AD of OSPF to optimize routing
+
+#### Route Filtering
+
+- A distribute list applied applied to an EIGRP process controls which routes are advertised to neighbors and which routes are received from neighbors
+
+- The distribute list is applied in EIGRP configuration mode either inbound or outbound, and the routes sent or received are controlled by ACLs, prefix lists or route maps
+
+- So when troubleshooting route filtering, you need to consider the following:
+
+    1. Is the distribute list applied in the correct direction
+
+    2. Is the distribute list applied to the correct interface
+
+    3. If the distribute list is using an ACL, is the ACL correct
+
+    4. If the distribute list is using a prefix list, is the prefix list correct?
+
+    5. If the distribute list is using a route map, is the route map correct?
+
+- The `show ip protocols` command identifies whether a distribute list is applied to all interfaces or to an individual interface
+
+
+```
+R2(config)#do sh ip protoc
+*** IP Routing is NSF aware ***
+
+Routing Protocol is "application"
+  Sending updates every 0 seconds
+  Invalid after 0 seconds, hold down 0, flushed after 0
+  Outgoing update filter list for all interfaces is not set
+  Incoming update filter list for all interfaces is not set
+  Maximum path: 32
+  Routing for Networks:
+  Routing Information Sources:
+    Gateway         Distance      Last Update
+  Distance: (default is 4)
+
+Routing Protocol is "eigrp 65001"
+  Outgoing update filter list for all interfaces is (prefix-list) FILTER-R3-10.3.100.x
+  Incoming update filter list for all interfaces is FILTER-R1-10.1.100.X
+  Incoming routes in GigabitEthernet1 will have 200000 added to metric if on list R1
+  Incoming routes in GigabitEthernet2 will have 200000 added to metric if on list R3
+  Default networks flagged in outgoing updates
+  Default networks accepted from incoming updates
+  EIGRP-IPv4 Protocol for AS(65001)
+    Metric weight K1=1, K2=0, K3=1, K4=0, K5=0
+    Soft SIA disabled
+    NSF-aware route hold timer is 240
+  EIGRP NSF disabled
+     NSF signal timer is 20s
+     NSF converge timer is 120s
+    Router-ID: 172.16.24.2
+    Topology : 0 (base) 
+      Active Timer: 3 min
+      Distance: internal 90 external 170
+      Maximum path: 4
+      Maximum hopcount 100
+      Maximum metric variance 1
+
+  Automatic Summarization: disabled
+  Maximum path: 4
+  Routing for Networks:
+    172.16.12.0/24
+    172.16.23.0/24
+    172.16.24.0/24
+  Routing Information Sources:
+    Gateway         Distance      Last Update
+    Gateway         Distance      Last Update
+    172.16.24.4           90      00:02:12
+    172.16.23.3           90      00:00:08
+    172.16.12.1           90      00:00:08
+  Distance: internal 90 external 170
+
+```
+
+- The example indicate that there is an outgoing filter for all interfaces using a prefix list, and an incoming filter for all interfaces using an access list
+
+- It also shows that interfaces G1 and G2 will have 200000 added to thei route metric if the routes are on list R1 or R3 respectively
+
+- The inbound filter list is using the filter with ACL FILTER-R1-10.1.100.X
+
+- To verify the entries in the ACL, you must issue the `show access-lists FILTER-R1-10.1.100.X` command
+
+```
+R2#show access-lists FILTER-R1-10.1.100.X
+Standard IP access list FILTER-R1-10.1.100.X
+    10 deny   10.1.100.0 (2 matches)
+    20 permit any (14 matches)
+```
+
+- If a prefix list has been applied, you issue the `show ip prefix-lists` command
+
+```
+R2#show ip prefix-list 
+ip prefix-list FILTER-R3-10.3.100.x: 2 entries
+   seq 5 deny 10.3.100.0/24
+   seq 10 permit 0.0.0.0/0 le 32
+```
+
+- If a route map has been applied, you issue the `show route-map` command
+
+```
+R2(config-route-map)#do sh route-map
+route-map FILTER-R3, permit, sequence 10
+  Match clauses:
+    ip address prefix-lists: FILTER-R3-10.3.100.x 
+  Set clauses:
+    tag 10 
+  Policy routing matches: 0 packets, 0 bytes
+```
+
+- Filtering outgoing routes on R2 G3 interface with a route map and set tag for routes:
+
+```
+R2(config-router)#do sh ip protocols
+*** IP Routing is NSF aware ***
+
+Routing Protocol is "application"
+  Sending updates every 0 seconds
+  Invalid after 0 seconds, hold down 0, flushed after 0
+  Outgoing update filter list for all interfaces is not set
+  Incoming update filter list for all interfaces is not set
+  Maximum path: 32
+  Routing for Networks:
+  Routing Information Sources:
+    Gateway         Distance      Last Update
+  Distance: (default is 4)
+
+Routing Protocol is "eigrp 65001"
+  Outgoing update filter list for all interfaces is not set
+    GigabitEthernet3 filtered by  (per-user), default is not set
+  Incoming update filter list for all interfaces is FILTER-R1-10.1.100.X
+  Incoming routes in GigabitEthernet1 will have 200000 added to metric if on list R1
+  Incoming routes in GigabitEthernet2 will have 200000 added to metric if on list R3
+  Default networks flagged in outgoing updates
+  Default networks accepted from incoming updates
+  EIGRP-IPv4 Protocol for AS(65001)
+    Metric weight K1=1, K2=0, K3=1, K4=0, K5=0
+    Soft SIA disabled
+    NSF-aware route hold timer is 240
+  EIGRP NSF disabled
+     NSF signal timer is 20s
+     NSF converge timer is 120s
+    Router-ID: 172.16.24.2
+    Topology : 0 (base) 
+      Active Timer: 3 min
+      Distance: internal 90 external 170
+      Maximum path: 4
+      Maximum hopcount 100
+      Maximum metric variance 1
+
+  Automatic Summarization: disabled
+  Maximum path: 4
+  Routing for Networks:
+    172.16.12.0/24
+    172.16.23.0/24
+    172.16.24.0/24
+  Routing Information Sources:
+    Gateway         Distance      Last Update
+    Gateway         Distance      Last Update
+    172.16.24.4           90      00:14:25
+    172.16.23.3           90      00:01:09
+    172.16.12.1           90      00:01:09
+  Distance: internal 90 external 170
+
+```
+
+```
+route-map FILTER-R3 permit 10 
+ match ip address prefix-list FILTER-R3-10.3.100.x
+ set tag 10
+
+R2(config-router)#do sh ip prefix-list 
+ip prefix-list FILTER-R3-10.3.100.x: 2 entries
+   seq 5 deny 10.3.100.0/24
+   seq 10 permit 0.0.0.0/0 le 32
+
+R2(config-router)#do sh run | s router eigrp
+router eigrp 65001
+ distribute-list FILTER-R1-10.1.100.X in 
+ distribute-list route-map FILTER-R3 out GigabitEthernet3
+ network 172.16.12.0 0.0.0.255
+ network 172.16.23.0 0.0.0.255
+ network 172.16.24.0 0.0.0.255
+ offset-list R1 in 200000 GigabitEthernet1 
+ offset-list R3 in 200000 GigabitEthernet2 
+```
+
+- Look on the EIGRP topology table on R4:
+
+```
+R4#show ip eigrp topology 
+EIGRP-IPv4 Topology Table for AS(65001)/ID(172.16.24.4)
+Codes: P - Passive, A - Active, U - Update, Q - Query, R - Reply,
+       r - reply Status, s - sia Status 
+
+P 172.16.24.0/24, 1 successors, FD is 2816
+        via Connected, GigabitEthernet1
+P 172.16.13.0/24, 1 successors, FD is 3328, tag is 10
+        via 172.16.24.2 (3328/3072), GigabitEthernet1
+P 172.16.12.0/24, 1 successors, FD is 3072, tag is 10
+        via 172.16.24.2 (3072/2816), GigabitEthernet1
+P 10.1.200.0/24, 1 successors, FD is 131072, tag is 10
+        via 172.16.24.2 (131072/130816), GigabitEthernet1
+P 10.3.200.0/24, 1 successors, FD is 131072, tag is 10
+        via 172.16.24.2 (131072/130816), GigabitEthernet1
+P 172.16.23.0/24, 1 successors, FD is 3072, tag is 10
+        via 172.16.24.2 (3072/2816), GigabitEthernet1
+
+```
+
+- We can see that tag 10 have been applied to the routes matching the route map
+
+- As shown below, you verify the command that was used to apply the distribute list in the running configuration by viewing the EIGRP configuration section
+
+```
+R2(config-router)#do sh run | s router eigrp
+router eigrp 65001
+ distribute-list FILTER-R1-10.1.100.X in 
+ distribute-list route-map FILTER-R3 out GigabitEthernet3
+ network 172.16.12.0 0.0.0.255
+ network 172.16.23.0 0.0.0.255
+ network 172.16.24.0 0.0.0.255
+ offset-list R1 in 200000 GigabitEthernet1 
+ offset-list R3 in 200000 GigabitEthernet2 
+```
+
+#### Stub Configuration
+
+- The EIGRP stub feature allows you to control the scope of EIGRP queries in the network
+
+- Below is shown the failure of network 192.168.1.0/24 on R1 that causes a query to be sent to R2 and then a query from R2 to be sent to R3 and R4
+
+- However the query to R3 is not needed because R3 will never have alternative information about the 192.168.1.0/24 network
+
+- The query wastes resources and slows convergence
+
+- As shown below, configuring the EIGRP stub feature on R3 with the `eigrp stub` command ensures that R2 never sends a query to R3
+
+[query-scope-no-eigrp-stub](./query-scope-no-eigrp-stub.png)
+
+[query-scope-eigrp-stub](./query-scope-eigrp-stub.png)
+
+- This feature comes in handy over slow hub-and-spoke WAN links, as seen below
+
+- The stub feature prevents the hub from querying the spokes, which reduces the amount of EIGRP traffic sent over the link
+
+- In addition, it reduces the chance of a route being stuck in active (SIA)
+
+- SIA happens when a router does not receive a reply to a query that is sent
+
+- Over WANs this can happen due to congestion, and it can result in the reestablishment of neighbor relationships, causing convergence and generating even more EIGRP traffic
+
+- Therefore, if you do not query the spokes, you do not have to worry about these issues
+
+![eigrp-stub-wan-links.png](./eigrp-stup-wan-links.png)
+
+- When configuring the EIGRP stub feature, you can control what routes the stub router advertises to it's neighbor
+
+- By default, it advertises connected and summary routes
+
+- However, you have the option of advertising connected, static, redistributed, or static - or a combination of those
+
+- The other option is to sent no routes (called receive only)
+
+- If the wrong option is chosen, the stub routers do not advertise the correct routes to their neighbors, resulting in missing routes on the hub or on other routers in the topology
+
+- In addition, if you configure the wrong router as a stub router (for example R1 in our topology), R1 never fully shares all routes it knows about to R4, R2, and R3, resulting in missing routes in the topology
+
+- To verify whether a router is a stub router and and determine the routes it advertise, issue the `show ip protocols` command, as shown below
+
+```
+R4(config-router-af)#do sh ip protocols
+*** IP Routing is NSF aware ***
+
+Routing Protocol is "application"
+  Sending updates every 0 seconds
+  Invalid after 0 seconds, hold down 0, flushed after 0
+  Outgoing update filter list for all interfaces is not set
+  Incoming update filter list for all interfaces is not set
+  Maximum path: 32
+  Routing for Networks:
+  Routing Information Sources:
+    Gateway         Distance      Last Update
+  Distance: (default is 4)
+
+Routing Protocol is "eigrp 65001"
+  Outgoing update filter list for all interfaces is not set
+  Incoming update filter list for all interfaces is not set
+  Default networks flagged in outgoing updates
+  Default networks accepted from incoming updates
+  EIGRP-IPv4 VR(EIGRP-NAMED) Address-Family Protocol for AS(65001)
+    Metric weight K1=1, K2=0, K3=1, K4=0, K5=0 K6=0
+    Metric rib-scale 128
+    Metric version 64bit
+    Soft SIA disabled
+    Gateway         Distance      Last Update
+    NSF-aware route hold timer is 240
+    Router-ID: 10.4.4.1
+    Stub, connected, summary
+    Topology : 0 (base) 
+      Active Timer: 3 min
+      Distance: internal 90 external 170
+      Maximum path: 4
+      Maximum hopcount 100
+      Maximum metric variance 1
+      Total Prefix Count: 7
+      Total Redist Count: 0
+
+  Automatic Summarization: disabled
+  Maximum path: 4
+  Routing for Networks:
+    10.4.4.1/32
+    10.34.1.4/32
+  Routing Information Sources:
+    Gateway         Distance      Last Update
+    10.34.1.3             90      00:00:06
+  Distance: internal 90 external 170
+```
+
+- To determine whether a neighbor is a stub router and the types of routes it advertises, issue the command `show ip eigrp neighbors detail`
+
+- Below is shown the output of `show ip eigrp neighbors detail` on R2, which indicates that the neighbor is a stub router advertising connected, static, summary and redistributed routes
+
+```
+R2#show ip eigrp neighbors detail 
+EIGRP-IPv4 VR(EIGRP-NAMED) Address-Family Neighbors for AS(65001)
+H   Address                 Interface              Hold Uptime   SRTT   RTO  Q  Seq
+                                                   (sec)         (ms)       Cnt Num
+1   10.23.1.3               Se1/1                    11 00:03:26   20   120  0  10
+   Version 28.0/2.0, Retrans: 0, Retries: 0, Prefixes: 3
+   Topology-ids from peer - 0 
+   Topologies advertised to peer:   base
+
+   Stub Peer Advertising (CONNECTED STATIC SUMMARY REDISTRIBUTED ) Routes
+   Suppressing queries
+0   10.12.1.1               Et0/0                    11 00:03:29 1279  5000  0  10
+   Version 28.0/2.0, Retrans: 1, Retries: 0, Prefixes: 4
+   Topology-ids from peer - 0 
+   Topologies advertised to peer:   base
+
+Max Nbrs: 0, Current Nbrs: 0
+```
+
+#### Interface is Shut Down
+
+- The network command enables the routing process on an interface
+
+- Once the EIGRP process is enabled on the interface, the network the interface is part of (that is, the directly connected entry in the routing table) is injected into the eigrp process
+
+- If the interface is shut down, there is no directly connected entry for the network in the routing table
+
+- Therefore, the network does not exist, and there is no network that can be injected into the EIGRP process
+
+- The interface must be up/up for routes to be advertised or for neighbor relationships to be formed
+
+#### Split Horizon
+
+- The EIGRP split-horizon rule states that any routes learned inbound on an interface will not be advertised out the same interface
+
+- This rule is designed to prevent routing loops
+
+- However, this rule presents an issue in certain topologies
+
+- Below is shown an older nonbroadcast multi-access (NBMA) Frame Relay hub and spoke topology over a newer Dynamic Multipoint Virtual Private Network (DMVPN) network, which both use multipoint interfaces on the hub
+
+- The multipoint interface (a single physical interface or a mGRE tunnel interface) provides connectivity to multiple routers in the same subnet out the single interface, as does Ethernet
+
+- In this figure R2 is sending an EIGRP update to R1 on the permanent virtual circuit (PVC) or Generic Routing Encapsulation (GRE) tunnel
+
+- Because split horizon is enabled on the Se1/0 interface or the multipoint GRE tunnel interface on R1, R1 does not advertise the 10.1.2.0/24 network back on that interface
+
+- Therefore, R3 never learns about 10.1.2.0/24
+
+- To verify whether split horizon is enabled on an interface, issue the command `show interface <type> <number>`
+
+- In this case you can see that split horizon is enabled:
+
+```
+R2#show ip int g0/0
+GigabitEthernet0/0 is up, line protocol is up
+  Internet address is 10.1.12.2/30
+  Broadcast address is 255.255.255.255
+  Address determined by setup command
+  MTU is 1500 bytes
+  Helper address is not set
+  Directed broadcast forwarding is disabled
+  Multicast reserved groups joined: 224.0.0.10
+  Outgoing access list is not set
+  Inbound  access list is not set
+  Proxy ARP is enabled
+  Local Proxy ARP is disabled
+  Security level is default
+  Split horizon is enabled
+  ICMP redirects are always sent
+  ICMP unreachables are always sent
+  ICMP mask replies are never sent
+  IP fast switching is enabled
+  IP fast switching on the same interface is disabled
+  IP Flow switching is disabled
+  IP CEF switching is enabled
+  IP CEF switching turbo vector
+  IP multicast fast switching is enabled
+  IP multicast distributed fast switching is disabled
+  IP route-cache flags are Fast, CEF
+  Router Discovery is disabled
+  IP output packet accounting is disabled
+  IP access violation accounting is disabled
+  TCP/IP header compression is disabled
+  RTP/IP header compression is disabled
+  Policy routing is disabled
+  Network address translation is disabled
+  BGP Policy Mapping is disabled
+  Input features: MCI Check
+  IPv4 WCCP Redirect outbound is disabled
+  IPv4 WCCP Redirect inbound is disabled
+  IPv4 WCCP Redirect exclude is disabled
+```
+
+![eigrp-split-horizon-serial-dmvpn](./eigrp-split-horizon-serial-dmvpn.png)
+
+- To completely disable split horizon on an interface, issue the `no ip split-horizon` command in interface configuration mode
+
+- If you only want to disable it for EIGRP process on the interface, issue the command `no ip split-horizon eigrp <as-number>`
+
+- If you disable split horizon for the EIGRP process, it still shows as enabled on the `show ip interface <type> <number>` output as above
+
+- To verify whether split horizon is enabled or disabled for the EIGRP process on an interface, issue the command `show ip eigrp interfaces detail <intf-type> <intf-nr>` command
+
+- Below is shown that it is disabled for EIGRP on interface g0/0
+
+```
+R2(config-if)#do sh run int g0/0
+Building configuration...
+
+Current configuration : 149 bytes
+!
+interface GigabitEthernet0/0
+ ip address 10.1.12.2 255.255.255.252
+ no ip split-horizon eigrp 65001
+ duplex auto
+ speed auto
+ media-type rj45
+end
+
+```
+
+```
+R2(config-if)#do sh ip eigrp int det g0/0
+EIGRP-IPv4 Interfaces for AS(65001)
+                              Xmit Queue   PeerQ        Mean   Pacing Time   Multicast    Pending
+Interface              Peers  Un/Reliable  Un/Reliable  SRTT   Un/Reliable   Flow Timer   Routes
+Gi0/0                    1        0/0       0/0           1       0/0           50           0
+  Hello-interval is 5, Hold-time is 15
+  Split-horizon is disabled
+  Next xmit serial <none>
+  Packetized sent/expedited: 8/0
+  Hello's sent/expedited: 166/2
+  Un/reliable mcasts: 0/7  Un/reliable ucasts: 7/2
+  Mcast exceptions: 0  CR packets: 0  ACKs suppressed: 0
+  Retransmissions sent: 0  Out-of-sequence rcvd: 0
+  Topology-ids on interface - 0 
+  Authentication mode is not set
+  Topologies advertised on this interface:  base
+  Topologies not advertised on this interface:
+
+
+R2(config-if)#do sh ip int g0/0 | i Split
+  Split horizon is enabled
+```
+
+### Troubleshooting Miscellaneous EIGRP for IPv4 issues
+
+- Troubleshooting issues related to feasible successors, discontiguous networks and autosummarization, route summarization and equal- and unequal- and unequal-metric load balancing
+
+#### Feasible Successors
+
+- The best route (based on the lowest feasible distance [FD] metric) for a specific network in the EIGRP topology table becomes a candidate to be injected into the router's routing table
+
+- (The term candidate is used because even though it is the best EIGRP route, a better source of the same information might be used instead)
+
+- If that route is indeed injected into the routing table, that routes becomes known as the *successor* (best) route
+
+- This is the route that is then advertised to neighboring routers
+
+- Below is an example of `show ip eigrp topology` command output
+
+- Focus on the entry for 172.16.32.192/29
+
+- Notice that there are three paths to reach that network
+
+- However, based on the fact that it states 1 successors, only one path is being used as the best path
+
+- It is the one with the lowest FD, 2174976, which is the path through 172.16.33.5, reachable out interface G0/3
+
+```
+R1#show ip eigrp topology 
+EIGRP-IPv4 Topology Table for AS(65001)/ID(1.1.1.1)
+Codes: P - Passive, A - Active, U - Update, Q - Query, R - Reply,
+       r - reply Status, s - sia Status 
+
+P 10.250.3.1/32, 1 successors, FD is 2816
+        via Redistributed (2816/0)
+P 10.1.12.0/24, 1 successors, FD is 15360
+        via Connected, GigabitEthernet0/1
+P 172.16.30.192/29, 1 successors, FD is 130816
+        via 172.16.33.6 (130816/128256), GigabitEthernet0/3
+        via 10.1.12.2 (143360/128256), GigabitEthernet0/1
+        via 10.1.1.2 (156160/128256), GigabitEthernet0/0
+P 0.0.0.0/0, 1 successors, FD is 2816
+        via Rstatic (2816/0)
+P 10.250.2.1/32, 1 successors, FD is 2816
+        via Redistributed (2816/0)
+P 2.2.2.2/32, 1 successors, FD is 130816
+        via 172.16.33.6 (130816/128256), GigabitEthernet0/3
+        via 10.1.12.2 (143360/128256), GigabitEthernet0/1
+        via 10.1.1.2 (156160/128256), GigabitEthernet0/0
+P 10.250.1.0/24, 1 successors, FD is 2816
+        via Redistributed (2816/0)
+P 172.16.33.0/28, 1 successors, FD is 2816
+        via Connected, GigabitEthernet0/3
+P 10.1.1.0/24, 1 successors, FD is 28160
+        via Connected, GigabitEthernet0/0
+P 1.1.1.1/32, 1 successors, FD is 128256
+        via Connected, Loopback1
+
+```
+
+- In the brackets after the next hop IP address is the FD followed by the *reported distance* (RD):
+
+    - **Feasible Distance** (FD): The RD plus the metric to reach the neighbor at the next-hop address that is advertising the RD
+
+    - **Reported Distance** (RD): The distance from the neighbor at the next-hop address to the destination network
+
+- The successor is the path with the lowest FD
+
+- However, EIGRP also pre-calculates paths that could be used if the successor dissapeared
+
+- These are known as *feasible successors*
+
+- To be a feasible successor, the RD to become a feasible successor must be less than the FD of the successor
+
+- The path through 172.16.33.6 is the successor
+
+- However, are the paths via 10.1.12.2 and 10.1.1.2 feasible successors (backups)?
+
+- To determine this, take the RD of these paths (in this case is the same 128256) and compare it to the FD of the successor (130816)
+
+- Is the RD less than the FD?
+
+- Yes! Therefore, they are feasible successors
+
+- For troubleshooting, it is important to note that the output of `show ip eigrp topology` only displays the successors and the feasible successors
+
+- If you need to verify the FD or RD of other paths to the same destination that are not feasible successors, yes you can use the `show ip eigrp topology all-links` command
+
+- Below is displayed the output of `show ip eigrp topology` and `show ip eigrp topology all-links`
+
+```
+R1(config-router)#do sh ip eigrp top
+EIGRP-IPv4 Topology Table for AS(65001)/ID(1.1.1.1)
+Codes: P - Passive, A - Active, U - Update, Q - Query, R - Reply,
+       r - reply Status, s - sia Status 
+
+P 10.250.3.1/32, 1 successors, FD is 2816
+        via Redistributed (2816/0)
+P 10.1.12.0/24, 1 successors, FD is 15360
+        via Connected, GigabitEthernet0/1
+P 172.16.30.192/29, 1 successors, FD is 130816
+        via 172.16.33.6 (130816/128256), GigabitEthernet0/3
+        via 10.1.12.2 (143360/128256), GigabitEthernet0/1
+        via 10.1.1.2 (156160/128256), GigabitEthernet0/0
+P 0.0.0.0/0, 1 successors, FD is 2816
+        via Rstatic (2816/0)
+P 10.250.2.1/32, 1 successors, FD is 2816
+        via Redistributed (2816/0)
+P 2.2.2.2/32, 1 successors, FD is 130816
+        via 172.16.33.6 (130816/128256), GigabitEthernet0/3
+        via 10.1.12.2 (143360/128256), GigabitEthernet0/1
+P 10.250.1.0/24, 1 successors, FD is 2816
+        via Redistributed (2816/0)
+P 172.16.33.0/28, 1 successors, FD is 2816
+        via Connected, GigabitEthernet0/3
+P 10.1.1.0/24, 1 successors, FD is 28160
+        via Connected, GigabitEthernet0/0
+P 1.1.1.1/32, 1 successors, FD is 128256
+        via Connected, Loopback1
+
+R1(config-router)#
+*Jun  7 19:14:14.235: %DUAL-5-NBRCHANGE: EIGRP-IPv4 65001: Neighbor 10.1.12.2 (GigabitEthernet0/1) is resync: intf route configuration changed
+R1(config-router)#do sh ip eigrp top
+EIGRP-IPv4 Topology Table for AS(65001)/ID(1.1.1.1)
+Codes: P - Passive, A - Active, U - Update, Q - Query, R - Reply,
+       r - reply Status, s - sia Status 
+
+P 10.250.3.1/32, 1 successors, FD is 2816
+        via Redistributed (2816/0)
+P 10.1.12.0/24, 1 successors, FD is 15360
+        via Connected, GigabitEthernet0/1
+P 172.16.30.192/29, 1 successors, FD is 130816
+        via 172.16.33.6 (130816/128256), GigabitEthernet0/3
+        via 10.1.12.2 (143360/128256), GigabitEthernet0/1
+        via 10.1.1.2 (156160/128256), GigabitEthernet0/0
+P 0.0.0.0/0, 1 successors, FD is 2816
+        via Rstatic (2816/0)
+P 10.250.2.1/32, 1 successors, FD is 2816
+        via Redistributed (2816/0)
+P 2.2.2.2/32, 1 successors, FD is 130816
+        via 172.16.33.6 (130816/128256), GigabitEthernet0/3
+P 10.250.1.0/24, 1 successors, FD is 2816
+        via Redistributed (2816/0)
+P 172.16.33.0/28, 1 successors, FD is 2816
+        via Connected, GigabitEthernet0/3
+P 10.1.1.0/24, 1 successors, FD is 28160
+        via Connected, GigabitEthernet0/0
+P 1.1.1.1/32, 1 successors, FD is 128256
+        via Connected, Loopback1
+```
+
+```
+R1(config-router)#do sh ip eigrp top all-links
+EIGRP-IPv4 Topology Table for AS(65001)/ID(1.1.1.1)
+Codes: P - Passive, A - Active, U - Update, Q - Query, R - Reply,
+       r - reply Status, s - sia Status 
+
+P 10.250.3.1/32, 1 successors, FD is 2816, serno 8
+        via Redistributed (2816/0)
+P 10.1.12.0/24, 1 successors, FD is 15360, serno 22
+        via Connected, GigabitEthernet0/1
+        via 172.16.33.6 (15616/15360), GigabitEthernet0/3
+        via 10.1.1.2 (40960/15360), GigabitEthernet0/0
+P 172.16.30.192/29, 1 successors, FD is 130816, serno 29
+        via 172.16.33.6 (130816/128256), GigabitEthernet0/3
+        via 10.1.12.2 (143360/128256), GigabitEthernet0/1
+        via 10.1.1.2 (156160/128256), GigabitEthernet0/0
+P 0.0.0.0/0, 1 successors, FD is 2816, serno 5
+        via Rstatic (2816/0)
+P 10.250.2.1/32, 1 successors, FD is 2816, serno 9
+        via Redistributed (2816/0)
+P 2.2.2.2/32, 1 successors, FD is 130816, serno 28
+        via 172.16.33.6 (130816/128256), GigabitEthernet0/3
+        via 10.1.12.2 (443360/428256), GigabitEthernet0/1
+        via 10.1.1.2 (356160/328256), GigabitEthernet0/0
+P 10.250.1.0/24, 1 successors, FD is 2816, serno 4
+        via Redistributed (2816/0)
+P 172.16.33.0/28, 1 successors, FD is 2816, serno 10
+        via Connected, GigabitEthernet0/3
+        via 10.1.1.2 (28416/2816), GigabitEthernet0/0
+        via 10.1.12.2 (15616/2816), GigabitEthernet0/1
+P 10.1.1.0/24, 1 successors, FD is 28160, serno 32
+        via Connected, GigabitEthernet0/0
+        via 172.16.33.6 (28416/28160), GigabitEthernet0/3
+        via 10.1.12.2 (40960/28160), GigabitEthernet0/1
+P 1.1.1.1/32, 1 successors, FD is 128256, serno 1
+        via Connected, Loopback1
+
+```
+
+- Focus on the entry for 2.2.2.2/32
+
+- In the output of `show ip eigrp topology` there is only one path listed; in the output of `show ip eigrp topology all-links`, notice that there are three paths listed
+
+- This is because the neht hops 10.1.12.2 and 10.1.1.2 has an RD greater than the FD of the successor and therefore cannot be a feasible successor
+
+- The EIGRP topology table contains not only the routes learned from other routers but also routes that have been redistributed into the EIGRP process and the local connected networks whose interfaces are participating in the EIGRP process as shown below, with the 0.0.0.0/0 route
+
+```
+R1(config-router)#do sh ip eigrp top          
+EIGRP-IPv4 Topology Table for AS(65001)/ID(1.1.1.1)
+Codes: P - Passive, A - Active, U - Update, Q - Query, R - Reply,
+       r - reply Status, s - sia Status 
+
+P 10.250.3.1/32, 1 successors, FD is 2816
+        via Redistributed (2816/0)
+P 10.1.12.0/24, 1 successors, FD is 15360
+        via Connected, GigabitEthernet0/1
+P 172.16.30.192/29, 1 successors, FD is 130816
+        via 172.16.33.6 (130816/128256), GigabitEthernet0/3
+        via 10.1.12.2 (143360/128256), GigabitEthernet0/1
+        via 10.1.1.2 (156160/128256), GigabitEthernet0/0
+P 0.0.0.0/0, 1 successors, FD is 2816
+        via Rstatic (2816/0)
+P 10.250.2.1/32, 1 successors, FD is 2816
+        via Redistributed (2816/0)
+P 2.2.2.2/32, 1 successors, FD is 130816
+        via 172.16.33.6 (130816/128256), GigabitEthernet0/3
+P 10.250.1.0/24, 1 successors, FD is 2816
+        via Redistributed (2816/0)
+P 172.16.33.0/28, 1 successors, FD is 2816
+        via Connected, GigabitEthernet0/3
+P 10.1.1.0/24, 1 successors, FD is 28160
+        via Connected, GigabitEthernet0/0
+P 1.1.1.1/32, 1 successors, FD is 128256
+        via Connected, Loopback1
+
+```
+
+#### Discontiguous Networks and Autosummarization
+
