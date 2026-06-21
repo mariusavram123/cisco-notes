@@ -1915,3 +1915,827 @@ P 1.1.1.1/32, 1 successors, FD is 128256
 
 #### Discontiguous Networks and Autosummarization
 
+- EIGRP supports variable length subnet masking (VLSM)
+
+- In earlier releases of Cisco IOS, EIGRP automatically performed route summarization at classful network boundaries
+
+- This was an issue in netorks containing *discontiguous networks*
+
+- As a result, it was necessary when configuring EIGRP to turn off automatic summarization (or autosummarization) by using the `no auto-summary` command in router configuration mode for an EIGRP autonomous system
+
+- However, from IOS 15.0 onward, autosummarization is off by default for EIGRP
+
+- Therefore, you do not have to worry about issue-ing the ``no auto-summary` command anymore
+
+- However you should be able to recognize a discontiguous network when reviewing a network topology and understand that if someone manually enabled autosummarization in your EIGRP autonomous system, routing would be broken
+
+- Below is an example of a discontiguous network
+
+- The 172.16.0.0/16 Class B classful network is considered discontiguous because it is subnetted as 172.16.1.0/24 and 172.16.2.0/24, and the subnets are separated from each other by a different classful network, which is 10.0.0.0.
+
+- With automatic summarization turned on, when R3 advertises the 172.16.2.0/24 network to R2, it is summarized to 172.16.0.0/16 because it is being sent out an interface in a different classful network
+
+- So instead of 172.16.2.0/24 being sent, 172.16.0.0/16 is sent
+
+- Likewise, the same thing happens when R1 advertises the 172.16.1.0/24 network to R2; it is advertised as 172.16.0.0/16
+
+- If you reviewed R2's routing table, you would see an entry for 172.16.0.0/16 with two next hops (if everything else is is equal): one through R3 using Fa0/1 and the other through R1 using Fa0/0
+
+- Now picture a packet arriving at R2 from R4, with the destination IP address 172.16.2.5. Which way does R2 send it?
+
+- You see the problem? Should it send it out on left side or on the right side?
+
+- There is an 50/50 chance it gets it correct
+
+```
+R2#show ip route eigrp | b Gate
+Gateway of last resort is not set
+
+      10.0.0.0/8 is variably subnetted, 7 subnets, 2 masks
+D        10.4.4.4/32 [90/130816] via 10.1.3.4, 00:00:46, GigabitEthernet0/2
+D     172.16.0.0/16 [90/130816] via 10.1.2.2, 00:02:50, GigabitEthernet0/1
+                    [90/130816] via 10.1.1.1, 00:02:50, GigabitEthernet0/0
+```
+
+- The moral of this story is this: If you have a discontiguous network, autosummarization has to be off, and you must take care when performing manual summarization
+
+```
+R4#traceroute 172.16.2.5 source l0
+Type escape sequence to abort.
+Tracing the route to 172.16.2.5
+VRF info: (vrf in name/id, vrf out name/id)
+  1 10.1.3.1 0 msec 0 msec 1 msec
+  2 10.1.2.2 1 msec 0 msec 1 msec
+  3  *  *  * 
+  4  * 
+R4#
+R4#
+R4#traceroute 172.16.2.5 source l0
+Type escape sequence to abort.
+Tracing the route to 172.16.2.5
+VRF info: (vrf in name/id, vrf out name/id)
+  1 10.1.3.1 0 msec 0 msec 1 msec
+  2 10.1.2.2 0 msec 0 msec 1 msec
+  3  *  *  * 
+  4  *  *  * 
+  5  *  *  * 
+  6 
+```
+
+![eigrp-autosummarization](./eigrp-autosummarization.png)
+
+- To verify whether autosummarization is enabled or disabled, use the `show ip protocols` command
+
+- R1:
+
+```
+R1#show ip protocols 
+*** IP Routing is NSF aware ***
+
+Routing Protocol is "application"
+  Sending updates every 0 seconds
+  Invalid after 0 seconds, hold down 0, flushed after 0
+  Outgoing update filter list for all interfaces is not set
+  Incoming update filter list for all interfaces is not set
+  Maximum path: 32
+  Routing for Networks:
+  Routing Information Sources:
+    Gateway         Distance      Last Update
+  Distance: (default is 4)
+
+Routing Protocol is "eigrp 65001"
+  Outgoing update filter list for all interfaces is not set
+  Incoming update filter list for all interfaces is not set
+  Default networks flagged in outgoing updates
+  Default networks accepted from incoming updates
+  EIGRP-IPv4 Protocol for AS(65001)
+    Metric weight K1=1, K2=0, K3=1, K4=0, K5=0
+    Soft SIA disabled
+    NSF-aware route hold timer is 240
+    Router-ID: 172.16.1.1
+    Topology : 0 (base) 
+      Active Timer: 3 min
+      Distance: internal 90 external 170
+      Maximum path: 4
+      Maximum hopcount 100
+      Maximum metric variance 1
+
+  Automatic Summarization: enabled ! here we see autosummary is enabled
+    172.16.0.0/16 for Gi0/0
+      Summarizing 1 component with metric 128256
+    10.0.0.0/8 for Lo0
+      Summarizing 4 components with metric 2816
+  Maximum path: 4
+  Routing for Networks:
+    10.1.1.0/24
+    172.16.1.0/24
+  Routing Information Sources:
+    Gateway         Distance      Last Update
+    10.1.1.2              90      00:12:40
+  Distance: internal 90 external 170
+
+```
+
+- R3:
+
+```
+R3#show ip protocols 
+*** IP Routing is NSF aware ***
+
+Routing Protocol is "application"
+  Sending updates every 0 seconds
+  Invalid after 0 seconds, hold down 0, flushed after 0
+  Outgoing update filter list for all interfaces is not set
+  Incoming update filter list for all interfaces is not set
+  Maximum path: 32
+  Routing for Networks:
+  Routing Information Sources:
+    Gateway         Distance      Last Update
+  Distance: (default is 4)
+
+Routing Protocol is "eigrp 65001"
+  Outgoing update filter list for all interfaces is not set
+  Incoming update filter list for all interfaces is not set
+  Default networks flagged in outgoing updates
+  Default networks accepted from incoming updates
+  EIGRP-IPv4 Protocol for AS(65001)
+    Metric weight K1=1, K2=0, K3=1, K4=0, K5=0
+    Soft SIA disabled
+    NSF-aware route hold timer is 240
+    Router-ID: 172.16.2.1
+    Topology : 0 (base) 
+      Active Timer: 3 min
+      Distance: internal 90 external 170
+      Maximum path: 4
+      Maximum hopcount 100
+      Maximum metric variance 1
+
+  Automatic Summarization: enabled
+    172.16.0.0/16 for Gi0/0
+      Summarizing 1 component with metric 128256
+    10.0.0.0/8 for Lo0
+      Summarizing 4 components with metric 2816
+  Maximum path: 4
+  Routing for Networks:
+    10.1.2.0/24
+    172.16.2.0/24
+  Routing Information Sources:
+    Gateway         Distance      Last Update
+    10.1.2.1              90      00:13:37
+  Distance: internal 90 external 170
+
+```
+
+#### Route Summarization
+
+- By default, with IOS 15.0 or later, autosummarization is off
+
+- Therefore, you can either turn it on (which is not recommended) or perform manual route summarization (which is recommended)
+
+- With EIGRP, manual route summarization is enabled on an interface-by-interface basis
+
+- Therefore, when troubleshooting route summarization, consider the following:
+
+    1. Did you enable route summarization on the correct interface?
+
+    2. Did you associate the summary route with the correct EIGRP autonomous system?
+
+    3. Did you create the appropriate summary route?
+
+- You determine answers to all these questions by using the `show ip protocols` command
+
+- In our example, autosummarization is disabled, and manual summarization is enabled for EIGRP AS 100 on interface g0/2 for 172.16.0.0/16
+
+- It is important that you create accurate summary routes to ensure that your router is not advertising networks in the summary route that it does not truly know how to reach
+
+- If it does, it is possible that it might receive packets to destinations that fall within the summary that it really does not know how to reach
+
+- If this is the case, it means that the packets will get dropped because of the route to null 0
+
+- When a summary route is created on a router, so is a summary route to null 0, as shown below
+
+```
+R2#show ip route | i Null0
+D        172.16.0.0/16 is a summary, 00:01:55, Null0
+```
+
+```
+R2#show run int g0/2
+Building configuration...
+
+Current configuration : 169 bytes
+!
+interface GigabitEthernet0/2
+ ip address 172.16.24.2 255.255.255.0
+ ip summary-address eigrp 100 172.16.0.0 255.255.0.0
+ duplex auto
+ speed auto
+ media-type rj45
+end
+
+R2#show run int g0/3
+Building configuration...
+
+Current configuration : 167 bytes
+!
+interface GigabitEthernet0/3
+ ip address 10.25.1.2 255.255.255.0
+ ip summary-address eigrp 100 172.16.0.0 255.255.0.0
+ duplex auto
+ speed auto
+ media-type rj45
+end
+
+```
+
+- This route to null 0 is created to prevent routing loops
+
+- It is imperative that this route exists in the table to ensure that when a packet is received by the router with a destination address that falls within the summary, and a more specific route does not exist, the packet will be dropped
+
+- If the route to null 0 does not exist, and there was a default route on the router, the router would forward the packet using the default route
+
+- The next hop router would then end up forwarding the packet back to this router because it would be using the summary route
+
+- The local router would then forward it based on the default route again, and then it would come back
+
+- This is a routing loop
+
+- The route to null 0 has an AD of 5, as shown below, to ensure that it is more trustworthy than most of the other sources of routing information
+
+```
+R2#show ip route 172.16.0.0 255.255.0.0
+Routing entry for 172.16.0.0/16
+  Known via "eigrp 100", distance 5, metric 2816, type internal
+  Redistributing via eigrp 100
+  Routing Descriptor Blocks:
+  * directly connected, via Null0
+      Route metric is 2816, traffic share count is 1
+      Total delay is 10 microseconds, minimum bandwidth is 1000000 Kbit
+      Reliability 255/255, minimum MTU 1500 bytes
+      Loading 1/255, Hops 0
+```
+
+- Therefore, the only way this route would not be in the routing table is if you had a source with a lower AD (for example if someone creates a static route for the same summary network and pointed it to a next-hop IP address instead of null0)
+
+- This would cause a routing loop
+
+### Load Balancing
+
+- By default, EIGRP does load balancing on four equal-metric paths
+
+- You can change this with the `maximum paths` command in router configuration mode for EIGRP
+
+- However, EIGRP also supports load balancing across unequal-metric paths, using the `variance` feature
+
+- By default, the variance value for an EIGRP process is 1, which means the load balancing will occur only over equal-metric paths
+
+- You issue the `variance <multiplier>` command in router configuration mode to specify a range of metrics over which load balancing will occur
+
+- For example, suppose that a route has a metric of 2000000, and you configure the `variance 2` command for the EIGRP routing process
+
+- This causes load balancing to occur over any route with a metric in the range of 2000000 through 4000000 (that is 2 x 2000000)
+
+- As you can see, a route could have a metric as high as 4000000 (that is, the variance multiplier multiplied by the best metric) and still be used
+
+- However, even with unequal-metric load balancing, you are still governed by the `maximum-paths` command
+
+- Therefore, if you have five unequal-metric paths that you want to use, and you configure the correct variance multiplier, but the `maximum-paths` is set to 2, you use only two of the five paths
+
+- To use all 5 paths, you will also need to make sure that `maximum-paths` is set to 5
+
+- Also, remember that the feasibility condition plays a huge role in unequal-path load balancing to prevent routing loops
+
+- If the path is not a feasible successor, it cannot be used for unequal-path load balancing
+
+- There is no exception to this rule
+
+- Recall the feasibility condition: *To be a feasible successor, the RD must be less than the FD of the successor*
+
+```
+R2#show ip protocols 
+*** IP Routing is NSF aware ***
+
+Routing Protocol is "application"
+  Sending updates every 0 seconds
+  Invalid after 0 seconds, hold down 0, flushed after 0
+  Outgoing update filter list for all interfaces is not set
+  Incoming update filter list for all interfaces is not set
+  Maximum path: 32
+  Routing for Networks:
+  Routing Information Sources:
+    Gateway         Distance      Last Update
+  Distance: (default is 4)
+
+Routing Protocol is "eigrp 100"
+  Outgoing update filter list for all interfaces is not set
+  Incoming update filter list for all interfaces is not set
+  Default networks flagged in outgoing updates
+  Default networks accepted from incoming updates
+  EIGRP-IPv4 Protocol for AS(100)
+    Metric weight K1=1, K2=0, K3=1, K4=0, K5=0
+    Soft SIA disabled
+    NSF-aware route hold timer is 240
+    Router-ID: 172.16.24.2
+    Topology : 0 (base) 
+      Active Timer: 3 min
+      Distance: internal 90 external 170
+      Maximum path: 4 ! - maximum paths
+      Maximum hopcount 100
+      Maximum metric variance 1 ! - variance
+
+  Automatic Summarization: disabled
+  Address Summarization:
+    172.16.0.0/16 for Gi0/3, Gi0/2
+      Summarizing 5 components with metric 2816
+  Maximum path: 4
+  Routing for Networks:
+    10.25.1.0/24
+    172.16.12.0/24
+    172.16.23.0/24
+    172.16.24.0/24
+  Routing Information Sources:
+    Gateway         Distance      Last Update
+    172.16.23.3           90      00:34:05
+    172.16.12.1           90      00:34:02
+  Distance: internal 90 external 170
+
+```
+
+```
+R2(config)#router eigrp 100
+R2(config-router)#variance 3
+
+R2(config-router)#maximum-paths 6
+R2(config-router)#
+R2(config-router)#
+R2(config-router)#do sh ip protoc | s eigrp
+Routing Protocol is "eigrp 100"
+  Outgoing update filter list for all interfaces is not set
+  Incoming update filter list for all interfaces is not set
+  Default networks flagged in outgoing updates
+  Default networks accepted from incoming updates
+  EIGRP-IPv4 Protocol for AS(100)
+    Metric weight K1=1, K2=0, K3=1, K4=0, K5=0
+    Soft SIA disabled
+    NSF-aware route hold timer is 240
+    Router-ID: 172.16.24.2
+    Topology : 0 (base) 
+      Active Timer: 3 min
+      Distance: internal 90 external 170
+      Maximum path: 6
+      Maximum hopcount 100
+      Maximum metric variance 3
+```
+
+### EIGRP for IPv4 Trouble Tickets
+
+- Trouble tickets related to EIGRP for IPv4
+
+- The purpose of these trouble tickets is to show a process that you can follow when troubleshooting in the real world or in an exam environment
+
+- Topology for these trouble tickets:
+
+![eigrp-ipv4-trouble-tickets-topology](./eigrp-ipv4-trouble-tickets-topology.png)
+
+![eigrp-ipv4-tt-cml-topology](./eigrp-ipv4-tt-cml-topology.png)
+
+- All the trouble tickets in this section are based on the topology shown above
+
+#### Trouble Ticket 4-1
+
+- Problem: Users in the 10.1.1.0/24 network indicate that they are not able to access resources in the 10.1.3.0/24 network
+
+- As always, the first item in the list for troubleshooting is to verify the problem
+
+- You access the PC in the 10.1.1.0/24 network and ping an IP address in the 10.1.3.0/24 network, and it is successful (0% loss) as shown below
+
+- However notice that the reply is from the default gateway at 10.1.1.1, and it states "Destination host unreachable"
+
+- Therefore, it was technically not successful
+
+```
+PC1#ping 10.1.3.10      
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 10.1.3.10, timeout is 2 seconds:
+U
+*Jun 21 10:22:17.382: ICMP: dst (10.1.1.10) host unreachable rcv from 10.1.1.1 .U
+*Jun 21 10:22:19.399: ICMP: dst (10.1.1.10) host unreachable rcv from 10.1.1.1 .U
+Success rate is 0 percent (0/5)
+PC1#
+*Jun 21 10:22:21.407: ICMP: dst (10.1.1.10) host unreachable rcv from 10.1.1.1 
+PC1#un all
+All possible debugging has been turned off
+```
+
+- Therefore you can focus your attention on R1 and work from there
+
+- On R1 you issue the same ping but it fails:
+
+```
+R1#ping 10.1.3.10   
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 10.1.3.10, timeout is 2 seconds:
+.....
+Success rate is 0 percent (0/5)
+```
+
+- Next, you check R1's routing table with the `show ip route` command and notice that there are only connected routes in the routing table
+
+```
+R1#sh ip route | b Gate
+Gateway of last resort is not set
+
+      10.0.0.0/8 is variably subnetted, 4 subnets, 2 masks
+C        10.1.1.0/24 is directly connected, GigabitEthernet0/1
+L        10.1.1.1/32 is directly connected, GigabitEthernet0/1
+C        10.1.12.0/24 is directly connected, GigabitEthernet0/0
+L        10.1.12.1/32 is directly connected, GigabitEthernet0/0
+      100.0.0.0/32 is subnetted, 1 subnets
+C        100.64.0.1 is directly connected, Loopback0
+```
+
+- You conclude that R1 is not learning any routes from R2
+
+- According with our topology, EIGRP is the routing protocol in use
+
+- Therefore, you issue `show ip protocols` command to verify that EIGRP is using the correct autonomous system number
+
+- Below is the output of `show ip protocols` on R1, which confirms that EIGRP 100 is in operation on R1
+
+```
+R1#sh ip protocols | s eigrp
+Routing Protocol is "eigrp 100"
+  Outgoing update filter list for all interfaces is not set
+  Incoming update filter list for all interfaces is not set
+  Default networks flagged in outgoing updates
+  Default networks accepted from incoming updates
+  EIGRP-IPv4 Protocol for AS(100)
+    Metric weight K1=1, K2=0, K3=1, K4=0, K5=0
+    Soft SIA disabled
+    NSF-aware route hold timer is 240
+    Router-ID: 10.1.12.1
+    Topology : 0 (base) 
+      Active Timer: 3 min
+      Distance: internal 90 external 170
+      Maximum path: 4
+      Maximum hopcount 100
+      Maximum metric variance 1
+```
+
+- Next, you check to see whether R1 has any EIGRP neighbors
+
+- According to the topology, R2 should be a neighbor
+
+- To verify EIGRP neighbors, you issue the `show ip eigrp neighbors` command on R1:
+
+```
+R1#sh ip eigrp neighbors 
+EIGRP-IPv4 Neighbors for AS(100)
+```
+
+- According to the output, R1 has no neighbors
+
+- Next you verify whether there are any interfaces participating in the EIGRP process by using the `show ip eigrp interfaces` command
+
+- The output indicates that there are two interfaces participating in the EIGRP process, g0/0 and g0/1
+
+```
+R1(config-router)#do sh ip eigrp interf
+EIGRP-IPv4 Interfaces for AS(100)
+                              Xmit Queue   PeerQ        Mean   Pacing Time   Multicast    Pending
+Interface              Peers  Un/Reliable  Un/Reliable  SRTT   Un/Reliable   Flow Timer   Routes
+Gi0/0                    0        0/0       0/0           0       0/0           50           0
+Gi0/1                    0        0/0       0/0           0       0/0            0           0
+```
+
+- The output of `show cdp neighbors` shown, indicates that R1 is connected to R2 using G0/0 and that R2 is using G0/0 interface
+
+- Therefore, you expect a peering between the two, using these interfaces
+
+```
+R1(config-router)#do sh cdp nei 
+Capability Codes: R - Router, T - Trans Bridge, B - Source Route Bridge
+                  S - Switch, H - Host, I - IGMP, r - Repeater, P - Phone, 
+                  D - Remote, C - CVTA, M - Two-port Mac Relay 
+
+Device ID        Local Intrfce     Holdtme    Capability  Platform  Port ID
+PC1              Gig 0/1           152               R    Linux Uni Eth 0/0
+R2               Gig 0/0           177              R B             Gig 0/0
+
+Total cdp entries displayed : 2
+```
+
+- Now is a great time to verify whether g0/0 on R2 is participating in the EIGRP process or not
+
+- On R2, you issue the command `show ip eigrp interfaces` command as shown below
+
+```
+R2(config-router)#do sh ip eigrp interfaces
+EIGRP-IPv4 Interfaces for AS(100)
+                              Xmit Queue   PeerQ        Mean   Pacing Time   Multicast    Pending
+Interface              Peers  Un/Reliable  Un/Reliable  SRTT   Un/Reliable   Flow Timer   Routes
+Gi0/1                    1        0/0       0/0           1       0/0           50           0
+Lo0                      0        0/0       0/0           0       0/0            0           0
+```
+
+- As you can see above, G0/0 on R2 is not participating in the EIGRP process
+
+- You review the output of `show run | s router eigrp` and `show ip interface brief` on R2 
+
+```
+R2(config-router)#do sh run | s router eigrp
+router eigrp 100
+ network 10.1.21.2 0.0.0.0
+ network 10.1.23.0 0.0.0.255
+ network 100.64.0.2 0.0.0.0
+(...)
+R2(config-router)#do sh ip int br
+Interface                  IP-Address      OK? Method Status                Protocol
+GigabitEthernet0/0         10.1.12.2       YES manual up                    up      
+GigabitEthernet0/1         10.1.23.2       YES manual up                    up      
+GigabitEthernet0/2         unassigned      YES unset  administratively down down    
+GigabitEthernet0/3         unassigned      YES unset  administratively down down    
+Loopback0                  100.64.0.2      YES manual up                    up      
+```
+
+- The output confirm that a wrong network statement was issued on R2
+
+- The network statement `network 10.1.21.2 0.0.0.0` enables the EIGRP process on the interface with that IP address
+
+- According to the output of `show ip interface brief`, the network statement should be `network 10.1.12.2 0.0.0.0`, based on the IP address 10.1.12.2 of the interface g0/0
+
+- To fix this issue, you issue the following commands on R2:
+
+```
+conf t
+ router eigrp 100
+  no network 10.1.21.2 0.0.0.0
+  network 10.1.12.2 0.0.0.0
+```
+
+- After you have done this, the neighbor relationship forms, as in with the following syslog message:
+
+- R1:
+
+```
+*Jun 21 12:47:54.377: %DUAL-5-NBRCHANGE: EIGRP-IPv4 100: Neighbor 10.1.12.2 (GigabitEthernet0/0) is up: new adjacency
+```
+
+- R2:
+
+```
+*Jun 21 12:47:53.643: %DUAL-5-NBRCHANGE: EIGRP-IPv4 100: Neighbor 10.1.12.1 (GigabitEthernet0/0) is up: new adjacency
+```
+
+```
+R2(config-router)#do sh ip eigrp interf
+EIGRP-IPv4 Interfaces for AS(100)
+                              Xmit Queue   PeerQ        Mean   Pacing Time   Multicast    Pending
+Interface              Peers  Un/Reliable  Un/Reliable  SRTT   Un/Reliable   Flow Timer   Routes
+Gi0/1                    1        0/0       0/0           1       0/0           50           0
+Gi0/0                    1        0/0       0/0           1       0/0           50           0
+```
+
+- You go back to the PC and ping the same IP address to confirm that the problem is solved, and you receive the same result
+
+- R1 still does not know about the 10.1.3.0/24 network
+
+```
+PC1#ping 10.1.3.10
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 10.1.3.10, timeout is 2 seconds:
+U
+*Jun 21 12:55:33.916: ICMP: dst (10.1.1.10) host unreachable rcv from 10.1.1.1 .U
+*Jun 21 12:55:35.926: ICMP: dst (10.1.1.10) host unreachable rcv from 10.1.1.1 .U
+Success rate is 0 percent (0/5)
+PC1#
+*Jun 21 12:55:37.929: ICMP: dst (10.1.1.10) host unreachable rcv from 10.1.1.1 
+PC1#un all
+All possible debugging has been turned off
+```
+
+- Back on R1, you issue the `show ip route` command
+
+- R1 is receiving EIGRP routes because now it is an EIGRP route in the routing table, as indicated by D
+
+- However R1 still does not know about 10.1.3.0/24
+
+```
+R1#show ip route | b Gate
+Gateway of last resort is not set
+
+      10.0.0.0/8 is variably subnetted, 5 subnets, 2 masks
+C        10.1.1.0/24 is directly connected, GigabitEthernet0/1
+L        10.1.1.1/32 is directly connected, GigabitEthernet0/1
+C        10.1.12.0/24 is directly connected, GigabitEthernet0/0
+L        10.1.12.1/32 is directly connected, GigabitEthernet0/0
+D        10.1.23.0/24 [90/3072] via 10.1.12.2, 00:11:31, GigabitEthernet0/0
+      100.0.0.0/32 is subnetted, 2 subnets
+C        100.64.0.1 is directly connected, Loopback0
+D        100.64.0.2 [90/130816] via 10.1.12.2, 00:11:31, GigabitEthernet0/0
+```
+
+- Does R2 know about the 10.1.3.0/24 network? As we can see below, R2 is missing the 10.1.3.0/24 network too
+
+```
+R2#show ip route | b Gate
+Gateway of last resort is not set
+
+      10.0.0.0/8 is variably subnetted, 5 subnets, 2 masks
+D        10.1.1.0/24 [90/3072] via 10.1.12.1, 00:13:16, GigabitEthernet0/0
+C        10.1.12.0/24 is directly connected, GigabitEthernet0/0
+L        10.1.12.2/32 is directly connected, GigabitEthernet0/0
+C        10.1.23.0/24 is directly connected, GigabitEthernet0/1
+L        10.1.23.2/32 is directly connected, GigabitEthernet0/1
+      100.0.0.0/32 is subnetted, 2 subnets
+D        100.64.0.1 [90/130816] via 10.1.12.1, 00:13:16, GigabitEthernet0/0
+C        100.64.0.2 is directly connected, Loopback0
+```
+
+- For R2 to learn about the network, it has to be neighbors with R3
+
+- The output of `show ip eigrp neighbors` command, indicates that R3 is not a neighbor. Only R1 is:
+
+```
+R2#sh ip eigrp neighbors 
+EIGRP-IPv4 Neighbors for AS(100)
+H   Address                 Interface              Hold Uptime   SRTT   RTO  Q  Seq
+                                                   (sec)         (ms)       Cnt Num
+1   10.1.12.1               Gi0/0                    12 00:15:19    1   100  0  21
+```
+
+- Previously we have saw that g0/1 on R2 is participating in the EIGRP process
+
+- Therefore, you should look at the interfaces on R3
+
+- According to the output, both interfaces on R3 are participating in the EIGRP process for autonomous system 10
+
+```
+R3#show ip eigrp interfaces 
+EIGRP-IPv4 Interfaces for AS(10)
+                              Xmit Queue   PeerQ        Mean   Pacing Time   Multicast    Pending
+Interface              Peers  Un/Reliable  Un/Reliable  SRTT   Un/Reliable   Flow Timer   Routes
+Gi0/1                    0        0/0       0/0           0       0/0            0           0
+Gi0/0                    0        0/0       0/0           0       0/0            0           0
+```
+
+- Can you see the issue?
+
+- The autonomous system numbers do not match, and to form an EIGRP neighbor relationship, the autonomous system must match
+
+- To solve this issue, you must enable EIGRP autonomous system 100 on R3and then provide the correct network statements to enable EIGRP on the required interfaces for EIGRP autonomous system 100
+
+- You should also remove any EIGRP configuration that is not needed, such as the EIGRP autonomous system 10
+
+- Below are the commands needed for this:
+
+```
+conf t
+ no router eigrp 10
+ router eigrp 100
+  network 10.1.3.0 0.0.0.255
+  network 10.1.23.3 0.0.0.0
+```
+
+- Notice that the neighbor relationship is now successful
+
+```
+R3(config-router)#
+*Jun 21 18:28:39.221: %DUAL-5-NBRCHANGE: EIGRP-IPv4 100: Neighbor 10.1.23.2 (GigabitEthernet0/0) is up: new adjacency
+```
+
+- Now it is time to verify that all the issues have been solved
+
+- On R2 you issue the `show ip route` command and notice that the 10.1.3.0/24 network is present
+
+```
+R2(config)#do sh ip ro | b Gate
+Gateway of last resort is not set
+
+      10.0.0.0/8 is variably subnetted, 6 subnets, 2 masks
+D        10.1.1.0/24 [90/3072] via 10.1.12.1, 00:34:12, GigabitEthernet0/0
+D        10.1.3.0/24 [90/3072] via 10.1.23.3, 00:03:49, GigabitEthernet0/1
+C        10.1.12.0/24 is directly connected, GigabitEthernet0/0
+L        10.1.12.2/32 is directly connected, GigabitEthernet0/0
+C        10.1.23.0/24 is directly connected, GigabitEthernet0/1
+L        10.1.23.2/32 is directly connected, GigabitEthernet0/1
+      100.0.0.0/32 is subnetted, 3 subnets
+D        100.64.0.1 [90/130816] via 10.1.12.1, 00:34:12, GigabitEthernet0/0
+C        100.64.0.2 is directly connected, Loopback0
+D        100.64.0.3 [90/130816] via 10.1.23.3, 00:03:49, GigabitEthernet0/1
+```
+
+- You also issue the same command on R1 and notice that 10.1.3.0/24 is present, as shown below:
+
+```
+R1#show ip route | b Gate
+Gateway of last resort is not set
+
+      10.0.0.0/8 is variably subnetted, 6 subnets, 2 masks
+C        10.1.1.0/24 is directly connected, GigabitEthernet0/1
+L        10.1.1.1/32 is directly connected, GigabitEthernet0/1
+D        10.1.3.0/24 [90/3328] via 10.1.12.2, 00:04:28, GigabitEthernet0/0
+C        10.1.12.0/24 is directly connected, GigabitEthernet0/0
+L        10.1.12.1/32 is directly connected, GigabitEthernet0/0
+D        10.1.23.0/24 [90/3072] via 10.1.12.2, 00:34:56, GigabitEthernet0/0
+      100.0.0.0/32 is subnetted, 3 subnets
+C        100.64.0.1 is directly connected, Loopback0
+D        100.64.0.2 [90/130816] via 10.1.12.2, 00:34:56, GigabitEthernet0/0
+D        100.64.0.3 [90/131072] via 10.1.12.2, 00:04:28, GigabitEthernet0/0
+```
+
+- You then ping from the PC again, and the ping is truly successful
+
+```
+PC1#debug ip icmp 
+ICMP packet debugging is on
+PC1#ping 10.1.3.10
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 10.1.3.10, timeout is 2 seconds:
+!!!!!
+Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/1 ms
+PC1#
+*Jun 21 19:00:24.605: ICMP: echo reply rcvd, src 10.1.3.10, dst 10.1.1.10, topology BASE, dscp 0 topoid 0
+*Jun 21 19:00:24.605: ICMP: echo reply rcvd, src 10.1.3.10, dst 10.1.1.10, topology BASE, dscp 0 topoid 0
+*Jun 21 19:00:24.606: ICMP: echo reply rcvd, src 10.1.3.10, dst 10.1.1.10, topology BASE, dscp 0 topoid 0
+*Jun 21 19:00:24.607: ICMP: echo reply rcvd, src 10.1.3.10, dst 10.1.1.10, topology BASE, dscp 0 topoid 0
+*Jun 21 19:00:24.607: ICMP: echo reply rcvd, src 10.1.3.10, dst 10.1.1.10, topology BASE, dscp 0 topoid 0
+```
+
+#### Trouble Ticket 4-2
+
+- Problem: Users in the 10.1.1.0/24 network have indicated that they are not able to access resources in 10.1.3.0/24 network
+
+- To begin, you verify the problem by pinging from a PC in 10.1.1.0/24 network to a PC in 10.1.3.0/24 network, and it fails
+
+- Notice that the reply is from the default gateway, and it states "Destination host unreachable"
+
+- Therefore it is technically not successful
+
+```
+PC1#ping 10.1.3.10
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 10.1.3.10, timeout is 2 seconds:
+U
+*Jun 21 19:05:56.473: ICMP: dst (10.1.1.10) host unreachable rcv from 10.1.1.1 .U
+*Jun 21 19:05:58.480: ICMP: dst (10.1.1.10) host unreachable rcv from 10.1.1.1 .U
+Success rate is 0 percent (0/5)
+PC1#
+*Jun 21 19:06:00.486: ICMP: dst (10.1.1.10) host unreachable rcv from 10.1.1.1 
+PC1#un all
+All possible debugging has been turned off
+```
+
+- The result of this ping tells you two important things
+
+- The PC can reach the default gateway, and the default gateway does not know how to get to the 10.1.3.0/24 network
+
+- Therefore, you can focus your attention on R1 and work from there
+
+- On R1, you issue the same ping but it fails
+
+```
+R1#debug ip packet 
+IP packet debugging is on
+
+R1#ping 10.1.3.10
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 10.1.3.10, timeout is 2 seconds:
+
+*Jun 21 19:09:39.438: IP: s=10.1.1.1 (local), d=10.1.3.10, len 100, unroutable.
+*Jun 21 19:09:41.438: IP: s=10.1.1.1 (local), d=10.1.3.10, len 100, unroutable.
+*Jun 21 19:09:43.438: IP: s=10.1.1.1 (local), d=10.1.3.10, len 100, unroutable.
+*Jun 21 19:09:45.438: IP: s=10.1.1.1 (local), d=10.1.3.10, len 100, unroutable.
+*Jun 21 19:09:47.438: IP: s=10.1.1.1 (local), d=10.1.3.10, len 100, unroutable.
+Success rate is 0 percent (0/5)
+
+R1#un all
+All possible debugging has been turned off
+```
+
+- Next, you check the routing table on R1 with the command `show ip route 10.1.3.0 255.255.255.0`. This is the output:
+
+```
+R1#show ip route 10.1.3.0 255.255.255.0
+% Subnet not in table
+```
+
+- Does R2 know about it? You go to R2 and issue the same command
+
+```
+R2#show ip route 10.1.3.0 255.255.255.0
+% Subnet not in table
+```
+
+- Next, you go to R3 and issue the same command. Notice that the 10.1.3.0/24 is in the routing table as a connected route
+
+```
+R3#show ip route 10.1.3.0 255.255.255.0
+Routing entry for 10.1.3.0/24
+  Known via "connected", distance 0, metric 0 (connected, via interface)
+  Routing Descriptor Blocks:
+  * directly connected, via GigabitEthernet0/1
+      Route metric is 0, traffic share count is 1
+```
+
+- 
