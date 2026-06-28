@@ -2738,4 +2738,403 @@ Routing entry for 10.1.3.0/24
       Route metric is 0, traffic share count is 1
 ```
 
-- 
+- What prevents a connected route from being advertised using EIGRP to a neighbor?
+
+- As you learned earlier, an interface not participating in EIGRP does this
+
+- You can check the EIGRP interfaces table on R3 with the `show ip eigrp interfaces` command
+
+- Below you can see that only G0/1 is part of EIGRP process
+
+```
+R3(config-router)#do sh ip eigrp interf
+EIGRP-IPv4 Interfaces for AS(100)
+                              Xmit Queue   PeerQ        Mean   Pacing Time   Multicast    Pending
+Interface              Peers  Un/Reliable  Un/Reliable  SRTT   Un/Reliable   Flow Timer   Routes
+Gi0/1                    0        0/0       0/0           0       0/0            0           0
+```
+
+- However, you should not jump to conclusion that G0/0 is not participating in the EIGRP process
+
+- Remember that passive interfaces do not appear in this output
+
+- Therefore, you should check out the `show ip protocols` output for passive interfaces
+
+- You can see that there are no passive interfaces
+
+```
+R3(config-router)#do sh ip protocols
+*** IP Routing is NSF aware ***
+
+Routing Protocol is "application"
+  Sending updates every 0 seconds
+  Invalid after 0 seconds, hold down 0, flushed after 0
+  Outgoing update filter list for all interfaces is not set
+  Incoming update filter list for all interfaces is not set
+  Maximum path: 32
+  Routing for Networks:
+  Routing Information Sources:
+    Gateway         Distance      Last Update
+  Distance: (default is 4)
+
+Routing Protocol is "eigrp 100"
+  Outgoing update filter list for all interfaces is not set
+  Incoming update filter list for all interfaces is not set
+  Default networks flagged in outgoing updates
+  Default networks accepted from incoming updates
+  EIGRP-IPv4 Protocol for AS(100)
+    Metric weight K1=1, K2=0, K3=1, K4=0, K5=0
+    Soft SIA disabled
+    NSF-aware route hold timer is 240
+    Router-ID: 100.64.0.3
+    Topology : 0 (base) 
+      Active Timer: 3 min
+      Distance: internal 90 external 170
+      Maximum path: 4
+      Maximum hopcount 100
+      Maximum metric variance 1
+
+  Automatic Summarization: disabled
+  Maximum path: 4
+  Routing for Networks:
+    10.1.3.0/32
+    10.1.23.3/32
+    100.64.0.3/32
+  Passive Interface(s):
+    Loopback0
+  Routing Information Sources:
+    Gateway         Distance      Last Update
+    10.1.23.2             90      00:01:19
+  Distance: internal 90 external 170
+
+```
+
+- Next, you need to make sure there is a `network` statement that will enable the EIGRP process on the interface connected to the 10.1.3.0/24 network
+
+- Above, the output of `show ip protocols` indicates that R3 is routing for the network 10.1.3.0/32
+
+- This really means the network 10.1.3.0 0.0.0.0
+
+- As a result, EIGRP is enabled on the interface with the IP address 10.1.3.0
+
+- Below is shown the output of `show ip interface brief` and we can see that there is no interface with the IP address 10.1.3.0
+
+```
+R3(config-router)#do sh ip int br
+Interface                  IP-Address      OK? Method Status                Protocol
+GigabitEthernet0/0         10.1.23.3       YES NVRAM  up                    up      
+GigabitEthernet0/1         10.1.3.1        YES NVRAM  up                    up      
+GigabitEthernet0/2         unassigned      YES NVRAM  administratively down down    
+GigabitEthernet0/3         unassigned      YES NVRAM  administratively down down    
+Loopback0                  100.64.0.3      YES NVRAM  up                    up      
+```
+
+- Interface G0/1 has IP addres 10.1.3.1
+
+- Therefore, the network statement is incorrect, as seen in the `show run | s router eigrp` command
+
+```
+R3(config-router)#do sh run | s router eigrp
+router eigrp 100
+ network 10.1.3.0 0.0.0.0
+ network 10.1.23.3 0.0.0.0
+ network 100.64.0.3 0.0.0.0
+ passive-interface Loopback0
+```
+
+- After fixing the issue with the following commands:
+
+```
+conf t
+ router eigrp 100
+  no network 10.1.3.0 0.0.0.0
+  network 10.1.3.1 0.0.0.0
+```
+
+- You check the routing table on R1 with the command `show ip route 10.1.3.0 255.255.255.0`
+
+- As seen below, 10.1.3.0/24 is now in the routing table of R1 and can be reached with the next hop 10.1.12.2
+
+```
+R1#show ip route 10.1.3.0 255.255.255.0
+Routing entry for 10.1.3.0/24
+  Known via "eigrp 100", distance 90, metric 3328, type internal
+  Redistributing via eigrp 100
+  Last update from 10.1.12.2 on GigabitEthernet0/0, 00:01:58 ago
+  Routing Descriptor Blocks:
+  * 10.1.12.2, from 10.1.12.2, 00:01:58 ago, via GigabitEthernet0/0
+      Route metric is 3328, traffic share count is 1
+      Total delay is 30 microseconds, minimum bandwidth is 1000000 Kbit
+      Reliability 255/255, minimum MTU 1500 bytes
+      Loading 1/255, Hops 2
+```
+
+- Finally, you ping from the PC again and the ping is successful
+
+```
+PC1#debug ip icmp 
+ICMP packet debugging is on
+PC1#ping 10.1.3.10
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 10.1.3.10, timeout is 2 seconds:
+!!!!!
+Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/1 ms
+PC1#
+*Jun 28 10:14:47.372: ICMP: echo reply rcvd, src 10.1.3.10, dst 10.1.1.10, topology BASE, dscp 0 topoid 0
+*Jun 28 10:14:47.373: ICMP: echo reply rcvd, src 10.1.3.10, dst 10.1.1.10, topology BASE, dscp 0 topoid 0
+*Jun 28 10:14:47.373: ICMP: echo reply rcvd, src 10.1.3.10, dst 10.1.1.10, topology BASE, dscp 0 topoid 0
+*Jun 28 10:14:47.374: ICMP: echo reply rcvd, src 10.1.3.10, dst 10.1.1.10, topology BASE, dscp 0 topoid 0
+*Jun 28 10:14:47.375: ICMP: echo reply rcvd, src 10.1.3.10, dst 10.1.1.10, topology BASE, dscp 0 topoid 0
+PC1#un all
+All possible debugging has been turned off
+PC1#
+```
+
+### Trouble Ticket 4-3
+
+- Problem: Users in the 10.1.3.0/24 network have indicated that they are not able to access resources in the 10.1.3.0/24 network
+
+- To begin, you verify the problem by pinging from a PC in the 10.1.1.0/24 network to a PC in the 10.1.3.0/24 network
+
+- As shown below, the ping fails
+
+```
+PC1#debug ip icmp 
+ICMP packet debugging is on
+PC1#ping 10.1.3.10
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 10.1.3.10, timeout is 2 seconds:
+U
+*Jun 28 10:23:18.194: ICMP: dst (10.1.1.10) host unreachable rcv from 10.1.1.1 .U
+*Jun 28 10:23:20.199: ICMP: dst (10.1.1.10) host unreachable rcv from 10.1.1.1 .U
+Success rate is 0 percent (0/5)
+PC1#
+*Jun 28 10:23:22.215: ICMP: dst (10.1.1.10) host unreachable rcv from 10.1.1.1 
+PC1#un all
+All possible debugging has been turned off
+PC1#
+```
+
+- Notice that the reply is from the default gateway at 10.1.1.1, and it states "Destination host unreachable"
+
+- The result of this ping tells you two very important things: The PC can reach the default gateway, and the default gateway does not know how to get to the 10.1.3.0/24 network
+
+- Therefore, you can focus your attention on R1 and work from there
+
+- On R1 you issue the same ping, but it fails
+
+```
+R1(config)#access-list 100 permit icmp any any
+
+R1#ping 10.1.3.10      
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 10.1.3.10, timeout is 2 seconds:
+
+*Jun 28 10:31:04.244: IP: s=10.1.1.1 (local), d=10.1.3.10, len 100, unroutable.
+*Jun 28 10:31:06.244: IP: s=10.1.1.1 (local), d=10.1.3.10, len 100, unroutable.
+*Jun 28 10:31:08.244: IP: s=10.1.1.1 (local), d=10.1.3.10, len 100, unroutable.
+*Jun 28 10:31:10.244: IP: s=10.1.1.1 (local), d=10.1.3.10, len 100, unroutable.
+*Jun 28 10:31:12.244: IP: s=10.1.1.1 (local), d=10.1.3.10, len 100, unroutable.
+Success rate is 0 percent (0/5)
+R1#
+```
+
+- Next you check the routing table on R1 with the `show ip route 10.1.3.0 255.255.255.0` command, as shown below
+
+```
+R1#sh ip route 10.1.3.0 255.255.255.0
+% Subnet not in table
+```
+
+- You conclude that R1 does not know about the route
+
+- However, does R2 know about the route?
+
+- You go to R2 and issue the same command. R2 does know about that route
+
+```
+R2#show ip route 10.1.3.0 255.255.255.0
+Routing entry for 10.1.3.0/24
+  Known via "eigrp 100", distance 90, metric 3072, type internal
+  Redistributing via eigrp 100
+  Last update from 10.1.23.3 on GigabitEthernet0/1, 00:24:41 ago
+  Routing Descriptor Blocks:
+  * 10.1.23.3, from 10.1.23.3, 00:24:41 ago, via GigabitEthernet0/1
+      Route metric is 3072, traffic share count is 1
+      Total delay is 20 microseconds, minimum bandwidth is 1000000 Kbit
+      Reliability 255/255, minimum MTU 1500 bytes
+      Loading 1/255, Hops 1
+```
+
+- Next, you go back to R1 and issue the `show ip eigrp topology` command to determine whether R1 is even learning about the 10.1.3.0/24 network
+
+```
+R1#show ip eigrp topology 
+EIGRP-IPv4 Topology Table for AS(100)/ID(100.64.0.1)
+Codes: P - Passive, A - Active, U - Update, Q - Query, R - Reply,
+       r - reply Status, s - sia Status 
+
+P 100.64.0.1/32, 1 successors, FD is 128256
+        via Connected, Loopback0
+P 10.1.12.0/24, 1 successors, FD is 2816
+        via Connected, GigabitEthernet0/0
+P 100.64.0.2/32, 1 successors, FD is 130816
+        via 10.1.12.2 (130816/128256), GigabitEthernet0/0
+P 10.1.23.0/24, 1 successors, FD is 3072
+        via 10.1.12.2 (3072/2816), GigabitEthernet0/0
+P 100.64.0.3/32, 1 successors, FD is 131072
+        via 10.1.12.2 (131072/130816), GigabitEthernet0/0
+P 10.1.1.0/24, 1 successors, FD is 2816
+        via Connected, GigabitEthernet0/1
+
+```
+
+- As we can see, it is not learning about that network
+
+- Is time to hypothesize!
+
+- Why would R2 know about 10.1.3.0/24 network and R2 does not know about it?
+
+- Consider these possibilities:
+
+    1. R1 and R2 are not EIGRP neighbors
+
+    2. A route filter on R2 is preventing it from advertising 10.1.3.0/24 to R1
+
+    3. A route filter on R1 prevents it from learning 10.1.3.0/24 route on G0/1
+
+- On R1 you issue the `show ip eigrp neighbors` command, and the output shows that R2 is a neighbor
+
+```
+R1#show ip eigrp neighbors 
+EIGRP-IPv4 Neighbors for AS(100)
+H   Address                 Interface              Hold Uptime   SRTT   RTO  Q  Seq
+                                                   (sec)         (ms)       Cnt Num
+0   10.1.12.2               Gi0/0                    12 01:01:34   89   534  0  19
+R1#
+```
+
+- However, if you look closely at the topology table of R1, you notice that R1 is learning about 10.1.23.0/24 from R2, meaning that they are neighbors, and routes are being learned
+
+- Therefore, you hypothesize that there must be a filter in place
+
+- Next, you issue the `show ip protocols` command, to determine whether there are any route filters on R1
+
+```
+R1(config-router)#do sh ip proto                    
+*** IP Routing is NSF aware ***
+
+Routing Protocol is "application"
+  Sending updates every 0 seconds
+  Invalid after 0 seconds, hold down 0, flushed after 0
+  Outgoing update filter list for all interfaces is not set
+  Incoming update filter list for all interfaces is not set
+  Maximum path: 32
+  Routing for Networks:
+  Routing Information Sources:
+    Gateway         Distance      Last Update
+  Distance: (default is 4)
+
+Routing Protocol is "eigrp 100"
+  Outgoing update filter list for all interfaces is not set
+  Incoming update filter list for all interfaces is not set
+    GigabitEthernet0/0 filtered by (prefix-list) DENY_10.1.3.0/24 (per-user), default is not set
+  Default networks flagged in outgoing updates
+  Default networks accepted from incoming updates
+  EIGRP-IPv4 Protocol for AS(100)
+    Metric weight K1=1, K2=0, K3=1, K4=0, K5=0
+    Soft SIA disabled
+    NSF-aware route hold timer is 240
+    Router-ID: 100.64.0.1
+    Topology : 0 (base) 
+      Active Timer: 3 min
+      Distance: internal 90 external 170
+      Maximum path: 4
+      Maximum hopcount 100
+      Maximum metric variance 1
+
+  Automatic Summarization: disabled
+  Maximum path: 4
+  Routing for Networks:
+    10.1.1.0/24
+    10.1.12.0/24
+    100.64.0.1/32
+  Passive Interface(s):
+    GigabitEthernet0/1
+    Loopback0
+  Routing Information Sources:
+    Gateway         Distance      Last Update
+    10.1.12.2             90      00:01:49
+  Distance: internal 90 external 170
+          
+```
+
+- The output indicates that there is an inbound route filter on R1's G0/0 interface 
+
+- The route filter is based on a prefix list called DENY_10.1.3.0/24
+
+- Next you issue the `show ip prefix-list` command on R1, and it indicates that 10.1.3.0/24 is being denied
+
+```
+R1(config-router)#do sh ip prefix-list
+ip prefix-list DENY_10.1.3.0/24: 2 entries
+   seq 5 deny 10.1.3.0/24
+   seq 10 permit 0.0.0.0/0 le 32
+```
+
+- In this case, you can either modify the prefix-list to allow 10.1.3.0/24, or you can remove the distribute list from the EIGRP process
+
+- The choice depends on the requirements of the organization or scenario
+
+- In this case, remove the distribute list from R1's EIGRP process with the commands: 
+
+```
+conf t
+ router eigrp 100
+  no distribute-list prefix DENY_10.1.3.0/24 in g0/0
+```
+
+- Because of this change, the neighbor relationship resets, as the following syslog message indicates:
+
+```
+*Jun 28 11:23:37.857: %DUAL-5-NBRCHANGE: EIGRP-IPv4 100: Neighbor 10.1.12.2 (GigabitEthernet0/0) is resync: intf route configuration changed
+```
+
+- After fixing the issue, you check R1's routing table for 10.1.3.0/24 network
+
+- As shown the prefix is now in the routing table of R1 and can be reached through the next hop 10.1.12.2
+
+```
+R1(config-router)#do sh ip route 10.1.3.0 255.255.255.0
+Routing entry for 10.1.3.0/24
+  Known via "eigrp 100", distance 90, metric 3328, type internal
+  Redistributing via eigrp 100
+  Last update from 10.1.12.2 on GigabitEthernet0/0, 00:03:04 ago
+  Routing Descriptor Blocks:
+  * 10.1.12.2, from 10.1.12.2, 00:03:04 ago, via GigabitEthernet0/0
+      Route metric is 3328, traffic share count is 1
+      Total delay is 30 microseconds, minimum bandwidth is 1000000 Kbit
+      Reliability 255/255, minimum MTU 1500 bytes
+      Loading 1/255, Hops 2
+```
+
+- Finally, you ping from the PC again and the ping is successful:
+
+```
+PC1#debug ip icmp 
+ICMP packet debugging is on
+PC1#ping 10.1.3.10
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 10.1.3.10, timeout is 2 seconds:
+!!!!!
+Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/1 ms
+PC1#
+*Jun 28 11:27:50.404: ICMP: echo reply rcvd, src 10.1.3.10, dst 10.1.1.10, topology BASE, dscp 0 topoid 0
+*Jun 28 11:27:50.405: ICMP: echo reply rcvd, src 10.1.3.10, dst 10.1.1.10, topology BASE, dscp 0 topoid 0
+*Jun 28 11:27:50.406: ICMP: echo reply rcvd, src 10.1.3.10, dst 10.1.1.10, topology BASE, dscp 0 topoid 0
+*Jun 28 11:27:50.406: ICMP: echo reply rcvd, src 10.1.3.10, dst 10.1.1.10, topology BASE, dscp 0 topoid 0
+*Jun 28 11:27:50.407: ICMP: echo reply rcvd, src 10.1.3.10, dst 10.1.1.10, topology BASE, dscp 0 topoid 0
+PC1#un all
+All possible debugging has been turned off
+PC1#
+```
