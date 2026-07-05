@@ -3138,3 +3138,418 @@ PC1#un all
 All possible debugging has been turned off
 PC1#
 ```
+
+### EIGRP in VRF (named mode) - VRF route leaking using VASI
+
+[VASI](https://blamethe.network/posts/demystifying-vasi/)
+
+Topology:
+
+![EIGRP-VRF-ROUTE-LEAK-VASI-TOPOLOGY](./EIGRP-VRF-ROUTE-LEAK-VASI-TOPOLOGY.png)
+
+- R1 - configuration:
+
+```
+conf t
+ vrf definition TEST1
+  address-family ipv4
+  exit
+
+ interface GigabitEthernet1
+  vrf forwarding TEST1
+  ip address 10.1.12.1 255.255.255.0
+
+ interface Loopback0
+  vrf forwarding TEST1
+  ip address 1.1.1.1 255.255.255.255
+
+ router eigrp TEST
+ !
+ address-family ipv4 unicast vrf TEST1 autonomous-system 65001
+  !
+  af-interface Loopback0
+   passive-interface
+  exit-af-interface
+  !
+  topology base
+  exit-af-topology
+  network 1.1.1.1 0.0.0.0
+  network 10.1.12.0 0.0.0.255
+  eigrp router-id 1.1.1.1
+ exit-address-family
+```
+
+- Routing table VRF TEST1 - R1:
+
+```
+R1#sh ip ro vrf TEST1 | b Gate
+Gateway of last resort is not set
+
+      1.0.0.0/32 is subnetted, 1 subnets
+C        1.1.1.1 is directly connected, Loopback0
+      2.0.0.0/32 is subnetted, 2 subnets
+D        2.2.2.2 [90/10880] via 10.1.12.2, 00:36:26, GigabitEthernet1
+D EX     2.2.2.3 [170/15360] via 10.1.12.2, 00:00:13, GigabitEthernet1
+      3.0.0.0/32 is subnetted, 1 subnets
+D EX     3.3.3.3 [170/15360] via 10.1.12.2, 00:34:24, GigabitEthernet1
+      10.0.0.0/8 is variably subnetted, 3 subnets, 2 masks
+C        10.1.12.0/24 is directly connected, GigabitEthernet1
+L        10.1.12.1/32 is directly connected, GigabitEthernet1
+D EX     10.1.23.0/24 [170/15360] via 10.1.12.2, 00:34:01, GigabitEthernet1
+```
+
+- R2 - configuration:
+
+```
+conf t
+ vrf definition TEST1
+  address-family ipv4
+ exit
+vrf definition TEST2
+  address-family ipv4
+ exit
+
+ interface GigabitEthernet1
+  vrf forwarding TEST1
+  ip address 10.1.12.2 255.255.255.0
+
+ interface Loopback0
+  vrf forwarding TEST1
+  ip address 2.2.2.2 255.255.255.255
+
+ interface GigabitEthernet2
+  vrf forwarding TEST2
+  ip address 10.1.23.1 255.255.255.0
+
+ interface Loopback2
+  vrf forwarding TEST2
+  ip address 2.2.2.3 255.255.255.255
+
+ interface vasileft1
+  vrf forwarding TEST1
+  ip address 10.100.1.1 255.255.255.0
+
+ interface vasiright1
+  vrf forwarding TEST2
+  ip address 10.100.1.2 255.255.255.0
+
+ router eigrp TEST1
+ !
+ address-family ipv4 unicast vrf TEST1 autonomous-system 65001
+  !
+  af-interface Loopback0
+   passive-interface
+  exit-af-interface
+  !
+  topology base
+   redistribute static metric 1000000 1 255 1 1500
+  exit-af-topology
+  network 2.2.2.2 0.0.0.0
+  network 10.1.12.0 0.0.0.3
+ exit-address-family
+ !
+ address-family ipv4 unicast vrf TEST2 autonomous-system 65002
+  !
+  af-interface Loopback2
+   passive-interface
+  exit-af-interface
+  !
+  topology base
+   redistribute static metric 1000000 1 255 1 1500
+  exit-af-topology
+  network 2.2.2.3 0.0.0.0
+  network 10.1.23.0 0.0.0.255
+ exit-address-family
+
+ ip route vrf TEST1 2.2.2.3 255.255.255.255 vasileft1 10.100.1.2
+ ip route vrf TEST1 3.3.3.3 255.255.255.255 vasileft1 10.100.1.2
+ ip route vrf TEST1 10.1.23.0 255.255.255.0 vasileft1 10.100.1.2
+ ip route vrf TEST2 1.1.1.1 255.255.255.255 vasiright1 10.100.1.1
+ ip route vrf TEST2 10.1.12.0 255.255.255.0 vasiright1 10.100.1.1
+```
+
+- Routing tables for each VRF on R2:
+
+```
+R2(config)#do sh ip ro vrf TEST1 | b Gate
+Gateway of last resort is not set
+
+      1.0.0.0/32 is subnetted, 1 subnets
+D        1.1.1.1 [90/10880] via 10.1.12.1, 00:41:38, GigabitEthernet1
+      2.0.0.0/32 is subnetted, 2 subnets
+C        2.2.2.2 is directly connected, Loopback0
+S        2.2.2.3 [1/0] via 10.100.1.2, vasileft1
+      3.0.0.0/32 is subnetted, 1 subnets
+S        3.3.3.3 [1/0] via 10.100.1.2, vasileft1
+      10.0.0.0/8 is variably subnetted, 5 subnets, 2 masks
+C        10.1.12.0/24 is directly connected, GigabitEthernet1
+L        10.1.12.2/32 is directly connected, GigabitEthernet1
+S        10.1.23.0/24 [1/0] via 10.100.1.2, vasileft1
+C        10.100.1.0/24 is directly connected, vasileft1
+L        10.100.1.1/32 is directly connected, vasileft1
+
+
+R2(config)#do sh ip ro vrf TEST2 | b Gate
+Gateway of last resort is not set
+
+      1.0.0.0/32 is subnetted, 1 subnets
+S        1.1.1.1 [1/0] via 10.100.1.1, vasiright1
+      2.0.0.0/32 is subnetted, 1 subnets
+C        2.2.2.3 is directly connected, Loopback2
+      3.0.0.0/32 is subnetted, 1 subnets
+D        3.3.3.3 [90/10880] via 10.1.23.3, 00:41:57, GigabitEthernet2
+      10.0.0.0/8 is variably subnetted, 5 subnets, 2 masks
+S        10.1.12.0/24 [1/0] via 10.100.1.1, vasiright1
+C        10.1.23.0/24 is directly connected, GigabitEthernet2
+L        10.1.23.1/32 is directly connected, GigabitEthernet2
+C        10.100.1.0/24 is directly connected, vasiright1
+L        10.100.1.2/32 is directly connected, vasiright1
+```
+
+- R3 - configuration:
+
+```
+conf t
+ vrf definition TEST2
+  address-family ipv4
+ exit
+
+ interface GigabitEthernet1
+  vrf forwarding TEST2
+  ip address 10.1.23.3 255.255.255.0
+
+ interface Loopback1
+  vrf forwarding TEST2
+  ip address 3.3.3.3 255.255.255.255
+
+ router eigrp TEST2
+ !
+ address-family ipv4 unicast vrf TEST2 autonomous-system 65002
+  !
+  af-interface Loopback1
+   passive-interface
+  exit-af-interface
+  !
+  topology base
+  exit-af-topology
+  network 3.3.3.3 0.0.0.0
+  network 10.1.23.0 0.0.0.255
+ exit-address-family
+```
+
+- R3's routing table:
+
+```
+R3#sh ip ro vrf TEST2 | b Gate
+Gateway of last resort is not set
+
+      1.0.0.0/32 is subnetted, 1 subnets
+D EX     1.1.1.1 [170/15360] via 10.1.23.1, 00:51:07, GigabitEthernet1
+      2.0.0.0/32 is subnetted, 1 subnets
+D        2.2.2.3 [90/10880] via 10.1.23.1, 00:53:54, GigabitEthernet1
+      3.0.0.0/32 is subnetted, 1 subnets
+C        3.3.3.3 is directly connected, Loopback1
+      10.0.0.0/8 is variably subnetted, 3 subnets, 2 masks
+D EX     10.1.12.0/24 [170/15360] via 10.1.23.1, 00:50:52, GigabitEthernet1
+C        10.1.23.0/24 is directly connected, GigabitEthernet1
+L        10.1.23.3/32 is directly connected, GigabitEthernet1
+```
+
+### Route leaking with classic EIGRP mode
+
+![Topology](./EIGRP-CLASSIC-MODE-ROUTELEAK-VASI.png)
+
+- R1 configuration:
+
+```
+conf t
+ vrf definition TEST1
+ 
+  address-family ipv4
+  exit
+
+ interface GigabitEthernet1
+  vrf forwarding TEST1
+  ip address 10.1.12.1 255.255.255.0
+ 
+ interface Loopback0
+  vrf forwarding TEST1
+  ip address 1.1.1.1 255.255.255.255
+
+ router eigrp 65001
+  address-family ipv4 vrf TEST1 
+   network 1.1.1.1 0.0.0.0
+   network 10.1.12.0 0.0.0.255
+   passive-interface Loopback0
+   autonomous-system 65001
+   eigrp router-id 1.1.1.1
+  exit-address-family
+ eigrp router-id 1.1.1.1
+```
+
+- Routing table - VRF TEST1 - R1:
+
+```
+R1#sh ip ro vrf TEST1 | b Gate
+Gateway of last resort is not set
+
+      1.0.0.0/32 is subnetted, 1 subnets
+C        1.1.1.1 is directly connected, Loopback0
+      2.0.0.0/32 is subnetted, 2 subnets
+D        2.2.2.2 [90/130816] via 10.1.12.2, 00:16:24, GigabitEthernet1
+D EX     2.2.3.3 [170/3072] via 10.1.12.2, 00:13:11, GigabitEthernet1
+      3.0.0.0/32 is subnetted, 1 subnets
+D EX     3.3.3.3 [170/3072] via 10.1.12.2, 00:13:11, GigabitEthernet1
+      10.0.0.0/8 is variably subnetted, 3 subnets, 2 masks
+C        10.1.12.0/24 is directly connected, GigabitEthernet1
+L        10.1.12.1/32 is directly connected, GigabitEthernet1
+D EX     10.1.23.0/24 [170/3072] via 10.1.12.2, 00:13:11, GigabitEthernet1
+```
+
+- R2 - Configuration:
+
+```
+conf t
+ vrf definition TEST1
+  address-family ipv4
+  exit-address-family
+
+ vrf definition TEST2
+  address-family ipv4
+  exit-address-family
+
+ interface GigabitEthernet1
+  vrf forwarding TEST1
+  ip address 10.1.12.2 255.255.255.0
+
+ interface Loopback1
+  vrf forwarding TEST1
+  ip address 2.2.2.2 255.255.255.255
+
+ interface GigabitEthernet2
+  vrf forwarding TEST2
+  ip address 10.1.23.2 255.255.255.0
+
+ interface Loopback2
+  vrf forwarding TEST2
+  ip address 2.2.3.3 255.255.255.255
+
+ interface vasileft1
+  vrf forwarding TEST1
+  ip address 10.100.1.1 255.255.255.252
+
+ interface vasiright1
+  vrf forwarding TEST2
+  ip address 10.100.1.2 255.255.255.252
+
+ ip route vrf TEST1 2.2.3.3 255.255.255.255 vasileft1 10.100.1.2
+ ip route vrf TEST1 3.3.3.3 255.255.255.255 vasileft1 10.100.1.2
+ ip route vrf TEST1 10.1.23.0 255.255.255.0 vasileft1 10.100.1.2
+ ip route vrf TEST2 1.1.1.1 255.255.255.255 vasiright1 10.100.1.1
+ ip route vrf TEST2 2.2.2.2 255.255.255.255 vasiright1 10.100.1.1
+ ip route vrf TEST2 10.1.12.0 255.255.255.0 vasiright1 10.100.1.1
+
+ router eigrp 65001
+  address-family ipv4 vrf TEST1
+  ! or address-family ipv4 vrf TEST1 autonomous-system 65001
+   redistribute static metric 1000000 1 255 1 1500
+   network 2.2.2.2 0.0.0.0
+   network 10.1.12.0 0.0.0.255
+   autonomous-system 65001
+   exit-address-family
+ 
+  address-family ipv4 vrf TEST2
+  ! or address-family ipv4 vrf TEST2 autonomous-system 65001
+   redistribute static metric 1000000 1 255 1 1500
+   network 2.2.3.3 0.0.0.0
+   network 10.1.23.0 0.0.0.255
+   passive-interface Loopback2
+   autonomous-system 65001
+   exit-address-family
+ eigrp router-id 2.2.2.2
+```
+
+- Ip routing table of R2:
+
+```
+R2#show ip route vrf TEST1 | b Gate
+Gateway of last resort is not set
+
+      1.0.0.0/32 is subnetted, 1 subnets
+D        1.1.1.1 [90/130816] via 10.1.12.1, 00:23:38, GigabitEthernet1
+      2.0.0.0/32 is subnetted, 2 subnets
+C        2.2.2.2 is directly connected, Loopback1
+S        2.2.3.3 [1/0] via 10.100.1.2, vasileft1
+      3.0.0.0/32 is subnetted, 1 subnets
+S        3.3.3.3 [1/0] via 10.100.1.2, vasileft1
+      10.0.0.0/8 is variably subnetted, 5 subnets, 3 masks
+C        10.1.12.0/24 is directly connected, GigabitEthernet1
+L        10.1.12.2/32 is directly connected, GigabitEthernet1
+S        10.1.23.0/24 [1/0] via 10.100.1.2, vasileft1
+C        10.100.1.0/30 is directly connected, vasileft1
+L        10.100.1.1/32 is directly connected, vasileft1
+
+
+R2#show ip route vrf TEST2 | b Gate
+Gateway of last resort is not set
+
+      1.0.0.0/32 is subnetted, 1 subnets
+S        1.1.1.1 [1/0] via 10.100.1.1, vasiright1
+      2.0.0.0/32 is subnetted, 2 subnets
+S        2.2.2.2 [1/0] via 10.100.1.1, vasiright1
+C        2.2.3.3 is directly connected, Loopback2
+      3.0.0.0/32 is subnetted, 1 subnets
+D        3.3.3.3 [90/130816] via 10.1.23.3, 00:22:05, GigabitEthernet2
+      10.0.0.0/8 is variably subnetted, 5 subnets, 3 masks
+S        10.1.12.0/24 [1/0] via 10.100.1.1, vasiright1
+C        10.1.23.0/24 is directly connected, GigabitEthernet2
+L        10.1.23.2/32 is directly connected, GigabitEthernet2
+C        10.100.1.0/30 is directly connected, vasiright1
+L        10.100.1.2/32 is directly connected, vasiright1
+```
+
+- R3 - configuration:
+
+```
+conf t
+ vrf definition TEST2
+  address-family ipv4
+  exit-address-family
+
+ interface GigabitEthernet1
+  vrf forwarding TEST2
+  ip address 10.1.23.3 255.255.255.0
+
+ interface Loopback1
+  vrf forwarding TEST2
+  ip address 3.3.3.3 255.255.255.255
+
+ router eigrp 65001
+ 
+  address-family ipv4 vrf TEST2 
+   network 3.3.3.3 0.0.0.0
+   network 10.1.23.0 0.0.0.255
+   passive-interface Loopback1
+   autonomous-system 65001
+   eigrp router-id 3.3.3.3
+  exit-address-family
+```
+
+- R3's routing table:
+
+```
+R3#sh ip ro vrf TEST2 | b Gate
+Gateway of last resort is not set
+
+      1.0.0.0/32 is subnetted, 1 subnets
+D EX     1.1.1.1 [170/3072] via 10.1.23.2, 00:26:17, GigabitEthernet1
+      2.0.0.0/32 is subnetted, 2 subnets
+D EX     2.2.2.2 [170/3072] via 10.1.23.2, 00:26:17, GigabitEthernet1
+D        2.2.3.3 [90/130816] via 10.1.23.2, 00:28:36, GigabitEthernet1
+      3.0.0.0/32 is subnetted, 1 subnets
+C        3.3.3.3 is directly connected, Loopback1
+      10.0.0.0/8 is variably subnetted, 3 subnets, 2 masks
+D EX     10.1.12.0/24 [170/3072] via 10.1.23.2, 00:26:17, GigabitEthernet1
+C        10.1.23.0/24 is directly connected, GigabitEthernet1
+L        10.1.23.3/32 is directly connected, GigabitEthernet1
+```
