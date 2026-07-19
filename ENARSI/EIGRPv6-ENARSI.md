@@ -294,3 +294,511 @@ conf t
    eigrp router-id 192.168.2.2
 ```
 
+- Below is provided the verification of the EIGRPv6 neighbor adjacency
+
+- Notice that the adjacency uses the link-local addressing
+
+```
+R1#sh ipv6 eigrp neighbors 
+EIGRP-IPv6 Neighbors for AS(100)
+H   Address                 Interface              Hold Uptime   SRTT   RTO  Q  Seq
+                                                   (sec)         (ms)       Cnt Num
+0   Link-local address:     Gi1                      13 00:25:40    4   100  0  3
+    FE80::2
+```
+
+```
+R2#show ipv6 eigrp neighbors 
+EIGRP-IPv6 VR(NAMED-MODE) Address-Family Neighbors for AS(100)
+H   Address                 Interface              Hold Uptime   SRTT   RTO  Q  Seq
+                                                   (sec)         (ms)       Cnt Num
+0   Link-local address:     Gi1                      10 00:26:12 1599  5000  0  3
+    FE80::1
+```
+
+- Below are shown the routing table entries for R1 and R2:
+
+```
+R1#sh ipv6 route eigrp 
+IPv6 Routing Table - default - 8 entries
+Codes: C - Connected, L - Local, S - Static, U - Per-user Static route
+       B - BGP, R - RIP, H - NHRP, I1 - ISIS L1
+       I2 - ISIS L2, IA - ISIS interarea, IS - ISIS summary, D - EIGRP
+       EX - EIGRP external, ND - ND Default, NDp - ND Prefix, DCE - Destination
+       NDr - Redirect, RL - RPL, O - OSPF Intra, OI - OSPF Inter
+       OE1 - OSPF ext 1, OE2 - OSPF ext 2, ON1 - OSPF NSSA ext 1
+       ON2 - OSPF NSSA ext 2, la - LISP alt, lr - LISP site-registrations
+       ld - LISP dyn-eid, lA - LISP away, le - LISP extranet-policy
+       lp - LISP publications, a - Application, m - OMP
+D   2001:DB8:2::2/128 [90/2848]
+     via FE80::2, GigabitEthernet1
+D   2001:DB8:2:2::/64 [90/3072]
+     via FE80::2, GigabitEthernet1
+
+```
+
+```
+R2#show ipv6 route eigrp 
+IPv6 Routing Table - default - 8 entries
+Codes: C - Connected, L - Local, S - Static, U - Per-user Static route
+       B - BGP, R - RIP, H - NHRP, I1 - ISIS L1
+       I2 - ISIS L2, IA - ISIS interarea, IS - ISIS summary, D - EIGRP
+       EX - EIGRP external, ND - ND Default, NDp - ND Prefix, DCE - Destination
+       NDr - Redirect, RL - RPL, O - OSPF Intra, OI - OSPF Inter
+       OE1 - OSPF ext 1, OE2 - OSPF ext 2, ON1 - OSPF NSSA ext 1
+       ON2 - OSPF NSSA ext 2, la - LISP alt, lr - LISP site-registrations
+       ld - LISP dyn-eid, lA - LISP away, le - LISP extranet-policy
+       lp - LISP publications, a - Application, m - OMP
+D   2001:DB8:1::1/128 [90/2570240]
+     via FE80::1, GigabitEthernet1
+D   2001:DB8:1:1::/64 [90/15360]
+     via FE80::1, GigabitEthernet1
+
+```
+
+#### IPv6 Route Summarization
+
+- There is no concept of classful or classless routing in IPv6, and therefore autosummarization is not possible
+
+- EIGRPv6 summarization for IPv6 is manually configured on a per-interface basis using the same rules as for IPv4:
+
+    1. The summary aggregate prefix is not advertised until a prefix matches it
+
+    2. More specific prefixes are suppressed
+
+    3. A Null0 route with an administrative distance of 5 is added to the routing table as a loop-prevention mechanism
+
+    4. A leak map can be used to advertise more specific prefixes while advertising a summary address
+
+- Network summarization is configured at the interface level in classic mode using the command `ipv6 summary-address eigrp <as-number> <ipv6-prefix/ipv6-prefix-length>` or in named mode with the command `summary-address <ipv6-prefix/ipv6-prefix-length>` under the af-interface
+
+- Below is demonstrated how to configure R1 to advertise a 2001:db8:1::/48 summary route to R2 and how to configure R2 to advertise a 2001:db8:2::/48 summary route to R1
+
+- It shows both classic and named mode summary configurations
+
+- R1:
+
+```
+conf t
+ interface g1
+  ipv6 summary-address eigrp 100 2001:db8:1::/48
+```
+
+- R2:
+
+```
+conf t
+ router eigrp NAMED-MODE
+  address-family ipv6 autonomous-system 100
+   af-interface g1
+    summary-address 2001:db8:2::/48
+```
+
+- Below are shown the routing tables for R1 and R2
+
+- R1:
+
+```
+R1#sh ipv6 route eigrp      
+IPv6 Routing Table - default - 8 entries
+Codes: C - Connected, L - Local, S - Static, U - Per-user Static route
+       B - BGP, R - RIP, H - NHRP, I1 - ISIS L1
+       I2 - ISIS L2, IA - ISIS interarea, IS - ISIS summary, D - EIGRP
+       EX - EIGRP external, ND - ND Default, NDp - ND Prefix, DCE - Destination
+       NDr - Redirect, RL - RPL, O - OSPF Intra, OI - OSPF Inter
+       OE1 - OSPF ext 1, OE2 - OSPF ext 2, ON1 - OSPF NSSA ext 1
+       ON2 - OSPF NSSA ext 2, la - LISP alt, lr - LISP site-registrations
+       ld - LISP dyn-eid, lA - LISP away, le - LISP extranet-policy
+       lp - LISP publications, a - Application, m - OMP
+D   2001:DB8:1::/48 [5/2816]
+     via Null0, directly connected
+D   2001:DB8:2::/48 [90/2848]
+     via FE80::2, GigabitEthernet1
+
+```
+
+- R2:
+
+```
+R2#show ipv6 route eigrp 
+IPv6 Routing Table - default - 8 entries
+Codes: C - Connected, L - Local, S - Static, U - Per-user Static route
+       B - BGP, R - RIP, H - NHRP, I1 - ISIS L1
+       I2 - ISIS L2, IA - ISIS interarea, IS - ISIS summary, D - EIGRP
+       EX - EIGRP external, ND - ND Default, NDp - ND Prefix, DCE - Destination
+       NDr - Redirect, RL - RPL, O - OSPF Intra, OI - OSPF Inter
+       OE1 - OSPF ext 1, OE2 - OSPF ext 2, ON1 - OSPF NSSA ext 1
+       ON2 - OSPF NSSA ext 2, la - LISP alt, lr - LISP site-registrations
+       ld - LISP dyn-eid, lA - LISP away, le - LISP extranet-policy
+       lp - LISP publications, a - Application, m - OMP
+D   2001:DB8:1::/48 [90/15360]
+     via FE80::1, GigabitEthernet1
+D   2001:DB8:2::/48 [5/1280]
+     via Null0, directly connected
+
+```
+
+- Notice that only the /48 summary prefix is received from the neighbor router and that the more specific /64 and /128 route entries are suppressed
+
+- A Null0 route is populated on the router for the local /48 summary route advertisement
+
+#### Default Route Advertising
+
+- You advertise a default route into the EIGRPv6 topology by placing the default prefix (::/0) as a summary address at the interface level
+
+- When you use the summary method, all prefix advertisements are suppressed by the router except for the ::/0 default route entry
+
+- Below we can see the two configuration methods for injecting a default route into EIGRPv6
+
+- R1 - classic mode:
+
+```
+conf t
+ interface g1
+  ipv6 summary-address eigrp 100 ::/0 
+```
+
+- R2 - named mode:
+
+```
+conf t
+ router eigrp NAMED-MODE
+  address-family ipv6 autonomous-system 100
+   af-interface g1
+    summary-address ::/0
+```
+
+- IPv6 EIGRP routing tables:
+
+- R1:
+
+```
+R1#show ipv6 route eigrp 
+IPv6 Routing Table - default - 9 entries
+Codes: C - Connected, L - Local, S - Static, U - Per-user Static route
+       B - BGP, R - RIP, H - NHRP, I1 - ISIS L1
+       I2 - ISIS L2, IA - ISIS interarea, IS - ISIS summary, D - EIGRP
+       EX - EIGRP external, ND - ND Default, NDp - ND Prefix, DCE - Destination
+       NDr - Redirect, RL - RPL, O - OSPF Intra, OI - OSPF Inter
+       OE1 - OSPF ext 1, OE2 - OSPF ext 2, ON1 - OSPF NSSA ext 1
+       ON2 - OSPF NSSA ext 2, la - LISP alt, lr - LISP site-registrations
+       ld - LISP dyn-eid, lA - LISP away, le - LISP extranet-policy
+       lp - LISP publications, a - Application, m - OMP
+D   ::/0 [5/2816]
+     via Null0, directly connected
+D   2001:DB8:1::/48 [5/2816]
+     via Null0, directly connected
+D   2001:DB8:2::/48 [90/2848]
+     via FE80::2, GigabitEthernet1
+
+```
+
+- R2:
+
+```
+R2#sh ipv6 route eigrp 
+IPv6 Routing Table - default - 9 entries
+Codes: C - Connected, L - Local, S - Static, U - Per-user Static route
+       B - BGP, R - RIP, H - NHRP, I1 - ISIS L1
+       I2 - ISIS L2, IA - ISIS interarea, IS - ISIS summary, D - EIGRP
+       EX - EIGRP external, ND - ND Default, NDp - ND Prefix, DCE - Destination
+       NDr - Redirect, RL - RPL, O - OSPF Intra, OI - OSPF Inter
+       OE1 - OSPF ext 1, OE2 - OSPF ext 2, ON1 - OSPF NSSA ext 1
+       ON2 - OSPF NSSA ext 2, la - LISP alt, lr - LISP site-registrations
+       ld - LISP dyn-eid, lA - LISP away, le - LISP extranet-policy
+       lp - LISP publications, a - Application, m - OMP
+D   ::/0 [5/1280]
+     via Null0, directly connected
+D   2001:DB8:1::/48 [90/15360]
+     via FE80::1, GigabitEthernet1
+D   2001:DB8:2::/48 [5/1280]
+     via Null0, directly connected
+
+```
+
+#### Route Filtering
+
+- On IOS and IOS XE you use prefix lists to match IPv6 routes in route maps and distribute lists
+
+- Below is demonstrated how to use a distribute list for filtering the default route ::/0 advertisements from an upstream neighbor connected to the interface g1
+
+- The associate prefix-list BLOCK-DEFAULT with sequence 5 is a deny statement that filters the exact match for the default route prefix ::/0
+
+- Sequence 10 is a permit any match statement that allows a prefix of any length to be received
+
+- R2:
+
+```
+conf t
+ ipv6 prefix-list BLOCK-DEFAULT seq 5 deny ::/0
+ ipv6 prefix-list BLOCK-DEFAULT seq 10 permit ::/0 le 128
+ router eigrp NAMED-MODE
+  address-family ipv6 autonomous-system 100
+   topology base
+    distribute-list prefix-list BLOCK-DEFAULT in G1
+    exit
+
+```
+
+- Now looking at the routing table, the default route is missing:
+
+```
+R2(config-router-af-topology)#do sh ipv6 route eigrp
+IPv6 Routing Table - default - 8 entries
+Codes: C - Connected, L - Local, S - Static, U - Per-user Static route
+       B - BGP, R - RIP, H - NHRP, I1 - ISIS L1
+       I2 - ISIS L2, IA - ISIS interarea, IS - ISIS summary, D - EIGRP
+       EX - EIGRP external, ND - ND Default, NDp - ND Prefix, DCE - Destination
+       NDr - Redirect, RL - RPL, O - OSPF Intra, OI - OSPF Inter
+       OE1 - OSPF ext 1, OE2 - OSPF ext 2, ON1 - OSPF NSSA ext 1
+       ON2 - OSPF NSSA ext 2, la - LISP alt, lr - LISP site-registrations
+       ld - LISP dyn-eid, lA - LISP away, le - LISP extranet-policy
+       lp - LISP publications, a - Application, m - OMP
+D   2001:DB8:1::/48 [90/15360]
+     via FE80::1, GigabitEthernet1
+D   2001:DB8:2::/48 [5/1280]
+     via Null0, directly connected
+```
+
+- R1 - classic mode:
+
+```
+conf t
+ ipv6 prefix-list BLOCK-DEFAULT seq 5 deny ::/0
+ ipv6 prefix-list BLOCK-DEFAULT seq 10 permit ::/0 le 128
+ ipv6 router eigrp 100
+  distribute-list prefix-list BLOCK-DEFAULT in g1
+```
+
+- Routing table of R1:
+
+```
+R1(config)#do sh ipv6 route eigrp
+IPv6 Routing Table - default - 8 entries
+Codes: C - Connected, L - Local, S - Static, U - Per-user Static route
+       B - BGP, R - RIP, H - NHRP, I1 - ISIS L1
+       I2 - ISIS L2, IA - ISIS interarea, IS - ISIS summary, D - EIGRP
+       EX - EIGRP external, ND - ND Default, NDp - ND Prefix, DCE - Destination
+       NDr - Redirect, RL - RPL, O - OSPF Intra, OI - OSPF Inter
+       OE1 - OSPF ext 1, OE2 - OSPF ext 2, ON1 - OSPF NSSA ext 1
+       ON2 - OSPF NSSA ext 2, la - LISP alt, lr - LISP site-registrations
+       ld - LISP dyn-eid, lA - LISP away, le - LISP extranet-policy
+       lp - LISP publications, a - Application, m - OMP
+D   2001:DB8:1::/48 [5/2816]
+     via Null0, directly connected
+D   2001:DB8:2::/48 [90/2848]
+     via FE80::2, GigabitEthernet1
+```
+
+- CAREFUL: The prefix list does not block the route to Null0 (summary route) to be added into the routing table
+
+- R1:
+
+```
+conf t
+ int g1
+  ipv6 summary-address eigrp 100 ::/0
+```
+
+- Routing table:
+
+```
+R1(config-if)#do sh ipv6 ro eigrp
+IPv6 Routing Table - default - 9 entries
+Codes: C - Connected, L - Local, S - Static, U - Per-user Static route
+       B - BGP, R - RIP, H - NHRP, I1 - ISIS L1
+       I2 - ISIS L2, IA - ISIS interarea, IS - ISIS summary, D - EIGRP
+       EX - EIGRP external, ND - ND Default, NDp - ND Prefix, DCE - Destination
+       NDr - Redirect, RL - RPL, O - OSPF Intra, OI - OSPF Inter
+       OE1 - OSPF ext 1, OE2 - OSPF ext 2, ON1 - OSPF NSSA ext 1
+       ON2 - OSPF NSSA ext 2, la - LISP alt, lr - LISP site-registrations
+       ld - LISP dyn-eid, lA - LISP away, le - LISP extranet-policy
+       lp - LISP publications, a - Application, m - OMP
+D   ::/0 [5/2816]
+     via Null0, directly connected
+D   2001:DB8:1::/48 [5/2816]
+     via Null0, directly connected
+D   2001:DB8:2::/48 [90/2848]
+     via FE80::2, GigabitEthernet1
+```
+
+#### Troubleshooting IPv6 Neighbor Issues
+
+- Because EIGRPv6 is based on EIGRP for IPv4, it involves similar issues when it comes to troubleshooting, although there are a few differences for IPv6
+
+- The great news is that you do not have to learn a large amount of new information for EIGRPv6
+
+- You basically need to know the show commands that display the information you need to troubleshoot any given EIGRPv6 related issue
+
+- Below the focus will be on the show commands that are used when troubleshooting EIGRPv6-related issues
+
+- The neighbor issues with EIGRPv6 are mostly the same as with EIGRP for IPv4, except a few differences based on the way EIGRPv6 is enabled on an interface
+
+- To identify EIGRPv6 neighbors, use the `show ipv6 eigrp neighbors` command, as shown below
+
+- Notice that EIGRPv6 neighbors are identified by their link-local addresses
+
+```
+R2#show ipv6 eigrp neighbors 
+EIGRP-IPv6 VR(EIGRP-NAMED) Address-Family Neighbors for AS(65002)
+H   Address                 Interface              Hold Uptime   SRTT   RTO  Q  Seq
+                                                   (sec)         (ms)       Cnt Num
+1   Link-local address:     Gi3                      14 00:39:34    1   100  0  6
+    FE80::5054:FF:FE21:A5CC
+0   Link-local address:     Gi2                      12 00:46:44  654  3924  0  7
+    FE80::5054:FF:FE22:34F6
+```
+
+- In this case R2 is a neighbor of two different routers
+
+- One is reachable out G2 and the other is reachable out G3
+
+##### Interface is Down
+
+- With EIGRPv6, to verify that an interface is up, you use the `show ipv6 interface brief` command 
+
+```
+R2#sh ipv6 int br
+GigabitEthernet1       [up/up]
+    FE80::5054:FF:FE74:75E4
+    2001:DB8:0:1::2
+GigabitEthernet2       [up/up]
+    FE80::5054:FF:FEE0:E9B2
+    2012:2:12:1::2
+GigabitEthernet3       [up/up]
+    FE80::5054:FF:FEAB:37BE
+    2002:2:2:3::2
+GigabitEthernet4       [administratively down/down]
+    unassigned
+Loopback0              [up/up]
+    FE80::21E:49FF:FE0A:CC00
+    2002:1:2:2::2
+Loopback2              [up/up]
+    FE80::21E:49FF:FE0A:CC00
+    2012:2:13:3::3
+```
+
+- In this case, G1, G2 and G3 are up/up, and G4 is administratively down/down
+
+- This indicates that G4 has been configured with the `shutdown` command
+
+##### Mismatched Autonomous System Numbers
+
+- With EIGRPv6, to verify the autonomous system number being used, you can use the `show ipv6 protocols` command
+
+```
+R2#show ipv6 protocols 
+IPv6 Routing Protocol is "connected"
+IPv6 Routing Protocol is "application"
+IPv6 Routing Protocol is "ND"
+IPv6 Routing Protocol is "eigrp 65002"
+EIGRP-IPv6 VR(EIGRP-NAMED) Address-Family Protocol for AS(65002)
+  Metric weight K1=1, K2=0, K3=1, K4=0, K5=0 K6=0
+  Metric rib-scale 128
+  Metric version 64bit
+  Soft SIA disabled
+  NSF-aware route hold timer is 240
+  EIGRP NSF disabled
+     NSF signal timer is 20s
+     NSF converge timer is 120s
+  Router-ID: 10.2.12.2
+  Topology : 0 (base) 
+    Active Timer: 3 min
+    Distance: internal 90 external 170
+    Maximum path: 16
+    Maximum hopcount 100
+    Maximum metric variance 1
+    Total Prefix Count: 5
+    Total Redist Count: 0
+
+  Interfaces:
+    GigabitEthernet2
+    GigabitEthernet3
+    Loopback2 (passive)
+  Redistribution:
+    None
+```
+
+- In this example the EIGRP autonomous system is 65002
+
+##### Mismatched K Values
+
+- You verify the EIGRPv6 K values with the command `show ipv6 protocols`
+
+```
+R2#show ipv6 protocols 
+IPv6 Routing Protocol is "connected"
+IPv6 Routing Protocol is "application"
+IPv6 Routing Protocol is "ND"
+IPv6 Routing Protocol is "eigrp 65002"
+EIGRP-IPv6 VR(EIGRP-NAMED) Address-Family Protocol for AS(65002)
+  Metric weight K1=1, K2=0, K3=1, K4=0, K5=0 K6=0
+  Metric rib-scale 128
+  Metric version 64bit
+  Soft SIA disabled
+  NSF-aware route hold timer is 240
+  EIGRP NSF disabled
+     NSF signal timer is 20s
+     NSF converge timer is 120s
+  Router-ID: 10.2.12.2
+  Topology : 0 (base) 
+    Active Timer: 3 min
+    Distance: internal 90 external 170
+    Maximum path: 16
+    Maximum hopcount 100
+    Maximum metric variance 1
+    Total Prefix Count: 5
+    Total Redist Count: 0
+
+  Interfaces:
+    GigabitEthernet2
+    GigabitEthernet3
+    Loopback2 (passive)
+  Redistribution:
+    None
+```
+
+- In this example the K values are: 1=1, K2=0, K3=1, K4=0, K5=0, K6=0 which are the defaults
+
+##### Passive Interfaces
+
+- To verify the router interfaces participating in an EIGRPv6 autonomous system that are passive, you use the `show ipv6 protocols` command
+
+```
+R2#show ipv6 protocols 
+IPv6 Routing Protocol is "connected"
+IPv6 Routing Protocol is "application"
+IPv6 Routing Protocol is "ND"
+IPv6 Routing Protocol is "eigrp 65002"
+EIGRP-IPv6 VR(EIGRP-NAMED) Address-Family Protocol for AS(65002)
+  Metric weight K1=1, K2=0, K3=1, K4=0, K5=0 K6=0
+  Metric rib-scale 128
+  Metric version 64bit
+  Soft SIA disabled
+  NSF-aware route hold timer is 240
+  EIGRP NSF disabled
+     NSF signal timer is 20s
+     NSF converge timer is 120s
+  Router-ID: 10.2.12.2
+  Topology : 0 (base) 
+    Active Timer: 3 min
+    Distance: internal 90 external 170
+    Maximum path: 16
+    Maximum hopcount 100
+    Maximum metric variance 1
+    Total Prefix Count: 5
+    Total Redist Count: 0
+
+  Interfaces:
+    GigabitEthernet2
+    GigabitEthernet3
+    Loopback2 (passive)
+  Redistribution:
+    None
+```
+
+- In this example, Loopback2 is a passive interface
+
+##### Mismatched Authentication
+
+- 
