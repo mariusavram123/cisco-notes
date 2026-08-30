@@ -1218,3 +1218,360 @@ Gi1                      1        0/0       0/0        1280       0/0         80
           
 ```
 
+### Troubleshooting Named EIGRP
+
+- The purpose of EIGRP named configuration is to provide a central location on the local router to perform all EIGRP for IPv4 and IPv6 configuration
+
+- Below we can see a sample named EIGRP configuration called EIGRP_ENARSI
+
+- This named EIGRP configuration includes an IPv4 unicast address family and an IPv6 unicast address family
+
+- They are both using autonomous system 100; however, that is not mandatory and does not cause conflict as these are separated routing processes
+
+```
+R3#sh run | s router eigrp
+router eigrp EIGRP_ENARSI
+ !
+ address-family ipv4 unicast autonomous-system 100
+  !
+  af-interface default
+   passive-interface
+  exit-af-interface
+  !
+  af-interface GigabitEthernet1
+   no passive-interface
+  exit-af-interface
+  !
+  topology base
+  exit-af-topology
+  network 3.3.3.3 0.0.0.0
+  network 10.2.3.0 0.0.0.255
+  eigrp router-id 3.3.3.3
+  eigrp stub connected summary
+ exit-address-family
+ !
+ address-family ipv6 unicast autonomous-system 100
+  !
+  af-interface default
+   passive-interface
+  exit-af-interface
+  !
+  af-interface GigabitEthernet1
+   no passive-interface
+  exit-af-interface
+  !
+  topology base
+   maximum-paths 2
+   variance 3
+  exit-af-topology
+  eigrp router-id 3.3.3.3
+  eigrp stub connected summary
+ exit-address-family
+```
+
+- Because the configuration is the only thing that is different, all the issues already discussed for EIGRP for IPv4 and EIGRPv6 apply here as well
+
+- However you need to know which `show` commands can help you successfully troubleshoot named EIGRP deployments
+
+- The show commands that can be used to troubleshoot named EIGRP deployments
+
+- With named EIGRP, you can use all the same EIGRP show commands that you can use for classic EIGRP for IPv4 and classic EIGRPv6, as seen until now
+
+- However, there is also a new set of `show` commands for named EIGRP that you might want to learn
+
+- The command `show eigrp protocols` shows both the EIGRP for IPv4 and the EIGRPv6 address family, along with the autonomous system number associated with each
+
+- It also displays the K values, the router ID, whether the router is a stub router, the AD, the maximum paths and the variance
+
+```
+R3#show eigrp protocols 
+EIGRP-IPv4 VR(EIGRP_ENARSI) Address-Family Protocol for AS(100)
+  Metric weight K1=1, K2=0, K3=1, K4=0, K5=0 K6=0
+  Metric rib-scale 128
+  Metric version 64bit
+  Soft SIA disabled
+  NSF-aware route hold timer is 240
+  EIGRP NSF disabled
+     NSF signal timer is 20s
+     NSF converge timer is 120s
+  Router-ID: 3.3.3.3
+  Stub, connected, summary
+  Topology : 0 (base) 
+    Active Timer: 3 min
+    Distance: internal 90 external 170
+    Maximum path: 4
+    Maximum hopcount 100
+    Maximum metric variance 1
+    Total Prefix Count: 5
+    Total Redist Count: 0
+
+EIGRP-IPv6 VR(EIGRP_ENARSI) Address-Family Protocol for AS(100)
+  Metric weight K1=1, K2=0, K3=1, K4=0, K5=0 K6=0
+  Metric rib-scale 128
+  Metric version 64bit
+  Soft SIA disabled
+  NSF-aware route hold timer is 240
+  EIGRP NSF disabled
+     NSF signal timer is 20s
+     NSF converge timer is 120s
+  Router-ID: 3.3.3.3
+  Stub, connected, summary
+  Topology : 0 (base) 
+    Active Timer: 3 min
+    Distance: internal 90 external 170
+    Maximum path: 2
+    Maximum hopcount 100
+    Maximum metric variance 3
+    Total Prefix Count: 5
+    Total Redist Count: 0
+
+```
+
+- This is similar to the output of `show ip protocols` and `show ipv6 protocols` commands
+
+- However, it is missing the interfaces that are participating in the routing process, along with the passive interfaces
+
+- Therefore, `show ip protocols` and `show ipv6 protocols` are better options than `show eigrp protocols`, at least for now
+
+```
+R3#show ip protocols 
+*** IP Routing is NSF aware ***
+
+Routing Protocol is "application"
+  Sending updates every 0 seconds
+  Invalid after 0 seconds, hold down 0, flushed after 0
+  Outgoing update filter list for all interfaces is not set
+  Incoming update filter list for all interfaces is not set
+  Maximum path: 32
+  Routing for Networks:
+  Routing Information Sources:
+    Gateway         Distance      Last Update
+  Distance: (default is 4)
+
+Routing Protocol is "eigrp 100"
+  Outgoing update filter list for all interfaces is not set
+  Incoming update filter list for all interfaces is not set
+  Default networks flagged in outgoing updates
+  Default networks accepted from incoming updates
+  EIGRP-IPv4 VR(EIGRP_ENARSI) Address-Family Protocol for AS(100)
+    Metric weight K1=1, K2=0, K3=1, K4=0, K5=0 K6=0
+    Metric rib-scale 128
+    Metric version 64bit
+    Soft SIA disabled
+    NSF-aware route hold timer is 240
+  EIGRP NSF disabled
+     NSF signal timer is 20s
+     NSF converge timer is 120s
+    Router-ID: 3.3.3.3
+    Stub, connected, summary
+    Topology : 0 (base) 
+      Active Timer: 3 min
+      Distance: internal 90 external 170
+      Maximum path: 4
+      Maximum hopcount 100
+      Maximum metric variance 1
+      Total Prefix Count: 5
+      Total Redist Count: 0
+
+  Automatic Summarization: disabled
+  Maximum path: 4
+  Routing for Networks:
+    3.3.3.3/32
+    10.2.3.0/24
+  Passive Interface(s):
+    Loopback0
+  Routing Information Sources:
+    Gateway         Distance      Last Update
+    10.2.3.2              90      00:25:54
+  Distance: internal 90 external 170
+
+```
+
+```
+R3#show ipv6 protocols 
+IPv6 Routing Protocol is "connected"
+IPv6 Routing Protocol is "application"
+IPv6 Routing Protocol is "ND"
+IPv6 Routing Protocol is "eigrp 100"
+EIGRP-IPv6 VR(EIGRP_ENARSI) Address-Family Protocol for AS(100)
+  Metric weight K1=1, K2=0, K3=1, K4=0, K5=0 K6=0
+  Metric rib-scale 128
+  Metric version 64bit
+  Soft SIA disabled
+  NSF-aware route hold timer is 240
+  EIGRP NSF disabled
+     NSF signal timer is 20s
+     NSF converge timer is 120s
+  Router-ID: 3.3.3.3
+  Stub, connected, summary
+  Topology : 0 (base) 
+    Active Timer: 3 min
+    Distance: internal 90 external 170
+    Maximum path: 2
+    Maximum hopcount 100
+    Maximum metric variance 3
+    Total Prefix Count: 5
+    Total Redist Count: 0
+          
+  Interfaces:
+    GigabitEthernet1
+    Loopback0 (passive)
+  Redistribution:
+    None
+```
+
+- To verify the interfaces that are participating in the routing process for each address family, you can issue the `show eigrp address-family ipv4 interfaces` and the `show eigrp address-family ipv6 interfaces` as shown below
+
+- Note that passive interfaces do not show up in this output
+
+- Using the classic `show ip protocols` or `show ipv6 protocols` you would be able to verify the passive interfaces
+
+```
+R3#show eigrp address-family ipv4 interfaces 
+EIGRP-IPv4 VR(EIGRP_ENARSI) Address-Family Interfaces for AS(100)
+                              Xmit Queue   PeerQ        Mean   Pacing Time   Multicast    Pending
+Interface              Peers  Un/Reliable  Un/Reliable  SRTT   Un/Reliable   Flow Timer   Routes
+Gi1                      1        0/0       0/0           2       0/0           50           0
+
+R3#show eigrp address-family ipv6 interfaces 
+EIGRP-IPv6 VR(EIGRP_ENARSI) Address-Family Interfaces for AS(100)
+                              Xmit Queue   PeerQ        Mean   Pacing Time   Multicast    Pending
+Interface              Peers  Un/Reliable  Un/Reliable  SRTT   Un/Reliable   Flow Timer   Routes
+Gi1                      1        0/0       0/0           1       0/0           50           0
+```
+
+- When you use the `detail` keyword with the commands from above, you can verify additional interface parameters (for example hello interval, and hold time, whether split horizon is enabled, whether authentication is set, and statistics about hellos and packets)
+
+```
+R3#show eigrp address-family ipv4 interfaces detail 
+EIGRP-IPv4 VR(EIGRP_ENARSI) Address-Family Interfaces for AS(100)
+                              Xmit Queue   PeerQ        Mean   Pacing Time   Multicast    Pending
+Interface              Peers  Un/Reliable  Un/Reliable  SRTT   Un/Reliable   Flow Timer   Routes
+Gi1                      1        0/0       0/0           2       0/0           50           0
+  Hello-interval is 5, Hold-time is 15
+  Split-horizon is enabled
+  Next xmit serial <none>
+  Packetized sent/expedited: 5/1
+  Hello's sent/expedited: 581/3
+  Un/reliable mcasts: 0/4  Un/reliable ucasts: 5/3
+  Mcast exceptions: 0  CR packets: 0  ACKs suppressed: 0
+  Retransmissions sent: 1  Out-of-sequence rcvd: 0
+  Topology-ids on interface - 0 
+  Authentication mode is not set
+  Topologies advertised on this interface:  base
+  Topologies not advertised on this interface:
+
+
+R3#show eigrp address-family ipv6 interfaces detail 
+EIGRP-IPv6 VR(EIGRP_ENARSI) Address-Family Interfaces for AS(100)
+                              Xmit Queue   PeerQ        Mean   Pacing Time   Multicast    Pending
+Interface              Peers  Un/Reliable  Un/Reliable  SRTT   Un/Reliable   Flow Timer   Routes
+Gi1                      1        0/0       0/0           1       0/0           50           0
+  Hello-interval is 5, Hold-time is 15
+  Split-horizon is enabled
+  Next xmit serial <none>
+  Packetized sent/expedited: 6/1
+  Hello's sent/expedited: 538/4
+  Un/reliable mcasts: 0/5  Un/reliable ucasts: 7/4
+  Mcast exceptions: 0  CR packets: 0  ACKs suppressed: 0
+  Retransmissions sent: 1  Out-of-sequence rcvd: 0
+  Topology-ids on interface - 0 
+  Authentication mode is not set
+  Topologies advertised on this interface:  base
+  Topologies not advertised on this interface:
+
+```
+
+- You can verify neighbors with `show eigrp address-family ipv4 neighbors` and `show eigrp address-family ipv6 neighbors` commands
+
+- Just as you saw with the classic commands, if you want to verify whether a neighbor is a stub router, you can add the `detail` keyword to these commands
+
+```
+R3#show eigrp address-family ipv4 neighbors 
+EIGRP-IPv4 VR(EIGRP_ENARSI) Address-Family Neighbors for AS(100)
+H   Address                 Interface              Hold Uptime   SRTT   RTO  Q  Seq
+                                                   (sec)         (ms)       Cnt Num
+0   10.2.3.2                Gi1                      14 00:48:14    2   150  0  13
+
+R3#show eigrp address-family ipv6 neighbors 
+EIGRP-IPv6 VR(EIGRP_ENARSI) Address-Family Neighbors for AS(100)
+H   Address                 Interface              Hold Uptime   SRTT   RTO  Q  Seq
+                                                   (sec)         (ms)       Cnt Num
+0   Link-local address:     Gi1                      14 00:44:17    1   150  0  19
+    FE80::5054:FF:FED0:E8BA
+
+
+R3#show eigrp address-family ipv4 neighbors detail 
+EIGRP-IPv4 VR(EIGRP_ENARSI) Address-Family Neighbors for AS(100)
+H   Address                 Interface              Hold Uptime   SRTT   RTO  Q  Seq
+                                                   (sec)         (ms)       Cnt Num
+0   10.2.3.2                Gi1                      13 00:49:00    2   150  0  13
+   Version 28.0/2.0, Retrans: 1, Retries: 0, Prefixes: 3
+   Topology-ids from peer - 0 
+   Topologies advertised to peer:   base
+
+Max Nbrs: 0, Current Nbrs: 0
+
+R3#show eigrp address-family ipv6 neighbors detail 
+EIGRP-IPv6 VR(EIGRP_ENARSI) Address-Family Neighbors for AS(100)
+H   Address                 Interface              Hold Uptime   SRTT   RTO  Q  Seq
+                                                   (sec)         (ms)       Cnt Num
+0   Link-local address:     Gi1                      13 00:45:18    1   150  0  19
+    FE80::5054:FF:FED0:E8BA
+   Version 28.0/2.0, Retrans: 1, Retries: 0, Prefixes: 4
+   Topology-ids from peer - 0 
+   Topologies advertised to peer:   base
+
+Max Nbrs: 0, Current Nbrs: 0
+```
+
+- To display the topology table, you can use the commands `show eigrp address-family ipv4 topology` and `show eigrp address-family ipv6 topology`
+
+```
+R3#show eigrp address-family ipv4 topology 
+EIGRP-IPv4 VR(EIGRP_ENARSI) Topology Table for AS(100)/ID(3.3.3.3)
+Codes: P - Passive, A - Active, U - Update, Q - Query, R - Reply,
+       r - reply Status, s - sia Status 
+
+P 10.1.2.0/24, 1 successors, FD is 1966080
+        via 10.2.3.2 (1966080/1310720), GigabitEthernet1
+P 2.2.2.2/32, 1 successors, FD is 1392640
+        via 10.2.3.2 (1392640/163840), GigabitEthernet1
+P 10.2.3.0/24, 1 successors, FD is 1310720
+        via Connected, GigabitEthernet1
+P 3.3.3.3/32, 1 successors, FD is 163840
+        via Connected, Loopback0
+P 1.1.1.1/32, 1 successors, FD is 2048000
+        via 10.2.3.2 (2048000/1392640), GigabitEthernet1
+
+
+R3#show eigrp address-family ipv6 topology 
+EIGRP-IPv6 VR(EIGRP_ENARSI) Topology Table for AS(100)/ID(3.3.3.3)
+Codes: P - Passive, A - Active, U - Update, Q - Query, R - Reply,
+       r - reply Status, s - sia Status 
+
+P 2001:DB8:2:2::2/128, 1 successors, FD is 1392640
+        via FE80::5054:FF:FED0:E8BA (1392640/163840), GigabitEthernet1
+P 2001:DB8:3:3::3/128, 1 successors, FD is 163840
+        via Connected, Loopback0
+P 2001:DB8:1:2::/64, 1 successors, FD is 1966080
+        via FE80::5054:FF:FED0:E8BA (1966080/1310720), GigabitEthernet1
+P 2001:DB8:2:3::/64, 1 successors, FD is 1310720
+        via Connected, GigabitEthernet1
+P 2001:DB8:1:1::1/128, 1 successors, FD is 2048000
+        via FE80::5054:FF:FED0:E8BA (2048000/1392640), GigabitEthernet1
+
+```
+
+### EIGRPv6 and Named EIGRP Trouble Tickets
+
+- Two trouble tickets related to EIGRPv6 and Named EIGRP
+
+- These tickets show a process that you can follow when troubleshooting in the real world or in the exam environment
+
+- Topology first ticket
+
+![eigrpv6-trouble-tickets-topology](./eigrpv6-trouble-tickets-topology.png)
+
+#### Trouble Ticket 5-1
+
