@@ -801,4 +801,346 @@ EIGRP-IPv6 VR(EIGRP-NAMED) Address-Family Protocol for AS(65002)
 
 ##### Mismatched Authentication
 
-- 
+- If authentication is being used with EIGRPv6, the key ID and key string must match and if the valid timers are configured, they must match between neighbors as well
+
+- Below is shown how to verify whether an interface is enabled for EIGRPv6 authentication with `show ipv6 eigrp interfaces detail` command and how to verify the configuration of the keychain that is being used with the `show key chain` command
+
+- In this example the authentication mode is MD5, and the keychain TEST is being used
+
+- R1:
+
+```
+conf t
+ key chain TEST
+  key 1
+   key-string TEST
+   exit
+ int g1
+  ipv6 authentication key-chain eigrp 100 TEST
+  ipv6 authentication mode eigrp 100 md5
+```
+
+```
+R1(config-if)#do sh ipv6 eigrp int det g1
+EIGRP-IPv6 Interfaces for AS(100)
+                              Xmit Queue   PeerQ        Mean   Pacing Time   Multicast    Pending
+Interface              Peers  Un/Reliable  Un/Reliable  SRTT   Un/Reliable   Flow Timer   Routes
+Gi1                      1        0/0       0/0           1       0/0           50           0
+  Hello-interval is 5, Hold-time is 15
+  Split-horizon is enabled
+  Next xmit serial <none>
+  Packetized sent/expedited: 4/2
+  Hello's sent/expedited: 108/3
+  Un/reliable mcasts: 0/4  Un/reliable ucasts: 7/4
+  Mcast exceptions: 0  CR packets: 0  ACKs suppressed: 0
+  Retransmissions sent: 2  Out-of-sequence rcvd: 0
+  Topology-ids on interface - 0 
+  Authentication mode is md5,  key-chain is "TEST"
+  Topologies advertised on this interface:  base
+  Topologies not advertised on this interface:
+
+```
+
+- R2 - named mode:
+
+```
+conf t
+ key chain TEST
+  key 1
+   key-string TEST
+   exit
+ router eigrp NAMED-MODE
+  address-family ipv6 unicast autonomous-system 100
+   af-interface g1
+    authentication key-chain TEST
+    authentication mode md5 
+```
+
+```
+R2#show ipv6 eigrp interfaces detail g1
+EIGRP-IPv6 VR(NAMED-MODE) Address-Family Interfaces for AS(100)
+                              Xmit Queue   PeerQ        Mean   Pacing Time   Multicast    Pending
+Interface              Peers  Un/Reliable  Un/Reliable  SRTT   Un/Reliable   Flow Timer   Routes
+Gi1                      1        0/0       0/0           1       0/0           50           0
+  Hello-interval is 5, Hold-time is 15
+  Split-horizon is enabled
+  Next xmit serial <none>
+  Packetized sent/expedited: 4/0
+  Hello's sent/expedited: 140/3
+  Un/reliable mcasts: 0/5  Un/reliable ucasts: 4/4
+  Mcast exceptions: 0  CR packets: 0  ACKs suppressed: 0
+  Retransmissions sent: 2  Out-of-sequence rcvd: 0
+  Topology-ids on interface - 0 
+  Authentication mode is md5,  key-chain is "TEST"
+  Topologies advertised on this interface:  base
+  Topologies not advertised on this interface:
+```
+
+##### Timers
+
+- With EIGRPv6 timers do not have to match; however, if they are not configured appropriately, neighbor relationships may flap
+
+- You can verify timers by using the `show ipv6 eigrp interfaces detail` command, as shown above
+
+- In this case, the hello interval is configured as 5 seconds, and the hold time is 15. These are the defaults
+
+##### Interface Not Participating in Routing Process
+
+- With EIGRPv6, interfaces are enabled for the routing process with the `ipv6 eigrp <as-number>` interface configuration command
+
+- You can use two show commands `show ipv6 eigrp interfaces` and `show ipv6 protocols` to verify the interfaces that are participating in the routing process
+
+- As with EIGRP for IPv4, the `show ipv6 eigrp interfaces` does not show the passive interfaces
+
+- However, `show ipv6 protocols` does show them
+
+```
+R1#show ipv6 eigrp interfaces 
+EIGRP-IPv6 Interfaces for AS(100)
+                              Xmit Queue   PeerQ        Mean   Pacing Time   Multicast    Pending
+Interface              Peers  Un/Reliable  Un/Reliable  SRTT   Un/Reliable   Flow Timer   Routes
+Gi1                      1        0/0       0/0           1       0/0           50           0
+Gi2                      0        0/0       0/0           0       0/0            0           0
+
+
+R1#show ipv6 protocols 
+IPv6 Routing Protocol is "connected"
+IPv6 Routing Protocol is "application"
+IPv6 Routing Protocol is "omp"
+  Redistribution:
+    None
+IPv6 Routing Protocol is "ND"
+IPv6 Routing Protocol is "eigrp 100"
+EIGRP-IPv6 Protocol for AS(100)
+  Metric weight K1=1, K2=0, K3=1, K4=0, K5=0
+  Soft SIA disabled
+  NSF-aware route hold timer is 240
+  EIGRP NSF disabled
+     NSF signal timer is 20s
+     NSF converge timer is 120s
+  Router-ID: 192.168.1.1
+  Topology : 0 (base) 
+    Active Timer: 3 min
+    Distance: internal 90 external 170
+    Maximum path: 16
+    Maximum hopcount 100
+    Maximum metric variance 1
+
+  Interfaces:
+    GigabitEthernet1
+    GigabitEthernet2
+    Loopback0 (passive)
+  Redistribution:
+    None
+  Address Summarization:
+    2001:DB8:1::/48 for Gi1
+      Summarizing 2 components with metric 2816
+```
+
+##### ACLs
+
+- EIGRPv6 uses the IPv6 multicast address FF02::A to form neighbor adjacencies
+
+- If an IPv6 access control list (ACL) is denying packets destined to the multicast address FF02::A, neighbor adjacencies do not form
+
+- In addition, because neighbor adjacencies are formed with link-local addresses, if the link-local address range is denied based on the source or destination IPv6 address on an interface with an IPv6 ACL, neighbor relationships do not form
+
+### Troubleshooting EIGRPv6 routes
+
+- The reasons a route might be missing and the steps used to troubleshoot them with EIGRPv6 are similar to those used for EIGRPv4
+
+- Identify the most common issues and the show commands used to detect then for EIGRPv6
+
+- EIGRP routes might be missing either from the topology table or the routing table
+
+#### Interface Not Participating in the Routing Process
+
+- For a network to be advertised by the EIGRPv6 process, the interface associated with that network must be participating in the routing process
+
+- You can use the commands `show ipv6 eigrp interfaces` and `show ipv6 protocols` to verify the interfaces participating in the process
+
+```
+R1#show ipv6 eigrp interfaces 
+EIGRP-IPv6 Interfaces for AS(100)
+                              Xmit Queue   PeerQ        Mean   Pacing Time   Multicast    Pending
+Interface              Peers  Un/Reliable  Un/Reliable  SRTT   Un/Reliable   Flow Timer   Routes
+Gi1                      1        0/0       0/0         407       0/0         1992           0
+Gi2                      0        0/0       0/0           0       0/0            0           0
+
+
+R1#show ipv6 protocols 
+IPv6 Routing Protocol is "connected"
+IPv6 Routing Protocol is "application"
+IPv6 Routing Protocol is "omp"
+  Redistribution:
+    None
+IPv6 Routing Protocol is "ND"
+IPv6 Routing Protocol is "eigrp 100"
+EIGRP-IPv6 Protocol for AS(100)
+  Metric weight K1=1, K2=0, K3=1, K4=0, K5=0
+  Soft SIA disabled
+  NSF-aware route hold timer is 240
+  EIGRP NSF disabled
+     NSF signal timer is 20s
+     NSF converge timer is 120s
+  Router-ID: 192.168.1.1
+  Topology : 0 (base) 
+    Active Timer: 3 min
+    Distance: internal 90 external 170
+    Maximum path: 16
+    Maximum hopcount 100
+    Maximum metric variance 1
+
+  Interfaces:
+    GigabitEthernet1
+    GigabitEthernet2
+    Loopback0 (passive)
+  Redistribution:
+    None
+  Address Summarization:
+    2001:DB8:1::/48 for Gi1
+      Summarizing 2 components with metric 2816
+```
+
+#### Better Source of Information
+
+- If exactly the same network is learned from a more reliable source, it is used instead of EIGRPv6-learned information
+
+- To verify the AD associated with the route in the routing table, you can issue the `show ipv6 route <ipv6-prefix/prefix-length>`
+
+- Below the route to the 2001:db8:2::/48 has an AD of 90 and it was learned from the EIGRP autonomous system 100
+
+```
+R1#show ipv6 route 2001:db8:2::/48
+Routing entry for 2001:DB8:2::/48
+  Known via "eigrp 100", distance 90, metric 2848, type internal
+  Route count is 1/1, share count 0
+  Routing paths:
+    FE80::2, GigabitEthernet1
+      From FE80::2
+      Last updated 00:20:36 ago
+
+```
+
+#### Route Filtering
+
+- A filter might be preventing a route from being advertised or learned
+
+- With EIGRPv6, the `distribute-list prefix-list` command is used to configure a route filter
+
+- To verify the filter applied, use the `show run | s ipv6 router eigrp` command
+
+```
+R1#sh run | s ipv6 router eigrp
+ipv6 router eigrp 100
+ distribute-list prefix-list BLOCK-DEFAULT in GigabitEthernet1
+ passive-interface Loopback0
+ eigrp router-id 192.168.1.1
+
+
+```
+
+- In the output above, R1 is using a prefix list called `BLOCK-DEFAULT` to filter routes inbound of the G1 interface
+
+- To suceessfully troubleshoot route filtering issues, you also need to verify the IPv6 prefix list by using the `show ipv6 prefix-list` command
+
+```
+R1#sh ipv6 prefix-list 
+ipv6 prefix-list BLOCK-DEFAULT: 2 entries
+   seq 5 deny ::/0
+   seq 10 permit ::/0 le 128
+```
+
+#### Stub Configuration
+
+- If the wrong router is configured as a stub router, or if the wrong setting is chosen during stub router configuration, it might prevent a router from being advertised when it should be advertised
+
+- When troubleshooting EIGRPv6 stub configurations, you can use either the `show ipv6 protocols` command to verify whether the local router is is a stub router and the networks that it is advertising
+
+- On a remote router (linked with the stub-configured router), you can use the the `show ipv6 eigrp neighbors detail` command
+
+- In this case R2 is a stub advertising only the connected and summary routes
+
+```
+R2(config-router-af)#do sh ipv6 protoc
+IPv6 Routing Protocol is "connected"
+IPv6 Routing Protocol is "application"
+IPv6 Routing Protocol is "ND"
+IPv6 Routing Protocol is "eigrp 65002"
+EIGRP-IPv6 VR(EIGRP-NAMED) Address-Family Protocol for AS(65002)
+  Metric weight K1=1, K2=0, K3=1, K4=0, K5=0 K6=0
+  Metric rib-scale 128
+  Metric version 64bit
+  Soft SIA disabled
+  NSF-aware route hold timer is 240
+  EIGRP NSF disabled
+     NSF signal timer is 20s
+     NSF converge timer is 120s
+  Router-ID: 10.2.12.2
+  Stub, connected, summary
+  Topology : 0 (base) 
+    Active Timer: 3 min
+    Distance: internal 90 external 170
+    Maximum path: 16
+    Maximum hopcount 100
+    Maximum metric variance 1
+    Total Prefix Count: 5
+    Total Redist Count: 0
+          
+  Interfaces:
+    GigabitEthernet2
+    GigabitEthernet3
+    Loopback2 (passive)
+  Redistribution:
+    None
+```
+
+```
+R1#show ipv6 eigrp neighbors detail 
+EIGRP-IPv6 VR(EIGRP-NAMED) Address-Family Neighbors for AS(65002)
+H   Address                 Interface              Hold Uptime   SRTT   RTO  Q  Seq
+                                                   (sec)         (ms)       Cnt Num
+0   Link-local address:     Gi2                      12 00:01:03    1   100  0  25
+    FE80::5054:FF:FEE0:E9B2
+   Version 28.0/2.0, Retrans: 0, Retries: 0, Prefixes: 3
+   Topology-ids from peer - 0 
+   Topologies advertised to peer:   base
+
+   Stub Peer Advertising (CONNECTED SUMMARY ) Routes
+   Suppressing queries
+Max Nbrs: 0, Current Nbrs: 0
+```
+
+#### Split Horizon
+
+- Split horizon is a loop prevention feature that prevents a router from advertising routes out the same interface on which they were learned 
+
+- You can verify whether split horizon is enabled or disabled by using the `show ipv6 eigrp interfaces detail` command
+
+```
+R1#show ipv6 eigrp interfaces detail 
+EIGRP-IPv6 VR(EIGRP-NAMED) Address-Family Interfaces for AS(65002)
+                              Xmit Queue   PeerQ        Mean   Pacing Time   Multicast    Pending
+Interface              Peers  Un/Reliable  Un/Reliable  SRTT   Un/Reliable   Flow Timer   Routes
+Gi2                      1        0/0       0/0           1       0/0           50           0
+  Hello-interval is 5, Hold-time is 15
+  Split-horizon is enabled
+  Next xmit serial <none>
+  Packetized sent/expedited: 10/1
+  Hello's sent/expedited: 234/5
+  Un/reliable mcasts: 0/10  Un/reliable ucasts: 9/5
+  Mcast exceptions: 0  CR packets: 0  ACKs suppressed: 0
+  Retransmissions sent: 1  Out-of-sequence rcvd: 1
+  Interface has all stub peers
+  Topology-ids on interface - 0 
+  Authentication mode is not set
+  Topologies advertised on this interface:  base
+  Topologies not advertised on this interface:
+
+```
+
+- As with EIGRP for IPv4, split horizon is an issue in EIGRPv6 network designs that need routes to be advertised out interfaces on which they were learned
+
+- An example of this type of network design is a Dynamic Multipoint Virtual Private Network (DMVPN), which uses a multipoint interface on the hub router
+
+- Therefore, split horizon needs to be disabled on the hub router interface of a DMVPN network so routes learned from the spoke routers can be advertised back out that interface to the other spoke routers
