@@ -1144,3 +1144,77 @@ Gi2                      1        0/0       0/0           1       0/0           
 - An example of this type of network design is a Dynamic Multipoint Virtual Private Network (DMVPN), which uses a multipoint interface on the hub router
 
 - Therefore, split horizon needs to be disabled on the hub router interface of a DMVPN network so routes learned from the spoke routers can be advertised back out that interface to the other spoke routers
+
+- EIGRPv6 named mode configuration for disabling split horizon:
+
+```
+conf t
+ router eigrp EIGRP-NAMED
+  address-family ipv6 autonomous-system 65002
+   af-interface g2
+    no split-horizon
+```
+
+- EIGRPv6 classic mode 
+
+```
+conf t
+ interface g1
+  no ipv6 split-horizon eigrp 65001
+```
+
+- Verifying eigrp split horizon on interfaces:
+
+```
+R2#show ipv6 eigrp interfaces detail 
+EIGRP-IPv6 VR(EIGRP-NAMED) Address-Family Interfaces for AS(65002)
+                              Xmit Queue   PeerQ        Mean   Pacing Time   Multicast    Pending
+Interface              Peers  Un/Reliable  Un/Reliable  SRTT   Un/Reliable   Flow Timer   Routes
+Gi2                      1        0/0       0/0           2       0/0           50           0
+  Hello-interval is 5, Hold-time is 15
+  Split-horizon is disabled
+  Next xmit serial <none>
+  Packetized sent/expedited: 12/3
+  Hello's sent/expedited: 443/5
+  Un/reliable mcasts: 0/8  Un/reliable ucasts: 14/9
+  Mcast exceptions: 0  CR packets: 0  ACKs suppressed: 0
+  Retransmissions sent: 4  Out-of-sequence rcvd: 0
+  Topology-ids on interface - 0 
+  Authentication mode is not set
+  Topologies advertised on this interface:  base
+  Topologies not advertised on this interface:
+
+
+EIGRP-IPv6 Interfaces for AS(65001)
+                              Xmit Queue   PeerQ        Mean   Pacing Time   Multicast    Pending
+Interface              Peers  Un/Reliable  Un/Reliable  SRTT   Un/Reliable   Flow Timer   Routes
+Lo0                      0        0/0       0/0           0       0/0            0           0
+  Hello-interval is 5, Hold-time is 15
+  Split-horizon is enabled
+  Next xmit serial <none>
+  Packetized sent/expedited: 0/0
+  Hello's sent/expedited: 0/1
+  Un/reliable mcasts: 0/0  Un/reliable ucasts: 0/0
+  Mcast exceptions: 0  CR packets: 0  ACKs suppressed: 0
+  Retransmissions sent: 0  Out-of-sequence rcvd: 0
+  Topology-ids on interface - 0 
+  Authentication mode is not set
+  Topologies advertised on this interface:  base
+  Topologies not advertised on this interface:
+
+Gi1                      1        0/0       0/0        1280       0/0         8000           0
+  Hello-interval is 5, Hold-time is 15
+  Split-horizon is disabled
+  Next xmit serial <none>
+  Packetized sent/expedited: 2/0
+  Hello's sent/expedited: 444/2
+  Un/reliable mcasts: 0/2  Un/reliable ucasts: 4/3
+  Mcast exceptions: 0  CR packets: 0  ACKs suppressed: 0
+  Retransmissions sent: 1  Out-of-sequence rcvd: 1
+  Topology-ids on interface - 0 
+  Authentication mode is not set
+  Topologies advertised on this interface:  base
+  Topologies not advertised on this interface:
+          
+```
+
