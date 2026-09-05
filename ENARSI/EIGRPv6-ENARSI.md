@@ -1573,5 +1573,389 @@ P 2001:DB8:1:1::1/128, 1 successors, FD is 2048000
 
 ![eigrpv6-trouble-tickets-topology](./eigrpv6-trouble-tickets-topology.png)
 
+![ipv6-eigrp-tt-51-cml-topology](ipv6-eigrp-tt-51-cml-topology.png)
+
 #### Trouble Ticket 5-1
 
+- **Problem**: Users at the branch network 2001:db8:0:4::/64 have indicated that they are not able to access the internet
+
+- To verify the problem you ping 2001:db8:0:f::f using a source address 2001:db8:0:4::4
+
+- As shown below the ping fails
+
+```
+BRANCH#ping 2001:db8:0:f::f source 2001:db8:0:4::4
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 2001:DB8:0:F::F, timeout is 2 seconds:
+Packet sent with a source address of 2001:DB8:0:4::4
+.....
+Success rate is 0 percent (0/5)
+```
+
+- Next you issue the `show ipv6 route 2001:db8:0:f::f` command on BRANCH to determine whether there is a route in the ipv6 routing table to reach the address
+
+- As you can see, the route is not found:
+
+```
+BRANCH#show ipv6 route 2001:db8:0:f::f
+% Route not found
+```
+
+- Next, you visit R1 to determine whether R1 has a route to reach 2001:db8:0:f::f.
+
+- In this example you can see that the internet address is reachable using a default route (::/0) that was learned through EIGRP
+
+```
+R1#show ipv6 route 2001:db8:0:f::f
+Routing entry for ::/0
+  Known via "eigrp 100", distance 90, metric 3072, type internal
+  Route count is 1/1, share count 0
+  Routing paths:
+    FE80::5054:FF:FE7A:74A2, GigabitEthernet0/0
+      From FE80::5054:FF:FE7A:74A2
+      Last updated 00:01:13 ago
+
+```
+
+- You conclude from the output that BRANCH is not learning the default route from R1, which would be used to reach the internet
+
+- You believe that it might be due to a neighbor relationship issue
+
+- Back on BRANCH you issue the `show ipv6 eigrp neighbors` command, and the output indicates that there is a neighbor relationship with a device out g0/0, that has the link-local address FE80::5054:FF:FE36:ADF
+
+- You are pretty sure that is R1's link-local address on g0/1, but just to be sure, you issue the `show ipv6 interface brief` command on R1
+
+- 
+
+```
+BRANCH#sh ipv6 eigrp neighbors 
+EIGRP-IPv6 Neighbors for AS(100)
+H   Address                 Interface              Hold Uptime   SRTT   RTO  Q  Seq
+                                                   (sec)         (ms)       Cnt Num
+0   Link-local address:     Gi0/0                    13 00:32:57    9   100  0  21
+    FE80::5054:FF:FE36:ADF
+```
+
+```
+R1#show ipv6 interface br g0/1
+GigabitEthernet0/1     [up/up]
+    FE80::5054:FF:FE36:ADF
+    2001:DB8:0:14::1
+```
+
+- The link-local address of R1's G0/1 matches the address expected as neighbor
+
+- You decide to look in the ipv6 topology table on R1 to see whether it is learning any IPV6 routes from R1
+
+- As you can see, BRANCH is learning EIGRP routes from R1
+
+```
+BRANCH#show ipv6 eigrp topology 
+EIGRP-IPv6 Topology Table for AS(100)/ID(4.4.4.4)
+Codes: P - Passive, A - Active, U - Update, Q - Query, R - Reply,
+       r - reply Status, s - sia Status 
+
+P 2001:DB8:0:4::/64, 1 successors, FD is 128256
+        via Connected, Loopback0
+P 2001:DB8:0:1::/64, 1 successors, FD is 130816
+        via FE80::5054:FF:FE36:ADF (130816/128256), GigabitEthernet0/0
+P 2001:DB8:0:14::/64, 1 successors, FD is 2816
+        via Connected, GigabitEthernet0/0
+P 2001:DB8:0:12::/64, 1 successors, FD is 3072
+        via FE80::5054:FF:FE36:ADF (3072/2816), GigabitEthernet0/0
+
+```
+
+- It has learned about 2001:db8:0:1::/64 and 2001:db8:0:12::/64
+
+- You quickly realize that those are only the connected routes on R1
+
+- You visit R1 again and issue `show ipv6 eigrp topology` command and notice R1 knows about other IPv6 routes
+
+- However it is not advertising them to BRANCH
+
+```
+R1(config-if)#do sh ipv6 eigrp topology
+EIGRP-IPv6 Topology Table for AS(100)/ID(1.1.1.1)
+Codes: P - Passive, A - Active, U - Update, Q - Query, R - Reply,
+       r - reply Status, s - sia Status 
+
+P 2001:DB8:0:4::/64, 1 successors, FD is 130816
+        via FE80::5054:FF:FE5A:273C (130816/128256), GigabitEthernet0/1
+P 2001:DB8:0:1::/64, 1 successors, FD is 128256
+        via Connected, Loopback0
+P ::/0, 1 successors, FD is 3328
+        via FE80::5054:FF:FE7A:74A2 (3328/3072), GigabitEthernet0/0
+P 2001:DB8:0:14::/64, 1 successors, FD is 2816
+        via Connected, GigabitEthernet0/1
+P 2001:DB8:0:F::F/128, 1 successors, FD is 130816
+        via FE80::5054:FF:FE7A:74A2 (130816/128256), GigabitEthernet0/0
+P 2001:DB8:0:12::/64, 1 successors, FD is 2816
+        via Connected, GigabitEthernet0/0
+P 2001:DB8:0:23::/64, 1 successors, FD is 3072
+        via FE80::5054:FF:FE7A:74A2 (3072/2816), GigabitEthernet0/0
+
+```
+
+- You believe that a route filter has been applied
+
+- Back on BRANCH, you issue the command `show run | s ipv6 router eigrp`
+
+```
+BRANCH#show run | s ipv6 router eigrp
+ipv6 router eigrp 100
+ passive-interface Loopback0
+ eigrp router-id 4.4.4.4
+```
+
+- As shown, there is no distribute list (route filter) applied
+
+- Only the EIGRP router ID is configured
+
+- You jump back to R1 you issue the same `show` command and there is no distribute list (route filter applied here either)
+
+```
+R1(config-rtr)#do sh run | s ipv6 router eigrp                      
+ipv6 router eigrp 100
+ passive-interface default
+ no passive-interface GigabitEthernet0/0
+ no passive-interface GigabitEthernet0/1
+ eigrp router-id 1.1.1.1
+ eigrp stub connected summary
+```
+
+- However, you notice in the output that R1 is configured as an EIGRP stub router that is advertising only connected and summary routes
+
+- This is the problem. The wrong router was configured as a stub router
+
+- The Spoke (BRANCH) - not the Hub (R1) in HQ is supposed to be the stub router
+
+- To solve the issue, you remove the stub configuration on R1 with the `no eigrp stub` command in the `ipv6 router eigrp 100` configuration mode
+
+```
+conf t
+ ipv6 router eigrp 100
+  no eigrp stub
+```
+
+- You the issue the command `eigrp stub` on the BRANCH router in `ipv6 router eigrp 100` configuration mode
+
+```
+conf t
+ ipv6 router eigrp 100
+  eigrp stub
+```
+
+- To verify that the problem is solved, you issue the `show ipv6 route 2001:db8:0:f::f` command to determine whether there is an entry in the routing table now. 
+The output shows that the default route is used
+
+```
+BRANCH(config-rtr)#do sh ipv6 route 2001:db8:0:f::f
+Routing entry for ::/0
+  Known via "eigrp 100", distance 170, metric 3328, type external
+  Route count is 1/1, share count 0
+  Routing paths:
+    FE80::5054:FF:FE36:ADF, GigabitEthernet0/0
+      From FE80::5054:FF:FE36:ADF
+      Last updated 00:00:59 ago
+
+```
+
+- Next you issue the ipv6 ping again, and it is sucessful.
+
+```
+BRANCH#ping 2001:db8:0:f::f source 2001:db8:0:4::4
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 2001:DB8:0:F::F, timeout is 2 seconds:
+Packet sent with a source address of 2001:DB8:0:4::4
+!!!!!
+Success rate is 100 percent (5/5), round-trip min/avg/max = 4/4/7 ms
+```
+
+#### Trouble Ticket 5-2
+
+- Trouble Ticket 5-2 is based on the topology shown below
+
+![eigrp-named-tt52-topology](./eigrp-named-tt52-topology.png)
+
+![eigrp-tt-52-cml-topology](./eigrp-tt-52-cml-topology.png)
+
+- **Problem**: Users in the 10.1.4.0/24 network indicate that they are not able to access resources outside their LAN
+
+- On BRANCH you verify the connectivity by pinging a few different IP addresses and source the packets from 10.1.4.4
+
+- As shown, the pings all fail
+
+```
+BRANCH#ping 10.1.3.3 source 10.1.4.4
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 10.1.3.3, timeout is 2 seconds:
+Packet sent with a source address of 10.1.4.4 
+.....
+Success rate is 0 percent (0/5)
+
+BRANCH#ping 192.0.2.1 source 10.1.4.4
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 192.0.2.1, timeout is 2 seconds:
+Packet sent with a source address of 10.1.4.4 
+.....
+Success rate is 0 percent (0/5)
+
+BRANCH#ping 10.1.1.1 source 10.1.4.4
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 10.1.1.1, timeout is 2 seconds:
+Packet sent with a source address of 10.1.4.4 
+.....
+Success rate is 0 percent (0/5)
+```
+
+- Next, you issue the `show ip route` command to verify whether any routes are installed in the routing table 
+
+- As shown. Only local and directly connected routes are in the routing table
+
+```
+BRANCH#sh ip route | b Gate
+Gateway of last resort is not set
+
+      10.0.0.0/8 is variably subnetted, 4 subnets, 2 masks
+C        10.1.4.0/24 is directly connected, Loopback0
+L        10.1.4.4/32 is directly connected, Loopback0
+C        10.1.14.0/24 is directly connected, GigabitEthernet0/0
+L        10.1.14.4/32 is directly connected, GigabitEthernet0/0
+```
+
+- You hypothesize that BRANCH is not a neighbor with R1 across the WAN
+
+- You issue the `show eigrp address-family ipv4 neighbors` command and confirm that R1 is not a neighbor because the address family table is empty
+
+```
+BRANCH#show eigrp address-family ipv4 neighbors 
+EIGRP-IPv4 VR(TSHOOT_EIGRP) Address-Family Neighbors for AS(100)
+```
+
+- Next, you hypothesize that G0/0 (the interface that will form an adjacency with R1) is not participating in the named EIGRP process
+
+- You issue the command `show eigrp address-family ipv4 interfaces`, and the output confirms your hypothesis
+
+```
+BRANCH#show eigrp address-family ipv4 interfaces 
+EIGRP-IPv4 VR(TSHOOT_EIGRP) Address-Family Interfaces for AS(100)
+                              Xmit Queue   PeerQ        Mean   Pacing Time   Multicast    Pending
+Interface              Peers  Un/Reliable  Un/Reliable  SRTT   Un/Reliable   Flow Timer   Routes
+Lo0                      0        0/0       0/0           0       0/0            0           0
+```
+
+- As shown below, the output of `show ip interface brief` indicates that G0/0 has the IPv4 address 10.1.14.4. Therefore a `network` statement is needed to enable the EIGRP process on that interface
+
+```
+BRANCH#show ip interface brief 
+Interface                  IP-Address      OK? Method Status                Protocol
+GigabitEthernet0/0         10.1.14.4       YES manual up                    up      
+GigabitEthernet0/1         unassigned      YES unset  administratively down down    
+GigabitEthernet0/2         unassigned      YES unset  administratively down down    
+GigabitEthernet0/3         unassigned      YES unset  administratively down down    
+Loopback0                  10.1.4.4        YES manual up                    up      
+```
+
+- Armed with the information you have, you issue the `show running-config | s router eigrp` command on BRANCH to confirm that the network statement is missing
+
+- Below you see that there is a valid `network` statement for 10.1.14.4. It is `network 10.1.14.4 0.0.0.0` and would successfully enable EIGRP process on the interface
+
+- Therefore you now know that your hypothesis was incorrect
+
+```
+BRANCH(config-router-af)#do sh run | s router eigrp
+router eigrp TSHOOT_EIGRP
+ !
+ address-family ipv4 unicast autonomous-system 100
+  !
+  af-interface default
+   passive-interface
+  exit-af-interface
+  !
+  af-interface Loopback0
+   no passive-interface
+  exit-af-interface
+  !
+  topology base
+  exit-af-topology
+  network 10.1.4.0 0.0.0.255
+  network 10.1.14.4 0.0.0.0
+  eigrp router-id 4.4.4.4
+  eigrp stub connected summary
+ exit-address-family
+```
+
+- What would cause a neighbor relationship to fail to form? A few possibilities are authentication, passive interface, and incorrect subnet
+
+- In the output above you spotted there is no authentication configurations
+
+- However you spot a passive-interface configuration on L0
+
+- The command listed in the output is `no passive-interface` command
+
+- You also notice that *af-interface default* has the `passive-interface` command and recall that all interfaces inherit configurations under the `af-interface default`
+
+- You also recall that they can be overriden with commands at the interface level
+
+- Reviewing the topology you come to the conclusion that the wrong interface was configured with the `no passive-interface` command
+
+- It should have been G0/0, and not L0
+
+- Below are the commands you use to fix the issue. Notice that once the issue is fixed, the neighbor relationship is formed with R1 at 10.1.14.1
+
+```
+router eigrp TSHOOT_EIGRP
+ address-family ipv4 autonomous-system 100
+  af-interface l0
+   passive-interface
+   exit
+  af-interface g0/0
+   no passive-interface
+  exit
+
+*Sep  5 17:07:38.575: %DUAL-5-NBRCHANGE: EIGRP-IPv4 100: Neighbor 10.1.14.1 (GigabitEthernet0/0) is up: new adjacency
+```
+
+- You then review the IPv4 routing table, and notice all the EIGRP-learned routes
+
+```
+BRANCH(config-router-af-interface)#do sh ip ro | b Gate
+Gateway of last resort is 10.1.14.1 to network 0.0.0.0
+
+D*EX  0.0.0.0/0 [170/20480] via 10.1.14.1, 00:03:14, GigabitEthernet0/0
+      10.0.0.0/8 is variably subnetted, 8 subnets, 2 masks
+D        10.1.1.0/24 [90/10880] via 10.1.14.1, 00:03:14, GigabitEthernet0/0
+D        10.1.3.0/24 [90/21120] via 10.1.14.1, 00:03:14, GigabitEthernet0/0
+C        10.1.4.0/24 is directly connected, Loopback0
+L        10.1.4.4/32 is directly connected, Loopback0
+D        10.1.12.0/24 [90/15360] via 10.1.14.1, 00:03:14, GigabitEthernet0/0
+C        10.1.14.0/24 is directly connected, GigabitEthernet0/0
+L        10.1.14.4/32 is directly connected, GigabitEthernet0/0
+D        10.1.23.0/24 [90/20480] via 10.1.14.1, 00:03:14, GigabitEthernet0/0
+```
+
+- Next, you reissue the same pings that were used to confirm the problem
+
+- As shown below, they succeeed
+
+```
+BRANCH#ping 10.1.3.3 source 10.1.4.4
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 10.1.3.3, timeout is 2 seconds:
+Packet sent with a source address of 10.1.4.4 
+!!!!!
+Success rate is 100 percent (5/5), round-trip min/avg/max = 5/6/11 ms
+BRANCH#ping 10.1.1.1 source 10.1.4.4
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 10.1.1.1, timeout is 2 seconds:
+Packet sent with a source address of 10.1.4.4 
+!!!!!
+Success rate is 100 percent (5/5), round-trip min/avg/max = 3/4/6 ms
+BRANCH#ping 192.0.2.1 source 10.1.4.4
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 192.0.2.1, timeout is 2 seconds:
+Packet sent with a source address of 10.1.4.4 
+!!!!!
+Success rate is 100 percent (5/5), round-trip min/avg/max = 5/6/8 ms
+```
