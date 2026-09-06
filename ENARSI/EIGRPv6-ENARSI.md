@@ -1959,3 +1959,292 @@ Packet sent with a source address of 10.1.4.4
 !!!!!
 Success rate is 100 percent (5/5), round-trip min/avg/max = 5/6/8 ms
 ```
+
+- IPv6 EIGRP - named mode with VRFs - VRF route leaking with static routes using VASI
+
+- CML topology:
+
+![eigrp-named-mode-vrf-route-leak](./eigrp-named-mode-vrf-route-leak.png)
+
+- Configuration R1:
+
+```
+vrf definition TEST1
+ !
+ address-family ipv4
+ exit-address-family
+ !
+ address-family ipv6
+ exit-address-family
+
+ interface GigabitEthernet1
+ vrf forwarding TEST1
+ ip address 10.1.12.1 255.255.255.0
+ negotiation auto
+ ipv6 address 2001:DB8:1:12::1/64
+ no mop enabled
+ no mop sysid
+end
+
+interface Loopback0
+ vrf forwarding TEST1
+ ip address 1.1.1.1 255.255.255.255
+ ipv6 address 2001:DB8:1:1::1/128
+end
+
+!!! EIGRP configuration
+
+router eigrp TEST
+ !
+ address-family ipv4 unicast vrf TEST1 autonomous-system 65001
+  !
+  af-interface Loopback0
+   passive-interface
+  exit-af-interface
+  !
+  topology base
+  exit-af-topology
+  network 1.1.1.1 0.0.0.0
+  network 10.1.12.0 0.0.0.255
+  eigrp router-id 1.1.1.1
+ exit-address-family
+ !
+ address-family ipv6 unicast vrf TEST1 autonomous-system 65001
+  !
+  af-interface Loopback0
+   passive-interface
+  exit-af-interface
+  !
+  topology base
+  exit-af-topology
+  eigrp router-id 1.1.1.1
+ exit-address-family
+```
+
+- R2
+
+```
+vrf definition TEST1
+ !
+ address-family ipv4
+ exit-address-family
+ !
+ address-family ipv6
+ exit-address-family
+vrf definition TEST2
+ !
+ address-family ipv4
+ exit-address-family
+ !
+ address-family ipv6
+ exit-address-family
+
+ interface GigabitEthernet1
+ vrf forwarding TEST1
+ ip address 10.1.12.2 255.255.255.0
+ negotiation auto
+ ipv6 address 2001:DB8:1:12::2/64
+ no mop enabled
+ no mop sysid
+end
+
+interface GigabitEthernet2
+ vrf forwarding TEST2
+ ip address 10.1.23.1 255.255.255.0
+ negotiation auto
+ ipv6 address 2001:DB8:2:23::2/64
+ no mop enabled
+ no mop sysid
+end
+
+interface Loopback0
+ vrf forwarding TEST1
+ ip address 2.2.2.2 255.255.255.255
+ ipv6 address 2001:DB8:2:2::2/128
+end
+
+interface Loopback2
+ vrf forwarding TEST2
+ ip address 2.2.2.3 255.255.255.255
+ ipv6 address 2001:DB8:2:2::3/128
+end
+
+interface vasileft1
+ vrf forwarding TEST1
+ ip address 10.100.1.1 255.255.255.0
+ ipv6 address 2001:DB8:100:1::1/64
+ no keepalive
+end
+
+interface vasiright1
+ vrf forwarding TEST2
+ ip address 10.100.1.2 255.255.255.0
+ ipv6 address FE80::21E:E6FF:FE7B:5600 link-local
+ ipv6 address 2001:DB8:100:1::2/64
+ no keepalive
+end
+
+ip route vrf TEST1 2.2.2.3 255.255.255.255 vasileft1 10.100.1.2
+ip route vrf TEST1 3.3.3.3 255.255.255.255 vasileft1 10.100.1.2
+ip route vrf TEST1 10.1.23.0 255.255.255.0 vasileft1 10.100.1.2
+ip route vrf TEST2 1.1.1.1 255.255.255.255 vasiright1 10.100.1.1
+ip route vrf TEST2 2.2.2.2 255.255.255.255 vasiright1 10.100.1.1
+ip route vrf TEST2 10.1.12.0 255.255.255.0 vasiright1 10.100.1.1
+
+ipv6 route vrf TEST2 2001:DB8:1:1::1/128 vasiright1 2001:DB8:100:1::1
+ipv6 route vrf TEST2 2001:DB8:1:12::/64 vasiright1 2001:DB8:100:1::1
+ipv6 route vrf TEST2 2001:DB8:2:2::2/128 vasiright1 2001:DB8:100:1::1
+ipv6 route vrf TEST1 2001:DB8:2:2::3/128 vasileft1 2001:DB8:100:1::2
+ipv6 route vrf TEST1 2001:DB8:2:23::/64 vasileft1 2001:DB8:100:1::2
+ipv6 route vrf TEST1 2001:DB8:3:3::3/128 vasileft1 2001:DB8:100:1::2
+
+router eigrp TEST1
+ !
+ address-family ipv4 unicast vrf TEST1 autonomous-system 65001
+  !
+  af-interface Loopback0
+   passive-interface
+  exit-af-interface
+  !
+  topology base
+   redistribute static metric 1000000 1 255 1 1500
+  exit-af-topology
+  network 2.2.2.2 0.0.0.0
+  network 10.1.12.0 0.0.0.3
+ exit-address-family
+ !
+ address-family ipv4 unicast vrf TEST2 autonomous-system 65002
+  !
+  af-interface Loopback2
+   passive-interface
+  exit-af-interface
+  !
+  topology base
+   redistribute static metric 1000000 1 255 1 1500
+  exit-af-topology
+  network 2.2.2.3 0.0.0.0
+  network 10.1.23.0 0.0.0.255
+ exit-address-family
+ !
+ address-family ipv6 unicast vrf TEST1 autonomous-system 65001
+  !
+  af-interface Loopback0
+   passive-interface
+  exit-af-interface
+  !
+  topology base
+   redistribute static metric 10000000 1 255 1 1500
+  exit-af-topology
+  eigrp router-id 2.2.2.2
+ exit-address-family
+ !
+ address-family ipv6 unicast vrf TEST2 autonomous-system 65002
+  !
+  af-interface Loopback2
+   passive-interface
+  exit-af-interface
+  !
+  topology base
+   redistribute static metric 1000000 1 255 1 1500
+  exit-af-topology
+  eigrp router-id 2.2.2.3
+ exit-address-family
+```
+
+- R3:
+
+```
+vrf definition TEST2
+ !
+ address-family ipv4
+ exit-address-family
+ !
+ address-family ipv6
+ exit-address-family
+
+interface GigabitEthernet1
+ vrf forwarding TEST2
+ ip address 10.1.23.3 255.255.255.0
+ negotiation auto
+ ipv6 address 2001:DB8:2:23::3/64
+ no mop enabled
+ no mop sysid
+end
+
+interface Loopback1
+ vrf forwarding TEST2
+ ip address 3.3.3.3 255.255.255.255
+ ipv6 address 2001:DB8:3:3::3/128
+end
+
+router eigrp TEST2
+ !
+ address-family ipv4 unicast vrf TEST2 autonomous-system 65002
+  !
+  af-interface Loopback1
+   passive-interface
+  exit-af-interface
+  !
+  topology base
+  exit-af-topology
+  network 3.3.3.3 0.0.0.0
+  network 10.1.23.0 0.0.0.255
+ exit-address-family
+ !
+ address-family ipv6 unicast vrf TEST2 autonomous-system 65002
+  !
+  af-interface Loopback1
+   passive-interface
+  exit-af-interface
+  !
+  topology base
+  exit-af-topology
+  eigrp router-id 3.3.3.3
+ exit-address-family
+```
+
+- R1:
+
+```
+R1(config)#do ping vrf TEST1 2001:db8:2:2::2 source l0
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 2001:DB8:2:2::2, timeout is 2 seconds:
+Packet sent with a source address of 2001:DB8:1:1::1%TEST1
+!!!!!
+Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/1 ms
+R1(config)#do ping vrf TEST1 2001:db8:2:2::3 source l0
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 2001:DB8:2:2::3, timeout is 2 seconds:
+Packet sent with a source address of 2001:DB8:1:1::1%TEST1
+!!!!!
+Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/1 ms
+R1(config)#do ping vrf TEST1 2001:db8:2:23::2 source l0
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 2001:DB8:2:23::2, timeout is 2 seconds:
+Packet sent with a source address of 2001:DB8:1:1::1%TEST1
+!!!!!
+Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/1 ms
+R1(config)#do ping vrf TEST1 2001:db8:2:23::3 source l0
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 2001:DB8:2:23::3, timeout is 2 seconds:
+Packet sent with a source address of 2001:DB8:1:1::1%TEST1
+!!!!!
+Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/1 ms
+R1(config)#do ping vrf TEST1 2001:db8:2:23::3 source l0
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 2001:DB8:2:23::3, timeout is 2 seconds:
+Packet sent with a source address of 2001:DB8:1:1::1%TEST1
+!!!!!
+Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/1 ms
+
+R1(config)#do ping vrf TEST1 2001:db8:2:23::3
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 2001:DB8:2:23::3, timeout is 2 seconds:
+!!!!!
+Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/1 ms
+R1(config)#do ping vrf TEST1 2001:db8:2:23::2
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 2001:DB8:2:23::2, timeout is 2 seconds:
+!!!!!
+Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/1 ms
+```
