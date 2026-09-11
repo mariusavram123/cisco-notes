@@ -2248,3 +2248,308 @@ Sending 5, 100-byte ICMP Echos to 2001:DB8:2:23::2, timeout is 2 seconds:
 !!!!!
 Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/1 ms
 ```
+
+- It is not possible to enable VRF for IPv6 EIGRP classic mode configuration. Use the named mode for that.
+
+Example (topology is the same as above but EIGRP for IPv4 is configured separately):
+
+- R1:
+
+```
+R1#show run | s vrf def
+vrf definition TEST1
+ !
+ address-family ipv4
+ exit-address-family
+ !
+ address-family ipv6
+ exit-address-family
+
+R1#sh run | s router eigrp
+router eigrp 65001
+ !
+ address-family ipv4 vrf TEST1 
+  network 1.1.1.1 0.0.0.0
+  network 10.1.12.0 0.0.0.255
+  passive-interface Loopback0
+  autonomous-system 65001
+  eigrp router-id 1.1.1.1
+ exit-address-family
+ eigrp router-id 1.1.1.1
+router eigrp CISCO
+ !
+ address-family ipv6 unicast vrf TEST1 autonomous-system 65001
+  !
+  af-interface Loopback0
+   passive-interface
+  exit-af-interface
+  !
+  topology base
+  exit-af-topology
+ exit-address-family
+
+ R1#sh run int l0
+Building configuration...
+
+Current configuration : 119 bytes
+!
+interface Loopback0
+ vrf forwarding TEST1
+ ip address 1.1.1.1 255.255.255.255
+ ipv6 address 2001:DB8:1:1::1/128
+end
+
+R1#sh run int g1
+Building configuration...
+
+Current configuration : 174 bytes
+!
+interface GigabitEthernet1
+ vrf forwarding TEST1
+ ip address 10.1.12.1 255.255.255.0
+ negotiation auto
+ ipv6 address 2001:DB8:1:12::1/64
+ no mop enabled
+ no mop sysid
+end
+```
+
+- R2:
+
+```
+R2#show run | s vrf def
+vrf definition TEST1
+ !
+ address-family ipv4
+ exit-address-family
+ !
+ address-family ipv6
+ exit-address-family
+vrf definition TEST2
+ !
+ address-family ipv4
+ exit-address-family
+ !
+ address-family ipv6
+ exit-address-family
+
+ R2#show run | s router eigrp
+router eigrp 65001
+ !
+ address-family ipv4 vrf TEST1 
+  redistribute static metric 1000000 1 255 1 1500
+  network 2.2.2.2 0.0.0.0
+  network 10.1.12.0 0.0.0.255
+  autonomous-system 65001
+  eigrp router-id 2.2.2.2
+ exit-address-family
+ !
+ address-family ipv4 vrf TEST2 
+  redistribute static metric 1000000 1 255 1 1500
+  network 2.2.3.3 0.0.0.0
+  network 10.1.23.0 0.0.0.255
+  passive-interface Loopback2
+  autonomous-system 65001
+ exit-address-family
+ eigrp router-id 2.2.2.2
+router eigrp CISCO
+ !
+ address-family ipv6 unicast vrf TEST1 autonomous-system 65001
+  !
+  af-interface Loopback1
+   passive-interface
+  exit-af-interface
+  !
+  topology base
+   redistribute static metric 1000000 1 255 1 1500
+  exit-af-topology
+  eigrp router-id 2.2.2.2
+ exit-address-family
+ !
+ address-family ipv6 unicast vrf TEST2 autonomous-system 65002
+  !
+  af-interface Loopback2
+   passive-interface
+  exit-af-interface
+  !
+  topology base
+   redistribute static metric 1000000 1 255 1 1500
+  exit-af-topology
+  eigrp router-id 2.2.2.3
+ exit-address-family
+
+R2#sh run | i ipv6 ro
+ipv6 route vrf TEST2 2001:DB8:1:1::1/128 vasiright1 2001:DB8:10:100::1
+ipv6 route vrf TEST2 2001:DB8:1:12::/64 vasiright1 2001:DB8:10:100::1
+ipv6 route vrf TEST2 2001:DB8:2:2::2/128 vasiright1 2001:DB8:10:100::1
+ipv6 route vrf TEST1 2001:DB8:2:2::3/128 vasileft1 2001:DB8:10:100::2
+ipv6 route vrf TEST1 2001:DB8:2:23::/64 vasileft1 2001:DB8:10:100::2
+ipv6 route vrf TEST1 2001:DB8:3:3::3/128 vasileft1 2001:DB8:10:100::2
+
+R2#sh run int g1
+Building configuration...
+
+Current configuration : 174 bytes
+!
+interface GigabitEthernet1
+ vrf forwarding TEST1
+ ip address 10.1.12.2 255.255.255.0
+ negotiation auto
+ ipv6 address 2001:DB8:1:12::2/64
+ no mop enabled
+ no mop sysid
+end
+
+R2#sh run int g2
+Building configuration...
+
+Current configuration : 174 bytes
+!
+interface GigabitEthernet2
+ vrf forwarding TEST2
+ ip address 10.1.23.2 255.255.255.0
+ negotiation auto
+ ipv6 address 2001:DB8:2:23::2/64
+ no mop enabled
+ no mop sysid
+end
+
+R2#sh run int l1
+Building configuration...
+
+Current configuration : 119 bytes
+!
+interface Loopback1
+ vrf forwarding TEST1
+ ip address 2.2.2.2 255.255.255.255
+ ipv6 address 2001:DB8:2:2::2/128
+end
+
+R2#sh run int l2
+Building configuration...
+
+Current configuration : 119 bytes
+!
+interface Loopback2
+ vrf forwarding TEST2
+ ip address 2.2.3.3 255.255.255.255
+ ipv6 address 2001:DB8:2:2::3/128
+end
+
+R2#sh run int vasileft1
+Building configuration...
+
+Current configuration : 138 bytes
+!
+interface vasileft1
+ vrf forwarding TEST1
+ ip address 10.100.1.1 255.255.255.252
+ ipv6 address 2001:DB8:10:100::1/64
+ no keepalive
+end
+
+R2#sh run int vasiright1
+Building configuration...
+
+Current configuration : 188 bytes
+!
+interface vasiright1
+ vrf forwarding TEST2
+ ip address 10.100.1.2 255.255.255.252
+ ipv6 address FE80::21E:E5FF:FE33:800 link-local
+ ipv6 address 2001:DB8:10:100::2/64
+ no keepalive
+end
+```
+
+- R3:
+
+```
+R3#sh run | s vrf def
+vrf definition TEST2
+ !
+ address-family ipv4
+ exit-address-family
+ !
+ address-family ipv6
+ exit-address-family
+
+ R3#sh run | s router eigrp
+router eigrp 65001
+ !
+ address-family ipv4 vrf TEST2 
+  network 3.3.3.3 0.0.0.0
+  network 10.1.23.0 0.0.0.255
+  passive-interface Loopback1
+  autonomous-system 65001
+  eigrp router-id 3.3.3.3
+ exit-address-family
+router eigrp CISCO
+ !
+ address-family ipv6 unicast vrf TEST2 autonomous-system 65002
+  !
+  af-interface Loopback1
+   passive-interface
+  exit-af-interface
+  !
+  topology base
+  exit-af-topology
+  eigrp router-id 3.3.3.3
+ exit-address-family
+
+ R3#sh run int l1          
+Building configuration...
+
+Current configuration : 119 bytes
+!
+interface Loopback1
+ vrf forwarding TEST2
+ ip address 3.3.3.3 255.255.255.255
+ ipv6 address 2001:DB8:3:3::3/128
+end
+
+R3#sh run int g1
+Building configuration...
+
+Current configuration : 174 bytes
+!
+interface GigabitEthernet1
+ vrf forwarding TEST2
+ ip address 10.1.23.3 255.255.255.0
+ negotiation auto
+ ipv6 address 2001:DB8:2:23::3/64
+ no mop enabled
+ no mop sysid
+end
+```
+
+```
+R1#ping vrf TEST1 2001:db8:3:3::3           
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 2001:DB8:3:3::3, timeout is 2 seconds:
+!!!!!
+Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/1 ms
+R1#ping vrf TEST1 2001:db8:2:23::2          
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 2001:DB8:2:23::2, timeout is 2 seconds:
+!!!!!
+Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/1 ms
+R1#ping vrf TEST1 2001:db8:2:23::3
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 2001:DB8:2:23::3, timeout is 2 seconds:
+!!!!!
+Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/1 ms
+
+R1#ping vrf TEST1 2001:db8:2:23::3 source l0
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 2001:DB8:2:23::3, timeout is 2 seconds:
+Packet sent with a source address of 2001:DB8:1:1::1%TEST1
+!!!!!
+Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/1 ms
+R1#ping vrf TEST1 2001:db8:2:2::3 source l0 
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 2001:DB8:2:2::3, timeout is 2 seconds:
+Packet sent with a source address of 2001:DB8:1:1::1%TEST1
+!!!!!
+Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/1 ms
+```
