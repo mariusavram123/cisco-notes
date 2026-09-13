@@ -1842,3 +1842,475 @@ D        172.16.12.0/24 [90/3072] via 172.16.24.2, 00:42:14, GigabitEthernet1
 D        172.16.13.0/24 [90/3328] via 172.16.24.2, 00:04:51, GigabitEthernet1
 D        172.16.23.0/24 [90/3072] via 172.16.24.2, 00:42:14, GigabitEthernet1
 ```
+
+### Advanced EIGRP features
+
+#### EIGRP Graceful restart
+
+- Is a feature build into EIGRP, is a command that can turn it on or off
+
+- To be used when a maintenaince is needed on a specific router
+
+- It allows to the router which goes in maintenaince mode to notify it's neighbor that it will go down for a period of time, and let the neighbor to reconverge and recalculate the routes as needed
+
+- It is not meant to be used for link failures
+
+![EIGRP-features-topology](./EIGRP-features-topology.png)
+
+- When simply reboot-ing a router, the link goes down, but, using the default hello timer of 5 seconds - which means you will have 3 times the hello timer (15 seconds hold timer) -> you continue forwarding or trying to forward traffic towards a router that was now rebooted
+
+- Depending on the IOS version, you can see a Goodbye message or a Peer termination received message
+
+- If a peer termination is received, all of K values will be set to 255
+
+- Capture when R5 shut itself down:
+
+![EIGRP-hello-peer-termination](./EIGRP-hello-peer-termination.png)
+
+- Can be configured in two ways:
+
+1. Remove the network statement - Preferred the network statement to have a /32 subnet mask
+
+```
+conf t
+ router eigrp 65001
+  no network 10.1.15.0 0.0.0.255
+! or
+
+conf t
+ router eigrp CISCO
+  address-family ipv4 autonomous-system 65001
+   no network 10.1.15.0 0.0.0.255
+```
+
+2. Shut down the EIGRP routing process
+
+```
+conf t
+ router eigrp 65001
+  shutdown
+
+! or
+
+conf t
+ router eigrp CISCO
+  address-family ipv4 autonomous-system 65001
+   shutdown
+```
+
+- On R1 we will see a PEER-TERMINATION received log
+
+```
+R1(config-if)#
+*Sep 13 09:14:30.258: %DUAL-5-NBRCHANGE: EIGRP-IPv4 65001: Neighbor 10.1.15.5 (GigabitEthernet2) is down: Interface PEER-TERMINATION received
+```
+
+- The preferred way is to shut down the EIGRP routing process, because this way all network statements stay intact
+
+#### EIGRP Over The Top Routing (EIGRP OTP)
+
+- Allows single End-to-End EIGRP domain over any WAN connection
+
+- Distributes routes betwen the customer edge devices without redistribution into the WAN
+
+- EIGRP Route Reflectors (E-RR) can be deployed when multiple customer sites are involved
+
+- Traffic forwarded across the WAN architecture is LISP-encapsulated:
+
+    - Control plane will be EIGRP
+
+    - Locator ID Separation Protocol will be used to route traffic over the WAN on the data plane
+
+- Available only in EIGRP named mode
+
+![l3vpn-topology-classic](./l3vpn-topology-classic.png)
+
+- In a classic L3VPN topology there are a lot of redistribution points involved
+
+- EIGRP Over the Top routing makes any type of WAN connection irrelevant
+
+![eigrp-otr-cml-topology](./eigrp-otr-cml-topology.png)
+
+- All we need to do this is reachability between our 2 points
+
+- Example - R1's G1 network to be reachable to R3's G1 network or R4's G1 network
+
+```
+R1#ping 10.1.23.3
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 10.1.23.3, timeout is 2 seconds:
+!!!!!
+Success rate is 100 percent (5/5), round-trip min/avg/max = 1/4/20 ms
+R1#ping 10.1.24.4
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 10.1.24.4, timeout is 2 seconds:
+!!!!!
+Success rate is 100 percent (5/5), round-trip min/avg/max = 1/5/23 ms
+R1#
+```
+
+- You can use an EIGRP Route Reflector - R1 in our case will be the EIGRP route reflector
+
+- It works very similar to the way a BGP route reflector is formed
+
+- This will require for EIGRP `no split horizon` and `no next-hop-self`
+
+- This will require LISP in the data plane -> we need to enable LISP encapsulation for this to work
+
+- We need IOS XE to run this Over the Top feature (CSR1000v or C8000V required)
+
+- OSPF is used as the reachability protocol in order to get to the subnets required on EIGRP routers
+
+- R4 and R3 will be the "spokes" for our topology, and R1 will be the "hub" or "EIGRP-RR"
+
+- R4 configuration:
+
+```
+conf t
+ router eigrp CISCO
+  address-family ipv4 autonomous-system 65001
+   network 192.168.4.0
+   neighbor 10.1.12.1 g1 remote 5 lisp-encap 65001
+```
+
+- R3 configuration:
+
+```
+conf t
+ router eigrp CISCO
+  address-family ipv4 autonomous-system 65001
+   network 192.168.3.0
+   neighbor 10.1.12.1 g1 remote 5 lisp-encap 65001
+```
+
+- The internal networks (the one corresponding to G1 interface will automatically be added into EIGRP configuration)
+
+```
+R4(config-router-af)#do sh run | s router eigrp
+router eigrp CISCO
+ !
+ address-family ipv4 unicast autonomous-system 65001
+  !
+  topology base
+  exit-af-topology
+  neighbor 10.1.12.1 GigabitEthernet1 remote 5 lisp-encap 65001 
+  network 10.1.24.0 0.0.0.255
+  network 192.168.4.0
+ exit-address-family
+```
+
+- R1 configuration - EIGRP RR
+
+```
+conf t
+ router eigrp CISCO
+  address-family ipv4 autonomous-system 65001
+   network 192.168.1.0
+   af-interface g1
+    no split-horizon
+    no next-hop-self
+    exit
+   remote-neighbors source g1 unicast-listen lisp-encap 65001
+```
+
+- Now R1 has EIGRP neighbors with both R3 and R4
+
+```
+R1(config-router-af)#
+*Sep 13 11:15:58.485: %LINEPROTO-5-UPDOWN: Line protocol on Interface LISP65001, changed state to up
+R1(config-router-af)#
+*Sep 13 11:16:00.948: %DUAL-5-NBRCHANGE: EIGRP-IPv4 65001: Neighbor 10.1.24.4 (GigabitEthernet1) is up: new adjacency
+*Sep 13 11:16:01.798: %DUAL-5-NBRCHANGE: EIGRP-IPv4 65001: Neighbor 10.1.23.3 (GigabitEthernet1) is up: new adjacency
+```
+
+- As you can see there is no redistribution here involved
+
+- The routing between the neighbors does not matter as long as there is reachability to them
+
+```
+R1(config-router-af)#do sh ip eigrp neig
+EIGRP-IPv4 VR(CISCO) Address-Family Neighbors for AS(65001)
+H   Address                 Interface              Hold Uptime   SRTT   RTO  Q  Seq
+                                                   (sec)         (ms)       Cnt Num
+2   10.1.23.3               Gi1                      12 00:02:56    4   100  0  3
+1   10.1.24.4               Gi1                      13 00:02:57    3   100  0  4
+0   10.1.15.5               Gi2                      11 02:03:46    1   100  0  13
+
+R1(config-router-af)#do sh ip route eigrp | b Gate
+Gateway of last resort is not set
+
+      192.168.3.0/32 is subnetted, 3 subnets
+D        192.168.3.1 [90/93994331] via 10.1.23.3, 00:03:46, LISP65001
+D        192.168.3.2 [90/93994331] via 10.1.23.3, 00:03:46, LISP65001
+D        192.168.3.3 [90/93994331] via 10.1.23.3, 00:03:46, LISP65001
+      192.168.4.0/32 is subnetted, 3 subnets
+D        192.168.4.1 [90/93994331] via 10.1.24.4, 00:03:47, LISP65001
+D        192.168.4.2 [90/93994331] via 10.1.24.4, 00:03:47, LISP65001
+D        192.168.4.3 [90/93994331] via 10.1.24.4, 00:03:47, LISP65001
+```
+
+- R4's EIGRP routing table:
+
+```
+R4#sh ip route eigrp | b Gate
+Gateway of last resort is not set
+
+      1.0.0.0/32 is subnetted, 1 subnets
+D        1.1.1.1 [90/93994331] via 10.1.12.1, 00:04:35, LISP65001
+      10.0.0.0/8 is variably subnetted, 5 subnets, 2 masks
+D        10.1.15.0/24 [90/93998811] via 10.1.12.1, 00:04:35, LISP65001
+      192.168.1.0/32 is subnetted, 3 subnets
+D        192.168.1.1 [90/93994331] via 10.1.12.1, 00:04:35, LISP65001
+D        192.168.1.2 [90/93994331] via 10.1.12.1, 00:04:35, LISP65001
+D        192.168.1.3 [90/93994331] via 10.1.12.1, 00:04:35, LISP65001
+      192.168.3.0/32 is subnetted, 3 subnets
+D        192.168.3.1 [90/93994331] via 10.1.23.3, 00:04:34, LISP65001
+D        192.168.3.2 [90/93994331] via 10.1.23.3, 00:04:34, LISP65001
+D        192.168.3.3 [90/93994331] via 10.1.23.3, 00:04:34, LISP65001
+R4#ping 192.168.3.1 so
+R4#ping 192.168.3.1 source l3 
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 192.168.3.1, timeout is 2 seconds:
+Packet sent with a source address of 192.168.4.3 
+!!!!!
+Success rate is 100 percent (5/5), round-trip min/avg/max = 1/6/26 ms
+R4#ping 192.168.1.1 source l1 
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 192.168.1.1, timeout is 2 seconds:
+Packet sent with a source address of 192.168.4.1 
+!!!!!
+Success rate is 100 percent (5/5), round-trip min/avg/max = 1/4/16 ms
+
+R4#ping 10.1.15.5 source l1  
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 10.1.15.5, timeout is 2 seconds:
+Packet sent with a source address of 192.168.4.1 
+!!!!!
+Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/1 ms
+```
+
+#### EIGRP Neighbor Relationships
+
+1. Multicast
+
+2. Unicast
+
+- Multicast:
+
+    - Utilizes a neighbor discovery process
+
+    - Network command enables the EIGRP process on the selected interfaces(s)
+
+    - EIGRP hello packets sent to 224.0.0.10
+
+    - Neighbors exchange the full routing table once adjacency is formed
+
+        - Only routing updates are sent after the first full exchange
+
+- Unicast:
+    
+    - Must be manually configured using the `neighbor` command
+
+    ```
+    neighbor 10.1.2.2 e0/0
+    ```
+
+    - Neighbor address is used for unicast hello packets
+
+- When a switch is between multiple routers and unicast neighbors are enabled, all multicast neighbor relationships existent get dropped and you have to manually add every neighbor with the neighbor command, as unicast
+
+- The passive-interface command is ignored if the neighbor command is in place (hellos will be sent over the passive interface if the neighbor is specified with the neighbor command)
+
+- The passive interface will prevent the neighborsip from coming up
+
+![static-peers-topology](./static-peers-topology.png)
+
+- R1 config - has a static neighbor configured, however the interface is passive
+
+```
+R1(config-router-af)#do sh run | s router eigrp
+router eigrp CISCO
+ !
+ address-family ipv4 unicast autonomous-system 65001
+  !
+  af-interface GigabitEthernet0/0
+   passive-interface
+  exit-af-interface
+  !
+  topology base
+  exit-af-topology
+  neighbor 10.1.123.2 GigabitEthernet0/0
+  network 1.0.0.0
+  network 10.1.123.1 0.0.0.0
+  network 192.168.1.0
+  eigrp router-id 1.1.1.1
+ exit-address-family
+```
+
+- Neighbor table on R1:
+
+```
+R1(config-router-af)#do sh ip eigrp neigh
+EIGRP-IPv4 VR(CISCO) Address-Family Neighbors for AS(65001)
+R1(config-router-af)#
+```
+
+- However R2 thinks it haves a neighborship via that interface:
+
+```
+R2(config-router)#do sh run | s router eigrp
+router eigrp 65001
+ network 2.2.2.2 0.0.0.0
+ network 10.1.123.2 0.0.0.0
+ network 192.168.2.0
+ neighbor 10.1.123.1 GigabitEthernet0/0
+```
+
+- R2's neighbor table:
+
+```
+R2(config-router)#
+*Sep 13 15:32:31.691: %DUAL-5-NBRCHANGE: EIGRP-IPv4 65001: Neighbor 10.1.123.1 (GigabitEthernet0/0) is down: retry limit exceeded
+R2(config-router)#
+R2(config-router)#
+*Sep 13 15:32:33.993: %DUAL-5-NBRCHANGE: EIGRP-IPv4 65001: Neighbor 10.1.123.1 (GigabitEthernet0/0) is up: new adjacency
+R2(config-router)#
+R2(config-router)#
+R2(config-router)#
+R2(config-router)#do sh ip eigrp neighbor
+EIGRP-IPv4 Neighbors for AS(65001)
+H   Address                 Interface              Hold Uptime   SRTT   RTO  Q  Seq
+                                                   (sec)         (ms)       Cnt Num
+0   10.1.123.1              Gi0/0                    13 00:00:10    1  5000  1  0
+R2(config-router)#
+```
+
+- However the Q Cnt for the interface is increasing
+
+- Disabling passive-interface on g0/0 sets the neighborship back
+
+```
+conf t
+ router eigrp CISCO
+  address-family ipv4 autonomous-system 65001
+   af-interface g0/0
+    no passive-interface
+```
+
+- Neighbor table on R1:
+
+```
+R1(config-router-af-interface)#do sh ip eigrp neigh
+EIGRP-IPv4 VR(CISCO) Address-Family Neighbors for AS(65001)
+H   Address                 Interface              Hold Uptime   SRTT   RTO  Q  Seq
+                                                   (sec)         (ms)       Cnt Num
+0   10.1.123.2              Gi0/0                    12 00:01:45    2   100  0  32
+```
+
+- Neighbor table on R2:
+
+```
+R2(config-router)#do sh ip eigrp neighbor
+EIGRP-IPv4 Neighbors for AS(65001)
+H   Address                 Interface              Hold Uptime   SRTT   RTO  Q  Seq
+                                                   (sec)         (ms)       Cnt Num
+0   10.1.123.1              Gi0/0                    14 00:03:08    1   100  0  23
+```
+
+- Now R2 does not have a Q Cnt other than 0
+
+- Routing table on R2:
+
+```
+R2(config-router)#do sh ip ro eigrp | b Gate
+Gateway of last resort is not set
+
+      1.0.0.0/32 is subnetted, 1 subnets
+D        1.1.1.1 [90/2848] via 10.1.123.1, 00:02:59, GigabitEthernet0/0
+      192.168.1.0/32 is subnetted, 3 subnets
+D        192.168.1.1 [90/2848] via 10.1.123.1, 00:02:59, GigabitEthernet0/0
+D        192.168.1.2 [90/2848] via 10.1.123.1, 00:02:59, GigabitEthernet0/0
+D        192.168.1.3 [90/2848] via 10.1.123.1, 00:02:59, GigabitEthernet0/0
+```
+
+#### Add path support in EIGRP
+
+- Topology
+
+![eigrp-addpath-feature](./eigrp-addpath-feature.png)
+
+- Hub router - interface config
+
+```
+conf t
+ interface tunnel 1
+  ip address 172.16.1.1 255.255.255.0
+  no ip redirects
+  ip nhrp map multicast 4.4.4.4
+  ip nhrp map multicast 5.5.5.5
+  ip nhrp map multicast 6.6.6.6
+  ip nhrp network-id 1
+  ip nhrp redirect
+  tunnel source loopback 0
+  tunnel mode gre multipoint
+```
+
+- Disable split horizon for EIGRP - classic mode
+
+```
+conf t
+ interface tunnel 1
+  no ip split-horizon eigrp 65001
+  no ip next-hop-self eigrp 65001
+```
+
+- EIGRP classic config:
+
+```
+conf t
+ router eigrp 65001
+  network 172.16.1.1 0.0.0.0
+```
+
+- Upgrade from classic eigrp to named eigrp mode:
+
+```
+conf t
+ router eigrp 65001
+  eigrp upgrade-cli DMVPN
+```
+
+- on R4 - enable EIGRP for LAN segment - 10.24.35.0/24
+
+```
+conf t
+ router eigrp 65001
+  network 10.24.35.0 0.0.0.255
+```
+
+- on R5 - do the same thing
+
+```
+conf t
+ router eigrp 65001
+  network 10.24.35.0 0.0.0.255
+```
+
+- Now R1 sees an ECMP path towards the 10.24.35.0/24 network
+
+- On R6 only has one path to the 10.24.35.0/24 network
+
+- Configuring addpath on R1:
+
+```
+conf t
+ router eigrp DMVPN
+  address-family ipv4 autonomous-system 65001
+   af-interface tunnel 1
+    add-paths 2
+```
+
+- Not recommended to use the variance command in configuration with add-paths because can cause problems with metrics
+
+- Now we have 2 paths to 10.24.35.0/24 network also on R6
+
