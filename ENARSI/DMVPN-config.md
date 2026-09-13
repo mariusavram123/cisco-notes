@@ -498,3 +498,88 @@ interface Tunnel1
  tunnel key 123
 end
 ```
+
+```
+R3#show dmvpn 
+Legend: Attrb --> S - Static, D - Dynamic, I - Incomplete
+        N - NATed, L - Local, X - No Socket
+        T1 - Route Installed, T2 - Nexthop-override
+        C - CTS Capable, I2 - Temporary
+        # Ent --> Number of NHRP entries with same NBMA peer
+        NHS Status: E --> Expecting Replies, R --> Responding, W --> Waiting
+        UpDn Time --> Up or Down Time for a Tunnel
+==========================================================================
+
+Interface: Tunnel1, IPv4 NHRP Details 
+Type:Spoke, NHRP Peers:1, 
+
+ # Ent  Peer NBMA Addr Peer Tunnel Add State  UpDn Tm Attrb
+ ----- --------------- --------------- ----- -------- -----
+     1 1.1.1.1              172.16.1.1    UP 00:32:26     S
+
+```
+
+```
+R4#show dmvpn 
+Legend: Attrb --> S - Static, D - Dynamic, I - Incomplete
+        N - NATed, L - Local, X - No Socket
+        T1 - Route Installed, T2 - Nexthop-override
+        C - CTS Capable, I2 - Temporary
+        # Ent --> Number of NHRP entries with same NBMA peer
+        NHS Status: E --> Expecting Replies, R --> Responding, W --> Waiting
+        UpDn Time --> Up or Down Time for a Tunnel
+==========================================================================
+
+Interface: Tunnel1, IPv4 NHRP Details 
+Type:Spoke, NHRP Peers:1, 
+
+ # Ent  Peer NBMA Addr Peer Tunnel Add State  UpDn Tm Attrb
+ ----- --------------- --------------- ----- -------- -----
+     1 1.1.1.1              172.16.1.1    UP 00:30:35     S
+
+```
+
+```
+R3#show ip nhrp 
+172.16.1.1/32 via 172.16.1.1
+   Tunnel1 created 00:34:22, never expire 
+   Type: static, Flags: used 
+   NBMA address: 1.1.1.1 
+```
+
+```
+R5#traceroute 192.168.3.3 source l2
+Type escape sequence to abort.
+Tracing the route to 192.168.3.3
+VRF info: (vrf in name/id, vrf out name/id)
+  1 172.16.1.1 0 msec
+    172.16.1.3 1 msec 1 msec
+
+R5#show ip nhrp 
+172.16.1.1/32 via 172.16.1.1
+   Tunnel1 created 00:32:54, never expire 
+   Type: static, Flags: used 
+   NBMA address: 1.1.1.1 
+172.16.1.3/32 via 172.16.1.3
+   Tunnel1 created 00:00:30, expire 00:09:29
+   Type: dynamic, Flags: router used nhop 
+   NBMA address: 3.3.3.3
+
+```
+
+```
+R3#show ip nhrp 
+172.16.1.1/32 via 172.16.1.1
+   Tunnel1 created 00:38:58, never expire 
+   Type: static, Flags: used 
+   NBMA address: 1.1.1.1 
+172.16.1.3/32 via 172.16.1.3
+   Tunnel1 created 00:01:42, expire 00:08:17
+   Type: dynamic, Flags: router unique local 
+   NBMA address: 3.3.3.3 
+    (no-socket) 
+172.16.1.5/32 via 172.16.1.5
+   Tunnel1 created 00:01:42, expire 00:08:17
+   Type: dynamic, Flags: router implicit used nhop 
+   NBMA address: 5.5.5.5 
+```
