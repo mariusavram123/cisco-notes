@@ -696,4 +696,989 @@ Routing entry for 10.56.1.0/24
 
 - Only the LSA age is modified during flooding for Type 2 external OSPF routes
 
-- 
+- Below we can see R6 redistributing the 172.16.6.0/24 route within the OSPF domain
+
+- Notice that Type 5 LSA exists in all OSPF areas of the routing domain
+
+![type5-lsa-flooding](./type5-lsa-flooding.png)
+
+- Below is provided a brief summary view of the Type 5 LSAs under Type-5 AS External
+
+- The link ID is the external network number, and the advertising router is the RID for the router originating the Type 5 LSA
+
+- Notice that Type 5 LSA is not associated with a specific OSPF area
+
+- This is because Type 5 LSAs are flooded throughout the OSPF routing domain by default
+
+```
+R4#show ip ospf database
+(...)
+                Type-5 AS External Link States
+
+Link ID         ADV Router      Age         Seq#       Checksum Tag
+172.16.6.0      192.168.6.6     594         0x80000001 0x006AD8 0
+```
+
+- You can see Type 5 LSAs in detail by using the `show ip ospf database external` command
+
+- ABRs only modify the LSA age as the Type 5 LSA propagates through the OSPF domain
+
+- Below you can see the detailed output for the OSPF external LSAs in the routing domain
+
+- Notice that only the LS age is modified between the routers
+
+```
+R6#show ip ospf database external 
+
+            OSPF Router with ID (192.168.6.6) (Process ID 1)
+
+                Type-5 AS External Link States
+
+  LS age: 16
+  Options: (No TOS-capability, DC, Upward)
+  LS Type: AS External Link
+  Link State ID: 172.16.6.0 (External Network Number )
+  Advertising Router: 192.168.6.6
+  LS Seq Number: 80000001
+  Checksum: 0xCA48
+  Length: 36
+  Network Mask: /24
+        Metric Type: 2 (Larger than any link state path)
+        MTID: 0 
+        Metric: 20 
+        Forward Address: 10.67.1.7
+        External Route Tag: 0
+
+```
+
+```
+R1#show ip ospf database external 
+
+            OSPF Router with ID (192.168.1.1) (Process ID 1)
+
+                Type-5 AS External Link States
+
+  LS age: 225
+  Options: (No TOS-capability, DC, Upward)
+  LS Type: AS External Link
+  Link State ID: 172.16.6.0 (External Network Number )
+  Advertising Router: 192.168.6.6
+  LS Seq Number: 80000001
+  Checksum: 0xCA48
+  Length: 36
+  Network Mask: /24
+        Metric Type: 2 (Larger than any link state path)
+        MTID: 0 
+        Metric: 20 
+        Forward Address: 10.67.1.7
+        External Route Tag: 0
+
+```
+
+- Below we can see an explanation of the fields in a Type 5 LSA 
+
+```
+Field                                               Description
+
+Link ID                                             External network number
+
+Network Mask                                        Subnet mask for the external network
+
+Advertising Router                                  RID of the router advertising the route (ASBR)
+
+Metric Type                                         OSPF external metric type (Type 1 O E1 or Type 2 O E2)
+
+Metric                                              Metric upon redistribution
+
+External Route Tag                                  32-bit field included with an external route, which is not used by OSPF under
+                                                    normal operation but can be used to communicate AS boundaries or other relevant information
+                                                    to prevent routing loops
+```
+
+##### LSA Type 4: ASBR Summary
+
+- A Type 4 LSA (ASBR summary LSA) locates the ASBR for a Type 5 LSA
+
+- A Type 5 LSA is flooded through the OSPF domain, and the only mechanism to identify the ASBR is the RID
+
+- Routers examine the Type 5 LSA, check whether the RID is in the local area, and if the ASBR is not local, they require a mechanism to locate the ASBR
+
+- Remember that the RID does not have to match an IP address on any OSPF router (including ASBRs)
+
+- Only Type 1 or Type 2 LSAs provide a method to locate the RID within an area
+
+- Type 4 LSAs provide a way for routers to locate the ASBR when the router is in a different area from the ASBR
+
+- A Type 4 LSA is created by the first ABR, and it provides a summary route strictly for the ASBR of a Type 5 LSA
+
+- The metric for the Type 4 LSA uses the following logic:
+
+    - When the Type 5 LSA crosses the first ABR, the ABR creates a Type 4 LSA with a metric set to the total path metric to the ASBR
+
+    - When an ABR receives a Type 4 LSA from Area 0, the ABR creates a new Type 4 LSA with a metric set to the total path metric of the first ABR plus the metric of the original Type 4 LSA
+
+- Below is shown how the ABRs (R4 and R5) create Type 4 LSAs for the ASBR (R6)
+
+![type4-and-type5-lsa-flooding](./type4-and-type5-lsa-flooding.png)
+
+- Below is a brief summary view of the Type 4 LSAs for R4 under "Summary ASB Link States"
+
+- Notice how the advertising router changes as the LSA crosses from ABR to ABR
+
+```
+R4#show ip ospf database 
+
+(...)
+                Summary ASB Link States (Area 0)
+
+Link ID         ADV Router      Age         Seq#       Checksum
+192.168.6.6     192.168.5.5     861         0x80000002 0x00064B
+
+(...)
+                Summary ASB Link States (Area 1234)
+
+Link ID         ADV Router      Age         Seq#       Checksum
+192.168.6.6     192.168.4.4     919         0x80000002 0x001D35
+```
+
+- To view the details of the Type 4 LSAs, you use the command `show ip ospf database asbr-summary`
+
+- Below is provided the detailed output of the Type 4 LSA on R4
+
+```
+R4#show ip ospf database asbr-summary 
+
+            OSPF Router with ID (192.168.4.4) (Process ID 1)
+
+                Summary ASB Link States (Area 0)
+
+  LS age: 1065
+  Options: (No TOS-capability, DC, Upward)
+  LS Type: Summary Links(AS Boundary Router)
+  Link State ID: 192.168.6.6 (AS Boundary Router address)
+  Advertising Router: 192.168.5.5
+  LS Seq Number: 80000002
+  Checksum: 0x64B
+  Length: 28
+  Network Mask: /0
+        MTID: 0         Metric: 1 
+
+
+                Summary ASB Link States (Area 1234)
+
+  LS age: 1123
+  Options: (No TOS-capability, DC, Upward)
+  LS Type: Summary Links(AS Boundary Router)
+  Link State ID: 192.168.6.6 (AS Boundary Router address)
+  Advertising Router: 192.168.4.4
+  LS Seq Number: 80000002
+  Checksum: 0x1D35
+  Length: 28
+  Network Mask: /0
+        MTID: 0         Metric: 2 
+
+```
+
+- Notice that the metric and advertising router change between the OSPF areas
+
+- An ABR advertises only one Type 4 LSA for every ASBR, even if the ASBR advertises thousands of Type 5 LSAs
+
+##### LSA Type 7: NSSA External Summary
+
+- Later we will be using not-so-stubby areas (NSSAs) to reduce the LSDB in an area
+
+- A Type 7 LSA (NSSA external LSA) exists only in NSSAs where route redistribution is occuring
+
+- An ASBR injects external routes as Type 7 LSAs in an NSSA
+
+- The ABR does not advertise the Type 7 LSAs outside the originating NSSA, but it converts the Type 7 LSA into a Type 5 LSA for the other OSPF areas
+
+- If the Type 5 LSA crosses Area 0, the second ABR creates a Type 4 LSA for the Type 5 LSA
+
+- Below is shown Area 56 as a NSSA and R6 redistributing the 172.16.6.0/24 prefix
+
+- The Type 7 LSA exists only for Area 56
+
+- R5 injects the Type 5 LSA in Area 0, which propagates to Area 1234, and R4 creates the Type 4 LSA for Area 1234
+
+![ospf-type7-lsas](./ospf-type7-lsas.png)
+
+- Below is provided a brief view of the Type 7 LSAs, under Type 7 AS External Link States
+
+- Type 7 LSAs are present only in the OSPF NSSA area where redistribution is occuring
+
+- Notice that the Type 7 LSA is not present on R4; R4 contains a Type 5 LSA that was created by R5 and the Type 4 LSA (created by R4 for Area 1234)
+
+- R5:
+
+```
+R5#show ip ospf database 
+
+            OSPF Router with ID (192.168.5.5) (Process ID 1)
+(...)
+                Type-7 AS External Link States (Area 56)
+
+Link ID         ADV Router      Age         Seq#       Checksum Tag
+172.16.6.0      192.168.6.6     431         0x80000001 0x0036D2 0
+
+                Type-5 AS External Link States
+
+Link ID         ADV Router      Age         Seq#       Checksum Tag
+172.16.6.0      192.168.5.5     423         0x80000001 0x00D73D 0
+```
+
+- R4:
+
+```
+R4#show ip ospf database 
+
+            OSPF Router with ID (192.168.4.4) (Process ID 1)
+(...)
+                Summary ASB Link States (Area 1234)
+
+Link ID         ADV Router      Age         Seq#       Checksum
+192.168.5.5     192.168.4.4     518         0x80000001 0x002A2C
+
+                Type-5 AS External Link States
+
+Link ID         ADV Router      Age         Seq#       Checksum Tag
+172.16.6.0      192.168.5.5     494         0x80000001 0x00D73D 0
+```
+
+- To see the specific Type 7 LSA details, you use the command `show ip ospf database nssa-external`
+
+- Below we can see this command on R5:
+
+```
+R5#show ip ospf database nssa-external 
+
+            OSPF Router with ID (192.168.5.5) (Process ID 1)
+
+                Type-7 AS External Link States (Area 56)
+
+  LS age: 652
+  Options: (No TOS-capability, Type 7/5 translation, DC, Upward)
+  LS Type: AS External Link
+  Link State ID: 172.16.6.0 (External Network Number )
+  Advertising Router: 192.168.6.6
+  LS Seq Number: 80000001
+  Checksum: 0x36D2
+  Length: 36
+  Network Mask: /24
+        Metric Type: 2 (Larger than any link state path)
+        MTID: 0 
+        Metric: 20 
+        Forward Address: 10.67.1.7
+        External Route Tag: 0
+
+```
+
+- Below is provided a explanation of the fields in the Type 7 LSA
+
+```
+Field                                           Description
+
+Link ID                                         External network number
+
+Network Mask                                    Subnet mask for the external network
+
+Advertising Router                              RID of the router advertising the the route (ASBR)
+
+Metric Type                                     Type 1 (O N1 or Type 2 O N2)
+
+Metric                                          Metric upon redistribution
+
+External Route Tag                              32-bit field that is included with an external route, which is not used by OSPF itself and
+                                                can be used to communicate AS boundaries or other relevant information to prevent routing loops
+```
+
+##### LSA Type Summary
+
+- OSPF LSA types are important when troubleshooting a router's behavior for a specific prefix
+
+- Below is a summary of the OSPF LSA types covered:
+
+```
+LSA Type                                        Description
+
+1                                               Router Link
+
+2                                               Network Link
+
+3                                               Summary Link
+
+4                                               ASBR Summary
+
+5                                               AS external
+
+7                                               NSSA External
+```
+
+- Below are shown the network prefixes from our sample topology and the relevant LSAs that are present
+
+- Notice that Type 2 LSAs are present only on the broadcast network segments that have established adjacencies with other routers (10.123.1.0/24, 10.45.1.0/24 and 10.56.1.0/24); they are not advertised outside their local area
+
+![lsa-types-overview-sample-topology](./lsa-types-overview-sample-topology.png)
+
+### OSPF Stubby Areas
+
+- OSPF Stubby Areas provide a method to filter out external routes and the option to block inter-area routes
+
+- OSPF stubby areas are identified by the Area flag in the OSPF hello packet
+
+- Every router within an OSPF stubby area needs to be configured as a stub so that the routers can establish/maintain OSPF adjacencies
+
+- There are the following types of OSPF stubby areas:
+
+    - Stub Areas
+
+    - Totally stubby areas
+
+    - Not-so-stubby Areas (NSSAs)
+    
+    - Totally NSSAs
+
+- Totally stubby areas and totally NSSAs are not defined in RFC 2328 but are compliant and commonly implemented by Cisco and other network vendors
+
+#### Stub Areas
+
+- OSPF stub areas prohibit Type 5 LSAs (external routes) and Type 4 LSAs (ASBR summary LSAs) from entering the area at the ABR
+
+- RFC 2328 states that when a Type 5 LSA reaches the ABR of a stub area, the ABR generates a default route for the stub via a Type 3 LSA
+
+- A Cisco ABR generates a default route when the area is configured as a stub and has an OSPF-enabled interface configured for Area 0
+
+- Below we can see the concept
+
+![ospf-stub-area-concept](./ospf-stub-area-concept.png)
+
+- Below are shown the routing table for R3 and R4 before Area 34 is configured as a stub area
+
+- Notice that the external 172.16.1.0/24 route that R1 has redistributed into the routing table and that is visible on R3 and R4
+
+- R3:
+
+```
+R3#show ip route ospf | b Gate
+Gateway of last resort is not set
+
+      10.0.0.0/8 is variably subnetted, 5 subnets, 2 masks
+O IA     10.1.12.0/24 [110/2] via 10.1.23.2, 00:02:15, GigabitEthernet1
+      172.16.0.0/24 is subnetted, 1 subnets
+O E2     172.16.1.0 [110/20] via 10.1.23.2, 00:02:15, GigabitEthernet1
+      192.168.1.0/32 is subnetted, 1 subnets
+O IA     192.168.1.1 [110/3] via 10.1.23.2, 00:02:15, GigabitEthernet1
+      192.168.2.0/32 is subnetted, 1 subnets
+O IA     192.168.2.2 [110/2] via 10.1.23.2, 00:02:15, GigabitEthernet1
+      192.168.4.0/32 is subnetted, 1 subnets
+O        192.168.4.4 [110/2] via 10.1.34.4, 00:01:49, GigabitEthernet2
+```
+
+- R4:
+
+```
+R4#show ip route ospf | b Gate
+Gateway of last resort is not set
+
+      10.0.0.0/8 is variably subnetted, 4 subnets, 2 masks
+O IA     10.1.12.0/24 [110/3] via 10.1.34.3, 00:02:19, GigabitEthernet1
+O IA     10.1.23.0/24 [110/2] via 10.1.34.3, 00:02:19, GigabitEthernet1
+      172.16.0.0/24 is subnetted, 1 subnets
+O E2     172.16.1.0 [110/20] via 10.1.34.3, 00:02:19, GigabitEthernet1
+      192.168.1.0/32 is subnetted, 1 subnets
+O IA     192.168.1.1 [110/4] via 10.1.34.3, 00:02:19, GigabitEthernet1
+      192.168.2.0/32 is subnetted, 1 subnets
+O IA     192.168.2.2 [110/3] via 10.1.34.3, 00:02:19, GigabitEthernet1
+      192.168.3.0/32 is subnetted, 1 subnets
+O IA     192.168.3.3 [110/2] via 10.1.34.3, 00:02:19, GigabitEthernet1
+```
+
+- All routers in the stub area must be configured as stubs, or an adjacency cannot form because the area type flags in the OSPF hello packets do not match
+
+- An area is configured as a stub with the OSPF process command `area <area-id> stub`
+
+- Configuring area 34 as stub on R3 and R4:
+
+- R3:
+
+```
+conf t
+ router ospf 1
+  area 34 stub
+```
+
+- R4:
+
+```
+conf t
+ router ospf 1
+  area 34 stub
+```
+
+- Below is shown the routing table for R3 and R4 after Area 34 is made an OSPF stub area
+
+- The routing table from R3's perspective is not modified as it receives the Type 4 and Type 5 LSAs from Area 0
+
+- When the Type 5 LSA (172.16.1.0/24) reaches the ABR (R3), the ABR generates a default route a default route by using a Type 3 LSA
+
+- While R4 does not see the route to the 172.16.1.0/24 in it's routing table, it has connectivity to that network through the default route
+
+- Notice that inter-area routes are allowed in Area 34
+
+```
+R3#sh ip ro ospf | b Gate
+Gateway of last resort is not set
+
+      10.0.0.0/8 is variably subnetted, 5 subnets, 2 masks
+O IA     10.1.12.0/24 [110/2] via 10.1.23.2, 00:07:40, GigabitEthernet1
+      172.16.0.0/24 is subnetted, 1 subnets
+O E2     172.16.1.0 [110/20] via 10.1.23.2, 00:07:40, GigabitEthernet1
+      192.168.1.0/32 is subnetted, 1 subnets
+O IA     192.168.1.1 [110/3] via 10.1.23.2, 00:07:40, GigabitEthernet1
+      192.168.2.0/32 is subnetted, 1 subnets
+O IA     192.168.2.2 [110/2] via 10.1.23.2, 00:07:40, GigabitEthernet1
+      192.168.4.0/32 is subnetted, 1 subnets
+O        192.168.4.4 [110/2] via 10.1.34.4, 00:07:16, GigabitEthernet2
+```
+
+```
+R4#show ip route ospf | b Gate
+Gateway of last resort is 10.1.34.3 to network 0.0.0.0
+
+O*IA  0.0.0.0/0 [110/2] via 10.1.34.3, 00:07:46, GigabitEthernet1
+      10.0.0.0/8 is variably subnetted, 4 subnets, 2 masks
+O IA     10.1.12.0/24 [110/3] via 10.1.34.3, 00:07:46, GigabitEthernet1
+O IA     10.1.23.0/24 [110/2] via 10.1.34.3, 00:07:46, GigabitEthernet1
+      192.168.1.0/32 is subnetted, 1 subnets
+O IA     192.168.1.1 [110/4] via 10.1.34.3, 00:07:46, GigabitEthernet1
+      192.168.2.0/32 is subnetted, 1 subnets
+O IA     192.168.2.2 [110/3] via 10.1.34.3, 00:07:46, GigabitEthernet1
+      192.168.3.0/32 is subnetted, 1 subnets
+O IA     192.168.3.3 [110/2] via 10.1.34.3, 00:07:46, GigabitEthernet1
+```
+
+- Default routes are Type 3 LSAs (inter-area summaries) because stub areas do not allow Type 5 LSAs within them
+
+- A benefit of using a Type 3 LSA is that it cannot be advertised from a nonbackbone area into a backbone area
+
+- The concept is explained later
+
+#### Totally Stubby Areas
+
+- An OSPF totally stubby area prohibits Type 3 LSAs (inter-area), Type 4 LSAs (ASBR external LSAs), and Type 5 LSAs (external routes) from entering the area at the ABR
+
+- When an ABR of a totally stubby area receives a Type 3 or Type 5 LSA, the ABR generates a default route for the totally stubby area
+
+- In fact, the ABR for a totally stubby area advertises the default route into the totally stubby area the instant an interface is assigned to Area 0
+
+- Assigning the interface acts as the trigger for the Type 3 LSA that leads to the generation of the default route
+
+- Only intra-area and default routes should exist within a totally stubby area
+
+- Below we can see the totally stubby area concept
+
+![totally-stubby-area-concept](./totally-stubby-area-concept.png)
+
+- Below we can see the routing table of R3 and R4 before area 34 is converted to a totally stubby area
+
+- R3:
+
+```
+R3(config-router)#do sh ip ro ospf | b Gate
+Gateway of last resort is not set
+
+      10.0.0.0/8 is variably subnetted, 5 subnets, 2 masks
+O IA     10.1.12.0/24 [110/2] via 10.1.23.2, 00:00:39, GigabitEthernet1
+      172.16.0.0/24 is subnetted, 1 subnets
+O E2     172.16.1.0 [110/20] via 10.1.23.2, 00:00:39, GigabitEthernet1
+      192.168.1.0/32 is subnetted, 1 subnets
+O IA     192.168.1.1 [110/3] via 10.1.23.2, 00:00:39, GigabitEthernet1
+      192.168.2.0/32 is subnetted, 1 subnets
+O IA     192.168.2.2 [110/2] via 10.1.23.2, 00:00:39, GigabitEthernet1
+      192.168.4.0/32 is subnetted, 1 subnets
+O        192.168.4.4 [110/2] via 10.1.34.4, 00:00:27, GigabitEthernet2
+```
+
+- R4:
+
+```
+R4(config-router)#do sh ip ro ospf | b Gatew 
+Gateway of last resort is not set
+
+      10.0.0.0/8 is variably subnetted, 4 subnets, 2 masks
+O IA     10.1.12.0/24 [110/3] via 10.1.34.3, 00:01:00, GigabitEthernet1
+O IA     10.1.23.0/24 [110/2] via 10.1.34.3, 00:01:00, GigabitEthernet1
+      172.16.0.0/24 is subnetted, 1 subnets
+O E2     172.16.1.0 [110/20] via 10.1.34.3, 00:01:00, GigabitEthernet1
+      192.168.1.0/32 is subnetted, 1 subnets
+O IA     192.168.1.1 [110/4] via 10.1.34.3, 00:01:00, GigabitEthernet1
+      192.168.2.0/32 is subnetted, 1 subnets
+O IA     192.168.2.2 [110/3] via 10.1.34.3, 00:01:00, GigabitEthernet1
+      192.168.3.0/32 is subnetted, 1 subnets
+O IA     192.168.3.3 [110/2] via 10.1.34.3, 00:01:00, GigabitEthernet1
+```
+
+- Member routers, (no ABRs) of a totally stubby area are configured the same as those in a stub area
+
+- ABRs of a totally stubby area have `no-summary` appended to the configuration
+
+- The command `area <area-id> stub no-summary` is configured under the OSPF process
+
+- The keyword `no-summary` does exactly what it states: It blocks all Type 3 (summary) LSAs going into the stub area, making it a totally stubby area
+
+- Below is shown the configuration for R3 and R4 to make area 34 a totally stubby area for both routers
+
+- R3:
+
+```
+conf t
+ router ospf 1
+  area 34 stub no-summary
+```
+
+- R4:
+
+```
+conf t
+ router ospf 1
+  area 34 stub
+```
+
+- Below is shown the routing tables for R3 and R4 after Area 34 is converted to a totally stubby area
+
+- Notice that only the default route exists on R4
+
+- R3's loopback is a member of Area 0, but if it were a member of Area 34, it would appear as an intra-area route
+
+- The routing table on R3 has not been impacted at all
+
+- R3:
+
+```
+R3(config-router)#do sh ip ro ospf | b Gate
+Gateway of last resort is not set
+
+      10.0.0.0/8 is variably subnetted, 5 subnets, 2 masks
+O IA     10.1.12.0/24 [110/2] via 10.1.23.2, 00:04:14, GigabitEthernet1
+      172.16.0.0/24 is subnetted, 1 subnets
+O E2     172.16.1.0 [110/20] via 10.1.23.2, 00:04:14, GigabitEthernet1
+      192.168.1.0/32 is subnetted, 1 subnets
+O IA     192.168.1.1 [110/3] via 10.1.23.2, 00:04:14, GigabitEthernet1
+      192.168.2.0/32 is subnetted, 1 subnets
+O IA     192.168.2.2 [110/2] via 10.1.23.2, 00:04:14, GigabitEthernet1
+      192.168.4.0/32 is subnetted, 1 subnets
+O        192.168.4.4 [110/2] via 10.1.34.4, 00:04:01, GigabitEthernet2
+```
+
+- R4:
+
+```
+R4(config-router)#do sh ip ro ospf | b Gate
+Gateway of last resort is 10.1.34.3 to network 0.0.0.0
+
+O*IA  0.0.0.0/0 [110/2] via 10.1.34.3, 00:04:46, GigabitEthernet1
+```
+
+#### Not-So-Stubby Areas
+
+- An OSPF stub area prohibits Type 5 LSAs (external routes) and Type 4 LSAs (ASBR summary LSAs) from entering the area at the ABR, and it prohibits redistribution of external routes into the stub area too
+
+- An OSPF not-so-stubby area (NSSA) prohibits Type 5 LSAs from entering at the ABR but allows for redistribution of external routes into the NSSA
+
+- As the ASBR redistributes the routes into OSPF in the NSSA, the ASBR advertises the route with a Type 7 LSA instead of a Type 5 LSA
+
+- When the Type 7 LSA reaches the ABR, the ABR converts the Type 7 LSA to a Type 5 LSA
+
+- The ABR does not automatically advertise a default route when a Type 5 or Type 7 LSA is blocked
+
+- During configuration, an option exists to advertise a default route to provide connectivity to the blocked LSAs; in addition, other techniques can be used to ensure bidirectional connectivity
+
+- Below is demonstrated the concept of LSAs being processed on the ABR for the NSSA
+
+- Notice that the default route is optional and depends on the configuration
+
+![nssa-concept](./nssa-concept.png)
+
+- Below are shown the routing tables of R1, R3 and R4 before Area 34 is converted into an NSSA
+
+- Notice that R1 and R4 have received external routes from each other
+
+- R1:
+
+```
+R1#show ip route 172.31.4.0 255.255.255.0 
+Routing entry for 172.31.4.0/24
+  Known via "ospf 1", distance 110, metric 20, type extern 2, forward metric 3
+  Last update from 10.1.12.2 on GigabitEthernet1, 00:03:44 ago
+  Routing Descriptor Blocks:
+  * 10.1.12.2, from 192.168.4.4, 00:03:44 ago, via GigabitEthernet1
+      Route metric is 20, traffic share count is 1
+
+R1#show ip route ospf | s 172.31
+      172.31.0.0/24 is subnetted, 1 subnets
+O E2     172.31.4.0 [110/20] via 10.1.12.2, 00:04:24, GigabitEthernet1
+
+```
+
+- R3:
+
+```
+R3(config-router)#do sh ip ro ospf | b Gate
+Gateway of last resort is not set
+
+      10.0.0.0/8 is variably subnetted, 5 subnets, 2 masks
+O IA     10.1.12.0/24 [110/2] via 10.1.23.2, 00:08:00, GigabitEthernet1
+      172.16.0.0/24 is subnetted, 1 subnets
+O E1     172.16.1.0 [110/22] via 10.1.23.2, 00:00:06, GigabitEthernet1
+      172.31.0.0/24 is subnetted, 1 subnets
+O E2     172.31.4.0 [110/20] via 10.1.34.4, 00:07:50, GigabitEthernet2
+      192.168.1.0/32 is subnetted, 1 subnets
+O IA     192.168.1.1 [110/3] via 10.1.23.2, 00:08:00, GigabitEthernet1
+      192.168.2.0/32 is subnetted, 1 subnets
+O IA     192.168.2.2 [110/2] via 10.1.23.2, 00:08:00, GigabitEthernet1
+      192.168.4.0/32 is subnetted, 1 subnets
+O        192.168.4.4 [110/2] via 10.1.34.4, 00:07:50, GigabitEthernet2
+```
+
+- R4:
+
+```
+R4(config-router)#do sh ip ro ospf | b Gate
+Gateway of last resort is not set
+
+      10.0.0.0/8 is variably subnetted, 4 subnets, 2 masks
+O IA     10.1.12.0/24 [110/3] via 10.1.34.3, 00:08:25, GigabitEthernet1
+O IA     10.1.23.0/24 [110/2] via 10.1.34.3, 00:08:25, GigabitEthernet1
+      172.16.0.0/24 is subnetted, 1 subnets
+O E1     172.16.1.0 [110/23] via 10.1.34.3, 00:00:41, GigabitEthernet1
+      192.168.1.0/32 is subnetted, 1 subnets
+O IA     192.168.1.1 [110/4] via 10.1.34.3, 00:08:25, GigabitEthernet1
+      192.168.2.0/32 is subnetted, 1 subnets
+O IA     192.168.2.2 [110/3] via 10.1.34.3, 00:08:25, GigabitEthernet1
+      192.168.3.0/32 is subnetted, 1 subnets
+O IA     192.168.3.3 [110/2] via 10.1.34.3, 00:08:25, GigabitEthernet1
+```
+
+- The command `area <area-id> nssa [default-information-originate]` is placed under the OSPF process on the ABR
+
+- All routers in an NSSA must be configured with the `nssa` option, or they do not become adjacent because the area type flags must match in the OSPF hello protocol in order to become adjacent
+
+- A default route is not injected into the ABRs automatically for NSSAs, but the optional command `default-information-originate` can be appended to the configuration if a default route is needed in the NSSA
+
+- Below is shown the OSPF configuration of R3 and R4 after making area 34 an NSSA
+
+- R3 is configured with the optional `default-information-originate` keyword to inject the default route into Area 34
+
+- Notice that R4 is allowed to redistribute networks into the NSSA
+
+- R3:
+
+```
+R3(config-router)#do sh run | s router ospf
+router ospf 1
+ router-id 192.168.3.3
+ area 34 nssa default-information-originate
+```
+
+- R4:
+
+```
+R4(config-router)#do sh run | s router ospf
+router ospf 1
+ router-id 192.168.4.4
+ area 34 nssa
+ redistribute connected metric-type 1 subnets
+```
+
+- Below is shown the routing tables of R3 and R4 after converting Area 34 to an NSSA
+
+- On R3, the previous external route from R1 still exists as an OSPF External Type 1 (O E1) route, and R4's external route is now an OSPF External NSSA Type 1 (O N1) route
+
+- On R4, R1's external route is no longer present
+
+- R3 is configured to advertise a default route, which appears as an OSPF external NSSA Type 2 (O N2) route
+
+- The OSPF external routes are representative of a Type 7 LSA, which exists only in an NSSA
+
+- R3:
+
+```
+R3#show ip route ospf | b Gate
+Gateway of last resort is not set
+
+      10.0.0.0/8 is variably subnetted, 5 subnets, 2 masks
+O IA     10.1.12.0/24 [110/2] via 10.1.23.2, 00:23:43, GigabitEthernet1
+      172.16.0.0/24 is subnetted, 1 subnets
+O E1     172.16.1.0 [110/22] via 10.1.23.2, 00:23:43, GigabitEthernet1
+      172.31.0.0/24 is subnetted, 1 subnets
+O N1     172.31.4.0 [110/22] via 10.1.34.4, 00:21:56, GigabitEthernet2
+      192.168.1.0/32 is subnetted, 1 subnets
+O IA     192.168.1.1 [110/3] via 10.1.23.2, 00:23:43, GigabitEthernet1
+      192.168.2.0/32 is subnetted, 1 subnets
+O IA     192.168.2.2 [110/2] via 10.1.23.2, 00:23:43, GigabitEthernet1
+      192.168.4.0/32 is subnetted, 1 subnets
+O        192.168.4.4 [110/2] via 10.1.34.4, 00:23:27, GigabitEthernet2
+
+```
+
+- R4:
+
+```
+R4#show ip route ospf | b Gate
+Gateway of last resort is 10.1.34.3 to network 0.0.0.0
+
+O*N2  0.0.0.0/0 [110/1] via 10.1.34.3, 00:24:18, GigabitEthernet1
+      10.0.0.0/8 is variably subnetted, 4 subnets, 2 masks
+O IA     10.1.12.0/24 [110/3] via 10.1.34.3, 00:24:18, GigabitEthernet1
+O IA     10.1.23.0/24 [110/2] via 10.1.34.3, 00:24:18, GigabitEthernet1
+      192.168.1.0/32 is subnetted, 1 subnets
+O IA     192.168.1.1 [110/4] via 10.1.34.3, 00:24:18, GigabitEthernet1
+      192.168.2.0/32 is subnetted, 1 subnets
+O IA     192.168.2.2 [110/3] via 10.1.34.3, 00:24:18, GigabitEthernet1
+      192.168.3.0/32 is subnetted, 1 subnets
+O IA     192.168.3.3 [110/2] via 10.1.34.3, 00:24:18, GigabitEthernet1
+```
+
+#### Totally NSSAs
+
+- Totally Stubby Areas prohibit Type 3 LSAs (inter-area), Type 4 LSAs (ASBR summary LSAs), and Type 5 LSAs (external routes) from entering the area at ABR, and they prohibit routes from being redistributed within that area
+
+- OSPF areas that need to block Type 3 and Type 5 LSAs and still provide the capability of redistributing external routes into OSPF should use the OSPF totally NSSA areas
+
+- When the ASBR redistributes the route into OSPF, the ASBR advertises the route with a Type 7 LSA
+
+- As the Type 7 LSA reaches the ABR, the ABR converts the Type 7 LSA to a Type 5 LSA
+
+- When an ABR for a Totally NSSA receives a Type 3 LSA from the backbone, the ABR generates a default route for the totally NSSA
+
+- When an interface in the ABR is assigned to Area 0, it acts as a trigger for the Type 3 LSA that leads to the default route generation within the Totally NSSA
+
+- Below is demonstrated how LSAs are processed on the ABR for a totally NSSA
+
+![totally-nssa-concept](./totally-nssa-concept.png)
+
+- Below is displayed the routing table of R1, R3 and R4 before Area 34 is converted into an OSPF totally NSSA area
+
+- R1:
+
+```
+R1#show ip route ospf | b Gate
+Gateway of last resort is not set
+
+      10.0.0.0/8 is variably subnetted, 4 subnets, 2 masks
+O IA     10.1.23.0/24 [110/2] via 10.1.12.2, 02:09:50, GigabitEthernet1
+O IA     10.1.34.0/24 [110/3] via 10.1.12.2, 02:09:48, GigabitEthernet1
+      172.31.0.0/24 is subnetted, 1 subnets
+O E1     172.31.4.0 [110/23] via 10.1.12.2, 00:00:48, GigabitEthernet1
+      192.168.2.0/32 is subnetted, 1 subnets
+O        192.168.2.2 [110/2] via 10.1.12.2, 02:09:50, GigabitEthernet1
+      192.168.3.0/32 is subnetted, 1 subnets
+O IA     192.168.3.3 [110/3] via 10.1.12.2, 02:09:48, GigabitEthernet1
+      192.168.4.0/32 is subnetted, 1 subnets
+O IA     192.168.4.4 [110/4] via 10.1.12.2, 00:00:48, GigabitEthernet1
+```
+
+- R3:
+
+```
+R3(config-router)#do sh ip ro ospf | b Gate
+Gateway of last resort is not set
+
+      10.0.0.0/8 is variably subnetted, 5 subnets, 2 masks
+O IA     10.1.12.0/24 [110/2] via 10.1.23.2, 00:01:25, GigabitEthernet1
+      172.16.0.0/24 is subnetted, 1 subnets
+O E1     172.16.1.0 [110/22] via 10.1.23.2, 00:01:25, GigabitEthernet1
+      172.31.0.0/24 is subnetted, 1 subnets
+O E1     172.31.4.0 [110/21] via 10.1.34.4, 00:01:21, GigabitEthernet2
+      192.168.1.0/32 is subnetted, 1 subnets
+O IA     192.168.1.1 [110/3] via 10.1.23.2, 00:01:25, GigabitEthernet1
+      192.168.2.0/32 is subnetted, 1 subnets
+O IA     192.168.2.2 [110/2] via 10.1.23.2, 00:01:25, GigabitEthernet1
+      192.168.4.0/32 is subnetted, 1 subnets
+O        192.168.4.4 [110/2] via 10.1.34.4, 00:01:21, GigabitEthernet2
+```
+
+- R4:
+
+```
+R4(config-router)#do sh ip ro ospf | b Gate
+Gateway of last resort is not set
+
+      10.0.0.0/8 is variably subnetted, 4 subnets, 2 masks
+O IA     10.1.12.0/24 [110/3] via 10.1.34.3, 00:01:51, GigabitEthernet1
+O IA     10.1.23.0/24 [110/2] via 10.1.34.3, 00:01:51, GigabitEthernet1
+      172.16.0.0/24 is subnetted, 1 subnets
+O E1     172.16.1.0 [110/23] via 10.1.34.3, 00:01:51, GigabitEthernet1
+      192.168.1.0/32 is subnetted, 1 subnets
+O IA     192.168.1.1 [110/4] via 10.1.34.3, 00:01:51, GigabitEthernet1
+      192.168.2.0/32 is subnetted, 1 subnets
+O IA     192.168.2.2 [110/3] via 10.1.34.3, 00:01:51, GigabitEthernet1
+      192.168.3.0/32 is subnetted, 1 subnets
+O IA     192.168.3.3 [110/2] via 10.1.34.3, 00:01:51, GigabitEthernet1
+```
+
+- Member routers of a totally NSSA use the same configuration as members of the NSSA
+
+- ABRs of the NSSA area have `no-summary` appended to the configuration
+
+- The command `area <area-id> nssa no-summary` is configured under the OSPF process
+
+- Below is shown the R3's and R4's configuration to convert Area 34 into a totally NSSA
+
+- Notice the `no-summary` keyword appended to R3's NSSA command
+
+- Below is shown the routing tables of R3 and R4 after Area 34 is converted into a totally NSSA
+
+- R3 detects R1's redistributed source as O E1 (Type 5 LSA) and R4 redistributed source as O N1 (Type 7 LSA)
+
+- Notice that only the default route exists on R4.
+
+- R3's loopback is a member of Area 0, but if it were a member of Area 34, it would appear as an inter-area route
+
+- R3:
+
+```
+R3(config-router)#do sh ip ro ospf | b Gate
+Gateway of last resort is not set
+
+      10.0.0.0/8 is variably subnetted, 5 subnets, 2 masks
+O IA     10.1.12.0/24 [110/2] via 10.1.23.2, 00:06:30, GigabitEthernet1
+      172.16.0.0/24 is subnetted, 1 subnets
+O E1     172.16.1.0 [110/22] via 10.1.23.2, 00:06:30, GigabitEthernet1
+      172.31.0.0/24 is subnetted, 1 subnets
+O N1     172.31.4.0 [110/22] via 10.1.34.4, 00:06:10, GigabitEthernet2
+      192.168.1.0/32 is subnetted, 1 subnets
+O IA     192.168.1.1 [110/3] via 10.1.23.2, 00:06:30, GigabitEthernet1
+      192.168.2.0/32 is subnetted, 1 subnets
+O IA     192.168.2.2 [110/2] via 10.1.23.2, 00:06:30, GigabitEthernet1
+      192.168.4.0/32 is subnetted, 1 subnets
+O        192.168.4.4 [110/2] via 10.1.34.4, 00:06:10, GigabitEthernet2
+```
+
+- R4:
+
+```
+R4(config-router)#do sh ip ro ospf | b Gate
+Gateway of last resort is 10.1.34.3 to network 0.0.0.0
+
+O*IA  0.0.0.0/0 [110/2] via 10.1.34.3, 00:06:46, GigabitEthernet1
+```
+
+### OSPF Path Selection
+
+- OSPF executed Dijkstra's shortest path first (SPF) algorithm to create a loop-free topology of shortest paths
+
+- All routers use the same logic to calculate the shortest path for each network
+
+- Path selection prioritizes paths in the following order:
+
+    1. Intra-area
+
+    2. Inter-area
+
+    3. External Type 1
+
+    4. External Type 2
+
+- Below each component is explained in detail
+
+#### Link Costs
+
+- Interface cost is an essential component for Dijkstra's SPF calculation because the shortest path metric is based on the cumulative interface cost (that is, metric) from the router to the destination
+
+- OSPF assigns the OSPF link cost (that is, metric) for an interface using the formula from below
+
+```
+Cost = Reference Bandwidth / Interface Bandwidth
+```
+
+- The default reference bandwidth is 100 Mbps
+
+- There is no differenciation in the link cost associated with a Fast Ethernet interface and a 10-Gigabit Ethernet interface
+
+- Changing the reference bandwidth to a higher value allows for differenciation of cost between higher-speed interfaces
+
+- The OSPF LSA metric field is 16-bits, and the interface cost cannot exceed 65535
+
+- Under the OSPF process, the command `auto-cost reference-bandwidth <bandwidth-in-mbps>` changes the reference bandwidth for all OSPF interfaces associated with that process
+
+```
+conf t
+ router ospf 1
+  auto-cost reference-bandwidth <bandwidth-in-mbps>
+```
+
+- If the reference bandwidth is changed on one router, then the reference bandwidth should be changed on all OSPF routers to ensure that SPF uses the same logic to prevent routing loops
+
+- It is a best practice to set the same reference bandwidth for all OSPF routers
+
+- The OSPF cost can be set manually with the command `ip ospf cost <1-65535>` under the interface
+
+```
+conf t
+ interface g1
+  ip ospf cost <cost>
+```
+
+- While the interface cost is limited to 65535 because of LSA field limitations, the path metric can exceed a 16-bit value (65535) because all the link metrics are calculated locally
+
+- NX-OS uses a default reference-bandwidth of 40000 Mbps
+
+#### Intra-Area routes
+
+- OSPF intra-area routes (Type 1 and Type 2 LSAs) are always preferred over inter-area routes (Type 3 LSAs)
+
+- If multiple intra-are routes exist for the same network, the path with the lowest total path metric is installed in the OSPF Routing Information Base (RIB) and is then presented to the router's global RIB
+
+- If there is a tie in metric, both routes are installed into the OSPF RIB
+
+- Below R1 is calculating the route to the 10.4.4.0/24 network
+
+- Instead of taking the faster Ethernet connection (R1 -> R2 -> R4), R1 takes the path across the slower serial link to R4 (R1-> R3-> R4) because that is the intra-area path
+
+- We can see the routing table entry on R1 for the 10.4.4.0/24 network
+
+- Notice that the metric is 111 and the intra-area path selected takes the inter-area path with the lower total path metric
+
+![intra-area-over-interarea-routes](./intra-area-over-interarea-routes.png)
+
+![ospf-intra-area-path](./ospf-intra-area-path.png)
+
+```
+R1#show ip route 10.4.4.0
+Routing entry for 10.4.4.0/24
+  Known via "ospf 1", distance 110, metric 111, type intra area
+  Last update from 10.1.13.3 on Ethernet0/1, 00:00:56 ago
+  Routing Descriptor Blocks:
+  * 10.1.13.3, from 192.168.4.4, 00:00:56 ago, via Ethernet0/1
+      Route metric is 111, traffic share count is 1
+```
+
+#### Inter-Area routes
+
+- The next priority for selecting a path to a network in a different area is selection of the path with the lowest total path metric to the destination
+
+- If there is a tie in metric, both paths install into the OSPF RIB
+
+- All inter-area paths for a route must go through Area 0 to be considered
+
+- Below, R1 is computing the path to R6
+
+- R1 uses the path R1-> R3-> R5 -> R6 because it's total path metric is 35 as compared to the metric of 40 for the R1-> R2 -> R4 -> R6 path
+
+![interarea-route-selection.png](./interarea-route-selection.png)
+
+![interarea-path-selection-cml](./interarea-path-selection-cml.png)
+
+```
+R1(config-if)#do sh ip route 10.6.6.0
+Routing entry for 10.6.6.0/24
+  Known via "ospf 1", distance 110, metric 36, type inter area
+  Last update from 10.1.13.3 on Ethernet0/1, 00:00:33 ago
+  Routing Descriptor Blocks:
+  * 10.1.13.3, from 192.168.3.3, 00:00:33 ago, via Ethernet0/1
+      Route metric is 36, traffic share count is 1
+```
+
+#### External Route Selection
+
