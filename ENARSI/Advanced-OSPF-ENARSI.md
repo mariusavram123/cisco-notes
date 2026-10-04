@@ -1682,3 +1682,293 @@ Routing entry for 10.6.6.0/24
 
 #### External Route Selection
 
+- External routes are classified as Type 1 or Type 2
+
+- The main differences between Type 1 and Type 2 external OSPF routes are as follows:
+
+    - Type 1 routes are preferred over Type 2 routes
+
+    - The Type 1 metric equals the redistribution metric plus the total path metric to the ASBR. In other words, as the LSA propagates away from the originating ASBR, the metric increases
+
+    - The Type 2 metric equals with the redistribution metric. The metric is the same for the router next to the ASBR as for the router 30 hops away from the originating ASBR
+
+    - This is the default external metric type that OSPF uses
+
+- Explanations of the best-path calculation for external routes
+
+##### E1 and N1 External routes
+
+- External OSPF Type 1 route calculation involves the redistribution metric plus the lowest path metric to reach the ASBR that advertised the network
+
+- Type 1 path metrics are lower for routes closer to the originating ASBR, whereas the path metric is higher for a router 10 hops away from the ASBR
+
+- If there is a tie in the path metric, both routes are installed into the RIB
+
+- If the ASBR is in a different area, the path of the traffic must go through Area 0
+
+- An ABR does not install O E1 and O N1 routes into the RIB on the same time for the same prefix
+
+- O N1 is always given preference for a typical NSSA, and it's presence prevents O E1 from being installed on the ABR for the same prefix
+
+##### E2 and N2 External routes
+
+- External OSPF Type 2 routes do not increment in metric, regardless of the path metric to the ASBR
+
+- If there is a tie in the redistribution metric, the router compares the forwarding cost
+
+- The forwarding cost is the metric to the ASBR that advertised that network, and the lower forwarding cost is preferred
+
+- If there is a tie in forwarding cost, both routes are installed into the routing table
+
+- An ABR does not install O E2 and O N2 routes into the RIB at the same time for the same prefix
+
+- O N2 is always given preference for a Typical NSSA, and it's presence prevents the O E2 from being installed on the ABR for the same prefix
+
+- Below is shown the topology for R1 computing a path to the external network (172.16.0.0/24) that is being redistributed
+
+- The path R1 -> R2 -> R4 -> R6 has a metric of 20, which ties with the path R1 -> R3 -> R5 -> R7
+
+- The forwarding metric of the R1 -> R2 -> R4 -> R6 is 31 and the forwarding metric of the R1 -> R3 -> R5 -> R7 path is 30
+
+- R1 installs the R1 -> R3 -> R5 -> R7 path into the routing table
+
+![external-type2-route-selection-topology](./external-type2-route-selection-topology.png)
+
+![ospf-external-routes-path-selection-cml](./ospf-external-routes-path-selection-cml.png)
+
+- Below is shown R1's metric and forwarding metric to the 172.16.0.0/24 network
+
+```
+R1-CSR#show ip route 172.16.0.0 
+Routing entry for 172.16.0.0/24, 1 known subnets
+O E2     172.16.0.0 [110/20] via 10.1.13.3, 00:00:36, GigabitEthernet2
+R1-CSR#show ip route 172.16.0.0 255.255.255.0
+Routing entry for 172.16.0.0/24
+  Known via "ospf 1", distance 110, metric 20, type extern 2, forward metric 30
+  Last update from 10.1.13.3 on GigabitEthernet2, 00:00:43 ago
+  Routing Descriptor Blocks:
+  * 10.1.13.3, from 192.168.7.7, 00:00:43 ago, via GigabitEthernet2
+      Route metric is 20, traffic share count is 1
+```
+
+- **IMPORTANT**:
+
+- The logic for chosing an O Nx route (Type 7 LSA) over an O Ex route (Type 5 LSA) is defined in RFC 3101
+
+- Choosing an O Nx is the current default for IOS XE implementations
+
+- RFC1583 prefers an O Ex route (Type 5 LSA) over an O Nx route (Type 7 LSA)
+
+- RFC1583 path selection can be enabled with the command `compatible rfc1583`
+
+- R7:
+
+```
+conf t
+ router ospf 1
+  compatible rfc1583
+```
+
+```
+R7(config-router)#compatible ?
+  rfc1583  compatible with RFC 1583
+  rfc1587  compatible with RFC 1587
+  rfc5243  supports DBD exchange optimization
+```
+
+#### Equal-Cost Multipathing
+
+- If OSPF identifies multiple paths in the algorithms discussed, these routes are installed into the routing table using equal-cost multipathing (ECMP)
+
+- The default maximum number of ECMP paths is four
+
+- The default ECMP setting can be overwritten with the command `maximum-paths <maximum-paths>` under the OSPF process to modify the default setting
+
+```
+conf t
+ router ospf 1
+  maximum-paths 6
+```
+
+### Summarization of Routes
+
+- Route scalability is a large factor for the Interior Gateway Protocols used by service providers because there can be thousands of routers running in the network
+
+- Splitting up an OSPF routing domain into multiple areas reduces the size of each area's LSDB
+
+- While the number of routers and networks remain the same within the OSPF routing domain, the detailed Type 1 and Type 2 LSAs are exchanged for simpler Type 3 LSAs
+
+- For example, look at our original topology (the one with area 1234, area 0 and area 56)
+
+- For area 1234 there are three Type 1 LSAs and one Type 2 LSA for the 10.123.1.0/24 network
+
+- Those 4 LSAs become one Type 3 LSA outside of area 1234
+
+- Below is ilustrated the reduction of LSAs through area segmentation for network 10.123.1.0/24
+
+![lsa-reduction-area-segmentation](./lsa-reduction-area-segmentation.png)
+
+#### Summarization Fundamentals
+
+- Another method from shrinking the LSDB involves summarizing network prefixes
+
+- Newer routers have more memory and faster processors than do older ones, but because all routers have an identical copy of the LSDB, an OSPF area needs to accomodate the smallest and slowest router in that area
+
+- Summarization of routes also helps SPF calculations run faster
+
+- A router that has 10000 network routes will take longer to run the SPF calculation than a router with 500 network routes
+
+- Because all routers within an area must maintain an identical copy of the LSDB, summarization occurs between areas on the ABRs
+
+- Summarization can eliminate the SPF calculation outside the area for the summarized prefixes because the smaller prefixes are hidden
+
+- Below is a simple network topology in which the serial link (between R3 and R4) significantly adds to the path metric, and all traffic uses the path through R2 to reach the 172.16.46.0/24 network
+
+- If the 10.1.12.0/24 link fails, all routers in Area 1 have to run SPF calculations
+
+- R2 identifies that the 10.1.13.0/24 and 10.1.34.0/24 networks change their next hop through the serial link
+
+- Both of the Type 3 LSAs for these networks need to be updated with the new path metrics and advertised into Area 0
+
+- The routers in Area 0 run an SPF calculation only on those two prefixes
+
+![summarization-impact-spf-calculation](./summarization-impact-spf-calculation.png)
+
+![ospf-summarization](./ospf-summarization.png)
+
+- Below are shown the networks in Area 1 being summarized at the ABR into the aggregate 10.1.0.0/18 prefix
+
+- If the 10.1.12.0/24 network link fails, all the routers in Area 1 can still perform the SPF calculation, but routers in Area 0 are not affected because the 10.1.13.0/24 and 10.1.34.0/24 networks are not known outside Area 1
+
+![topology-example-with-summarization](./topology-example-with-summarization.png)
+
+- This concept applies to networks of varying sizes but is beneficial for networks with carefully developed IP addressing and proper summarization
+
+#### Inter-Area Summarization
+
+- Inter-area summarization reduces the number of Type 3 LSAs that an ABR advertises into an area when it receives Type 1 LSAs
+
+- The network summarization range is associated with a specific source area for Type 1 LSAs
+
+- When a Type 1 LSA in the summarization range reaches the ABR from the source area, the ABR creates a Type 3 LSA for the summarized network range
+
+- The ABR suppresses the more specific Type 3 LSAs from being generated and advertised in the neighboring areas
+
+- Inter-area summarization does not impact the Type 1 LSAs within the source area
+
+- Below is illustrated the concept, with the three Type 1 LSAs (172.16.1.0/24, 172.16.2.0/24 and 172.16.3.0/24) being summarized into one Type 3 LSA, as the 172.16.0.0/20 network
+
+![ospf-interarea-summarization-concept](./ospf-interarea-summarization-concept.png)
+
+- Summarization works only on Type 1 LSAs and is normally configured, or designed so that summarization occurs as routes enter the backbone area from nonbackbone areas
+
+- Cisco IOS-XE set the default metric for the summary LSA to be the lowest metric associated with a LSA based on RFC1583 guidelines
+
+- However, the summary metric can statically be set as part of the configuration
+
+- In the picture from above R1 summarizes three prefixes with various path costs
+
+- The 172.16.3.0/24 prefix has the lowest metric, so that metric will be used for the summarized route
+
+- OSPF behaves similar to Enhanced Interior Gateway Routing Protocol (EIGRP) in that it checks every prefix in the summarization range when a matching Type 1 LSA is added or removed
+
+- If a lower metric is available, the summary LSA is advertised with the newer metric; if the lowest metric is removed a newer and higher metric is identified, and a new summary LSA is advertised with the higher metric
+
+#### Configuration of Inter-area Summarization
+
+- You define the summarization range and associated area by using the command `area <area-id> range <network> <subnet-mask> [advertise|not-advertise|cost <metric>]` under the OSPF process:
+
+- R4:
+
+```
+conf t
+ router ospf 1
+  area 1 range 10.1.0.0 255.255.192.0
+```
+
+- The default behaviour is to advertise the summary prefix, so the keyword `advertise` is not necessary
+
+- Appending the `cost <metric>` on the command statically sets the metric on the summary route
+
+- Below is a topology example on which R1 is advertising the 172.16.1.0/24, 172.16.2.0/24 and 172.16.3.0/24 networks 
+
+![ospf-interarea-summarization-topology2](./ospf-interarea-summarization-topology2.png)
+
+![ospf-interarea-summarization2](./ospf-interarea-summarization2.png)
+
+- Below is shown the routing table of R3 before summarization
+
+- Notice that 172.16.1.0/24, 172.16.2.0/24 and 172.16.3.0/24 routes are all present
+
+```
+R3(config-router)#do sh ip ro ospf | b Gate
+Gateway of last resort is not set
+
+      10.0.0.0/8 is variably subnetted, 3 subnets, 2 masks
+O IA     10.1.12.0/24 [110/2] via 10.1.23.2, 00:08:28, GigabitEthernet0/0
+      172.16.0.0/24 is subnetted, 3 subnets
+O IA     172.16.1.0 [110/3] via 10.1.23.2, 00:08:28, GigabitEthernet0/0
+O IA     172.16.2.0 [110/3] via 10.1.23.2, 00:08:28, GigabitEthernet0/0
+O IA     172.16.3.0 [110/3] via 10.1.23.2, 00:08:28, GigabitEthernet0/0
+      192.168.1.0/32 is subnetted, 1 subnets
+O IA     192.168.1.1 [110/3] via 10.1.23.2, 00:08:28, GigabitEthernet0/0
+      192.168.2.0/32 is subnetted, 1 subnets
+O        192.168.2.2 [110/2] via 10.1.23.2, 00:08:28, GigabitEthernet0/0
+```
+
+- As the component routes 172.16.1.0/24, 172.16.2.0/24 and 172.16.3.0/24 are being advertised into Area 0, R2 summarizes them into a single summary route: 172.16.0.0/16
+
+- Below is provided the R2 configuration for inter-area summarization into an aggregate route 172.16.0.0/16
+
+- A static cost of 45 has been added to the summary route to reduce CPU load if any of the three networks flap
+
+- R2:
+
+```
+conf t
+ router ospf 1
+  area 12 range 172.16.0.0 255.255.0.0 cost 45
+```
+
+- Below is shown R3's routing table, which can be used to verify that the smaller component routes were suppressed while the summary route was aggregated
+
+- Notice in this output that the path metric is 46, whereas previously the metric for the 172.16.1.0/24 was 3
+
+```
+R3(config-router)#do sh ip ro ospf | b Gate
+Gateway of last resort is not set
+
+      10.0.0.0/8 is variably subnetted, 3 subnets, 2 masks
+O IA     10.1.12.0/24 [110/2] via 10.1.23.2, 00:16:09, GigabitEthernet0/0
+O IA  172.16.0.0/16 [110/46] via 10.1.23.2, 00:03:19, GigabitEthernet0/0
+      192.168.1.0/32 is subnetted, 1 subnets
+O IA     192.168.1.1 [110/3] via 10.1.23.2, 00:16:09, GigabitEthernet0/0
+      192.168.2.0/32 is subnetted, 1 subnets
+O        192.168.2.2 [110/2] via 10.1.23.2, 00:16:09, GigabitEthernet0/0
+```
+
+- The ABR performing inter-area summarization installs discard routes, which are routes to the Null0 interface that match the summarized network
+
+- Discard routes prevent routing loops where portions of the summarized network range do not have a more specific route in the RIB
+
+- The administrative distance (AD) for OSPF summary discard route for internal networks is 110, and it is 254 for external networks
+
+- Below is shown the discard route to Null0 on R2
+
+```
+R2(config-router)#do sh ip ro ospf | b Gate
+Gateway of last resort is not set
+
+      172.16.0.0/16 is variably subnetted, 4 subnets, 2 masks
+O        172.16.0.0/16 is a summary, 00:08:17, Null0
+O        172.16.1.0/24 [110/2] via 10.1.12.1, 00:08:17, GigabitEthernet0/0
+O        172.16.2.0/24 [110/2] via 10.1.12.1, 00:08:17, GigabitEthernet0/0
+O        172.16.3.0/24 [110/2] via 10.1.12.1, 00:08:17, GigabitEthernet0/0
+      192.168.1.0/32 is subnetted, 1 subnets
+O        192.168.1.1 [110/2] via 10.1.12.1, 00:08:17, GigabitEthernet0/0
+      192.168.3.0/32 is subnetted, 1 subnets
+O        192.168.3.3 [110/2] via 10.1.23.3, 00:08:17, GigabitEthernet0/1
+```
+
+#### External Summarization
+
