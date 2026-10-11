@@ -1972,3 +1972,589 @@ O        192.168.3.3 [110/2] via 10.1.23.3, 00:08:17, GigabitEthernet0/1
 
 #### External Summarization
 
+- During OSPF redistribution, external routes are redistributed into the OSPF domain into Type 5 or Type 7 LSAs (NSSA)
+
+- External summarization reduces the number of external LSAs in an OSPF domain
+
+- As external summarization route is configured on the ASBR router, and a smaller component route that matches the network range does not generate a Type 5/Type 7 LSA for the specific prefix
+
+- Instead a Type 5/Type 7 LSA with the external summary route is created, and the smaller component routes in the summary routes are suppressed
+
+- Below is demonstrated the concept with the external network summarization range 172.16.0.0/20 configured on the ASBR (R6)
+
+- The ASBR creates only one Type 5/Type 7 LSA in Area 56 where EIGRP redistributes routes into OSPF
+
+![external-summarization-concept](./external-summarization-concept.png)
+
+![ospf-external-summarization-topology](./ospf-external-summarization-topology.png)
+
+- Routing table on R5 before external summarization:
+
+```
+R5(config-router)#do sh ip ro ospf | b Gate
+Gateway of last resort is not set
+
+      10.0.0.0/8 is variably subnetted, 9 subnets, 3 masks
+O IA     10.3.3.0/24 [110/67] via 10.45.1.4, 00:00:44, GigabitEthernet0/0
+O IA     10.24.1.0/29 [110/65] via 10.45.1.4, 00:00:44, GigabitEthernet0/0
+O E2     10.67.1.0/24 [110/20] via 10.56.1.6, 00:00:14, GigabitEthernet0/1
+O E2     10.68.1.0/24 [110/250] via 10.56.1.6, 00:00:14, GigabitEthernet0/1
+O IA     10.123.1.0/24 [110/66] via 10.45.1.4, 00:00:44, GigabitEthernet0/0
+      172.16.0.0/24 is subnetted, 16 subnets
+O E2     172.16.1.0 [110/20] via 10.56.1.6, 00:00:14, GigabitEthernet0/1
+O E2     172.16.2.0 [110/20] via 10.56.1.6, 00:00:14, GigabitEthernet0/1
+O E2     172.16.3.0 [110/20] via 10.56.1.6, 00:00:14, GigabitEthernet0/1
+O E2     172.16.4.0 [110/20] via 10.56.1.6, 00:00:14, GigabitEthernet0/1
+O E2     172.16.5.0 [110/20] via 10.56.1.6, 00:00:14, GigabitEthernet0/1
+O E2     172.16.6.0 [110/20] via 10.56.1.6, 00:00:14, GigabitEthernet0/1
+O E2     172.16.7.0 [110/20] via 10.56.1.6, 00:00:14, GigabitEthernet0/1
+O E2     172.16.8.0 [110/20] via 10.56.1.6, 00:00:14, GigabitEthernet0/1
+O E2     172.16.9.0 [110/20] via 10.56.1.6, 00:00:14, GigabitEthernet0/1
+O E2     172.16.10.0 [110/20] via 10.56.1.6, 00:00:14, GigabitEthernet0/1
+O E2     172.16.11.0 [110/20] via 10.56.1.6, 00:00:14, GigabitEthernet0/1
+O E2     172.16.12.0 [110/20] via 10.56.1.6, 00:00:14, GigabitEthernet0/1
+O E2     172.16.13.0 [110/20] via 10.56.1.6, 00:00:14, GigabitEthernet0/1
+O E2     172.16.14.0 [110/20] via 10.56.1.6, 00:00:14, GigabitEthernet0/1
+O E2     172.16.15.0 [110/20] via 10.56.1.6, 00:00:14, GigabitEthernet0/1
+O E2     172.16.31.0 [110/250] via 10.56.1.6, 00:00:14, GigabitEthernet0/1
+      192.168.1.0/32 is subnetted, 1 subnets
+O IA     192.168.1.1 [110/67] via 10.45.1.4, 00:00:44, GigabitEthernet0/0
+      192.168.3.0/32 is subnetted, 1 subnets
+O IA     192.168.3.3 [110/67] via 10.45.1.4, 00:00:44, GigabitEthernet0/0
+      192.168.6.0/32 is subnetted, 1 subnets
+O        192.168.6.6 [110/2] via 10.56.1.6, 00:00:14, GigabitEthernet0/1
+```
+
+- To configure external summarization, you use the command `summary-address <prefix> <subnet-mask>` under the OSPF process
+
+- Below is demonstrated the configuration for external route summarization on R6, the ASBR
+
+```
+conf t
+ router ospf 1
+  router-id 192.168.6.6
+  summary-address 172.16.0.0 255.255.240.0 # 172.16.0.0/20
+  redistribute eigrp 65001 subnets
+  passive-interface Loopback0
+  network 10.56.1.0 0.0.0.255 area 56
+  network 192.168.6.6 0.0.0.0 area 56
+```
+
+- Below is shown R5's routing table after summarization, which verifies that the component routes were summarized into the 172.16.0.0/20 summary network
+
+```
+R5(config-router)#do sh ip ro ospf | b Gate
+Gateway of last resort is not set
+
+      10.0.0.0/8 is variably subnetted, 9 subnets, 3 masks
+O IA     10.3.3.0/24 [110/67] via 10.45.1.4, 00:04:43, GigabitEthernet0/0
+O IA     10.24.1.0/29 [110/65] via 10.45.1.4, 00:04:43, GigabitEthernet0/0
+O E2     10.67.1.0/24 [110/20] via 10.56.1.6, 00:04:13, GigabitEthernet0/1
+O E2     10.68.1.0/24 [110/250] via 10.56.1.6, 00:04:13, GigabitEthernet0/1
+O IA     10.123.1.0/24 [110/66] via 10.45.1.4, 00:04:43, GigabitEthernet0/0
+      172.16.0.0/16 is variably subnetted, 2 subnets, 2 masks
+O E2     172.16.0.0/20 [110/20] via 10.56.1.6, 00:00:19, GigabitEthernet0/1
+O E2     172.16.31.0/24 [110/250] via 10.56.1.6, 00:04:13, GigabitEthernet0/1
+      192.168.1.0/32 is subnetted, 1 subnets
+O IA     192.168.1.1 [110/67] via 10.45.1.4, 00:04:43, GigabitEthernet0/0
+      192.168.3.0/32 is subnetted, 1 subnets
+O IA     192.168.3.3 [110/67] via 10.45.1.4, 00:04:43, GigabitEthernet0/0
+      192.168.6.0/32 is subnetted, 1 subnets
+O        192.168.6.6 [110/2] via 10.56.1.6, 00:04:13, GigabitEthernet0/1
+```
+
+- R5:
+
+```
+R5#show ip route 172.16.0.0 255.255.240.0
+Routing entry for 172.16.0.0/20
+  Known via "ospf 1", distance 110, metric 20, type extern 2, forward metric 1
+  Last update from 10.56.1.6 on GigabitEthernet0/1, 00:00:33 ago
+  Routing Descriptor Blocks:
+  * 10.56.1.6, from 192.168.6.6, 00:00:33 ago, via GigabitEthernet0/1
+      Route metric is 20, traffic share count is 1
+```
+
+- You also can use `not-advertise` keyword when creating a summary external route. The route will not be advertised to other OSPF routers
+
+```
+conf t
+ router ospf 1
+  summary-address 172.16.0.0 255.255.240.0 not-advertise
+```
+
+- Routing table of R5 when `not-advertise` is used
+
+```
+R5#show ip route ospf | b Gate
+Gateway of last resort is not set
+
+      10.0.0.0/8 is variably subnetted, 9 subnets, 3 masks
+O IA     10.3.3.0/24 [110/67] via 10.45.1.4, 00:22:27, GigabitEthernet0/0
+O IA     10.24.1.0/29 [110/65] via 10.45.1.4, 00:22:27, GigabitEthernet0/0
+O E2     10.67.1.0/24 [110/20] via 10.56.1.6, 00:21:57, GigabitEthernet0/1
+O E2     10.68.1.0/24 [110/250] via 10.56.1.6, 00:21:57, GigabitEthernet0/1
+O IA     10.123.1.0/24 [110/66] via 10.45.1.4, 00:22:27, GigabitEthernet0/0
+      172.16.0.0/24 is subnetted, 1 subnets
+O E2     172.16.31.0 [110/250] via 10.56.1.6, 00:21:57, GigabitEthernet0/1
+      192.168.1.0/32 is subnetted, 1 subnets
+O IA     192.168.1.1 [110/67] via 10.45.1.4, 00:22:27, GigabitEthernet0/0
+      192.168.3.0/32 is subnetted, 1 subnets
+O IA     192.168.3.3 [110/67] via 10.45.1.4, 00:22:27, GigabitEthernet0/0
+      192.168.6.0/32 is subnetted, 1 subnets
+O        192.168.6.6 [110/2] via 10.56.1.6, 00:21:57, GigabitEthernet0/1
+```
+
+- The summary ASBR installs a discard route to Null0 that matches the summary route as part of a loop-prevention mechanism
+
+- Below is shown the routing table of R6 with the external summary discard route
+
+```
+R6(config-router)#do sh ip ro ospf | b Gate
+Gateway of last resort is not set
+
+      10.0.0.0/8 is variably subnetted, 10 subnets, 3 masks
+O IA     10.3.3.0/24 [110/68] via 10.56.1.5, 00:25:57, GigabitEthernet0/0
+O IA     10.24.1.0/29 [110/66] via 10.56.1.5, 00:25:57, GigabitEthernet0/0
+O IA     10.45.1.0/24 [110/2] via 10.56.1.5, 00:25:57, GigabitEthernet0/0
+O IA     10.123.1.0/24 [110/67] via 10.56.1.5, 00:25:57, GigabitEthernet0/0
+      172.16.0.0/16 is variably subnetted, 17 subnets, 2 masks
+O        172.16.0.0/20 is a summary, 00:03:05, Null0
+      192.168.1.0/32 is subnetted, 1 subnets
+O IA     192.168.1.1 [110/68] via 10.56.1.5, 00:25:57, GigabitEthernet0/0
+      192.168.3.0/32 is subnetted, 1 subnets
+O IA     192.168.3.3 [110/68] via 10.56.1.5, 00:25:57, GigabitEthernet0/0
+      192.168.5.0/32 is subnetted, 1 subnets
+O        192.168.5.5 [110/2] via 10.56.1.5, 00:25:57, GigabitEthernet0/0
+```
+
+- When `not-advertise` is used, the route is not installed even on the local router's routing table, as discard route
+
+```
+R6(config-router)#do sh ip ro ospf | b Gate
+Gateway of last resort is not set
+
+      10.0.0.0/8 is variably subnetted, 10 subnets, 3 masks
+O IA     10.3.3.0/24 [110/68] via 10.56.1.5, 00:26:43, GigabitEthernet0/0
+O IA     10.24.1.0/29 [110/66] via 10.56.1.5, 00:26:43, GigabitEthernet0/0
+O IA     10.45.1.0/24 [110/2] via 10.56.1.5, 00:26:43, GigabitEthernet0/0
+O IA     10.123.1.0/24 [110/67] via 10.56.1.5, 00:26:43, GigabitEthernet0/0
+      192.168.1.0/32 is subnetted, 1 subnets
+O IA     192.168.1.1 [110/68] via 10.56.1.5, 00:26:43, GigabitEthernet0/0
+      192.168.3.0/32 is subnetted, 1 subnets
+O IA     192.168.3.3 [110/68] via 10.56.1.5, 00:26:43, GigabitEthernet0/0
+      192.168.5.0/32 is subnetted, 1 subnets
+O        192.168.5.5 [110/2] via 10.56.1.5, 00:26:43, GigabitEthernet0/0
+```
+
+- The summary route is also not present on the LSDB in this case
+
+```
+R6(config-router)#do sh ip ospf database ext 172.16.0.0
+
+            OSPF Router with ID (192.168.6.6) (Process ID 1)
+```
+
+- ABRs for NSSAs act as ASBRs when a Type 7 LSA is converted to a Type 5 LSA 
+
+- External summarization can be performed on ABRs only when they match this scenario
+
+#### Discontiguous Network
+
+- A network engineer who does not fully understand OSPF design might create a topology such as the one from below
+
+- While R2 and R4 have OSPF interfaces in Area 0, traffic from Area 12 must cross Area 234 to reach Area 45
+
+- An OSPF network with this design is a discontiguous network because inter-area traffic is trying to cross a non-backbone Area
+
+![ospf-discontiguous-network](./ospf-discontiguous-network.png)
+
+- Upon first glance at the routing table on R2 and R4, it seems as though routes are being advertised across Area 234; however that is not the case
+
+- The 10.1.45.0/24 network is received by R4, injected into R4's area 0, and then readvertised to Area 234, where R2 installs the route
+
+![ospf-routers-for-discontiguous-network](./ospf-routers-for-discontiguous-network.png)
+
+- Most people will assume that R1 would learn about the route learned by Area 45 because R4 is an ABR. However, they would be wrong
+
+- ABRs follow three fundamental rules for creating Type 3 LSAs:
+
+    - Type 1 LSAs received from an Area create Type 3 LSAs into backbone area and non-backbone areas
+
+    - Type 3 LSAs received from Area 0 are created for the non-backbone area
+
+    - Type 3 LSAs received from a non-backbone area are only inserted into the LSDB for the source area. The ABR does not create a Type 3 LSA for the other areas (including a segmented Area 0)
+
+- The simplest fix for a discontiguous networks is to ensure that Area 0 is contiguous and convert the interfaces on R2, R3 and R4 to Area 0
+
+- Another option is to use a virtual link
+
+- R2's summary LSAs
+
+```
+R2(config-router)#do sh ip ospf data            
+
+            OSPF Router with ID (192.168.2.2) (Process ID 1)
+
+                Summary Net Link States (Area 0)
+
+Link ID         ADV Router      Age         Seq#       Checksum
+10.1.12.0       192.168.2.2     675         0x80000001 0x00B4F9
+10.1.23.0       192.168.2.2     675         0x80000001 0x003B68
+10.1.34.0       192.168.2.2     522         0x80000001 0x002668
+192.168.1.1     192.168.2.2     597         0x80000001 0x000B4E
+192.168.3.3     192.168.2.2     455         0x80000001 0x00E074
+
+
+                Summary Net Link States (Area 12)
+
+Link ID         ADV Router      Age         Seq#       Checksum
+10.1.23.0       192.168.2.2     675         0x80000001 0x003B68
+10.1.34.0       192.168.2.2     522         0x80000001 0x002668
+10.2.2.0        192.168.2.2     675         0x80000001 0x00BC04
+192.168.3.3     192.168.2.2     455         0x80000001 0x00E074
+
+                Summary Net Link States (Area 234)
+
+Link ID         ADV Router      Age         Seq#       Checksum
+10.1.12.0       192.168.2.2     675         0x80000001 0x00B4F9
+10.1.45.0       192.168.4.4     352         0x80000001 0x002E5B
+10.2.2.0        192.168.2.2     675         0x80000001 0x00BC04
+10.4.4.0        192.168.4.4     397         0x80000001 0x007444
+192.168.1.1     192.168.2.2     597         0x80000001 0x000B4E
+192.168.5.5     192.168.4.4     244         0x80000001 0x009CB0
+```
+
+- As you can see, the LSA for 10.45.1.0/24 is not sent out to Area 12, as the advertising router is not R2, but R4
+
+#### Virtual Links
+
+- OSPF virtual links provide a method to overcome discontiguous networks 
+
+- Using a virtual link is similar to running a virtual tunnel within OSPF between an ABR and another multi-area OSPF router
+
+- The tunnel belongs to the backbone (Area 0), and therefore the router terminating the virtual link becomes an ABR if it does not have an interface already associated with Area 0
+
+- Below we can see our discontiguous network topology and shows a contiguous backbone between R2 and R4, with a virtual link across Area 234
+
+- With the virtual link established, the routes from Area 12 are advertised into Area 45 and vice versa
+
+![repair-discontiguous-networks-virtual-links](./repair-discontiguous-networks-virtual-links.png)
+
+- Virtual links are built between routers in the same area
+
+- The area in which the virtual link endpoints are established is known as the transit area
+
+- Each router identifies the remote router by it's RID
+
+- The virtual link can be one hop away or multiple hops away from the remote device
+
+- The virtual link is built using Type 1 LSAs, where the neighbor state is Type 4
+
+- You configure the virtual link by using the command `area <area-id> virtual-link <endpoint-rid>`
+
+- The configuration is performed on both endpoints of the virtual link
+
+- At least one end point virtual link router has to be a member of Area 0, and virtual links cannot be formed on any OSPF stubby areas
+
+- In our topology, Area 234 cannot be an OSPF stub area
+
+- Below we can see the link configuration between R2 and R4
+
+- Notice that the RID is specified as the remote tunnel endpoint, even though it is not advertised into OSPF
+
+- R2:
+
+```
+conf t
+ router ospf 1
+  area 234 virtual-link 192.168.4.4
+```
+
+- R4:
+
+```
+conf t
+ router ospf 1
+  area 234 virtual-link 192.168.2.2
+```
+
+- To verify the virtual links status, you use the command `show ip ospf virtual-links`. Below we can see the output
+
+- Notice that the output includes the virtual link status, the outbound interface to the endpoints, and the interface cost
+
+- Interface cost for a virtual link cannot be set or dynamically generated as the metric for the intra-area distance between the two virtual link endpoints
+
+- R2:
+
+```
+R2(config-router)#do sh ip ospf virtual-links
+Virtual Link OSPF_VL0 to router 192.168.4.4 is up
+  Run as demand circuit
+  DoNotAge LSA allowed.
+  Transit area 234, via interface Ethernet0/1
+ Topology-MTID    Cost    Disabled     Shutdown      Topology Name
+        0           20        no          no            Base
+  Transmit Delay is 1 sec, State POINT_TO_POINT,
+  Timer intervals configured, Hello 10, Dead 40, Wait 40, Retransmit 5
+    Hello due in 00:00:01
+    Adjacency State FULL (Hello suppressed)
+    Index 1/1/3, retransmission queue length 0, number of retransmission 0
+    First 0x0(0)/0x0(0)/0x0(0) Next 0x0(0)/0x0(0)/0x0(0)
+    Last retransmission scan length is 0, maximum is 0
+    Last retransmission scan time is 0 msec, maximum is 0 msec
+```
+
+- R4:
+
+```
+R4#show ip ospf virtual-links 
+Virtual Link OSPF_VL0 to router 192.168.2.2 is up
+  Run as demand circuit
+  DoNotAge LSA allowed.
+  Transit area 234, via interface Ethernet0/0
+ Topology-MTID    Cost    Disabled     Shutdown      Topology Name
+        0           20        no          no            Base
+  Transmit Delay is 1 sec, State POINT_TO_POINT,
+  Timer intervals configured, Hello 10, Dead 40, Wait 40, Retransmit 5
+    Hello due in 00:00:01
+    Adjacency State FULL (Hello suppressed)
+    Index 1/1/3, retransmission queue length 0, number of retransmission 0
+    First 0x0(0)/0x0(0)/0x0(0) Next 0x0(0)/0x0(0)/0x0(0)
+    Last retransmission scan length is 0, maximum is 0
+    Last retransmission scan time is 0 msec, maximum is 0 msec
+```
+
+- A virtual link appears as a specific interface
+
+- Notice here that the cost here is 20, which accounts for the metrics between R2 and R4 (10 Mb link)
+
+```
+R4#show ip ospf interface brief 
+Interface    PID   Area            IP Address/Mask    Cost  State Nbrs F/C
+VL0          1     0               10.1.34.4/24       20    P2P   1/1
+Lo0          1     0               10.4.4.1/24        1     P2P   0/0
+Et0/1        1     45              10.1.45.4/24       10    BDR   1/1
+Et0/0        1     234             10.1.34.4/24       10    DR    1/1
+```
+
+- Notice that R4 views R2 as a neighbor even though it is not directly connected
+
+```
+R4#show ip ospf neighbor 
+
+Neighbor ID     Pri   State           Dead Time   Address         Interface
+192.168.2.2       0   FULL/  -           -        10.1.23.1       OSPF_VL0
+192.168.5.5       1   FULL/DR         00:00:34    10.1.45.5       Ethernet0/1
+192.168.3.3       1   FULL/BDR        00:00:31    10.1.34.3       Ethernet0/0
+```
+
+- Below are shown the routing tables of R2 and R5 after the virtual link is established
+
+- Notice that now R1 has the 10.1.45.0/24 route in it's routing table, and R5 has the 10.1.12.0/24 route in it's routing table
+
+```
+R1#show ip route ospf | b Gate
+Gateway of last resort is not set
+
+      10.0.0.0/8 is variably subnetted, 7 subnets, 2 masks
+O IA     10.1.23.0/24 [110/20] via 10.1.12.2, 00:41:55, Ethernet0/0
+O IA     10.1.34.0/24 [110/30] via 10.1.12.2, 00:41:55, Ethernet0/0
+O IA     10.1.45.0/24 [110/40] via 10.1.12.2, 00:24:43, Ethernet0/0
+O IA     10.2.2.0/24 [110/11] via 10.1.12.2, 00:41:55, Ethernet0/0
+O IA     10.4.4.0/24 [110/31] via 10.1.12.2, 00:24:43, Ethernet0/0
+      192.168.3.0/32 is subnetted, 1 subnets
+O IA     192.168.3.3 [110/21] via 10.1.12.2, 00:41:55, Ethernet0/0
+      192.168.5.0/32 is subnetted, 1 subnets
+O IA     192.168.5.5 [110/41] via 10.1.12.2, 00:24:43, Ethernet0/0
+```
+
+```
+R5#show ip route ospf | b Gate
+Gateway of last resort is not set
+
+      10.0.0.0/8 is variably subnetted, 7 subnets, 2 masks
+O IA     10.1.12.0/24 [110/40] via 10.1.45.4, 00:25:19, Ethernet0/0
+O IA     10.1.23.0/24 [110/30] via 10.1.45.4, 00:42:31, Ethernet0/0
+O IA     10.1.34.0/24 [110/20] via 10.1.45.4, 00:42:31, Ethernet0/0
+O IA     10.2.2.0/24 [110/31] via 10.1.45.4, 00:25:19, Ethernet0/0
+O IA     10.4.4.0/24 [110/11] via 10.1.45.4, 00:42:31, Ethernet0/0
+      192.168.1.0/32 is subnetted, 1 subnets
+O IA     192.168.1.1 [110/41] via 10.1.45.4, 00:25:19, Ethernet0/0
+      192.168.3.0/32 is subnetted, 1 subnets
+O IA     192.168.3.3 [110/21] via 10.1.45.4, 00:42:31, Ethernet0/0
+```
+
+- In the LSDB of R2 we can see some LSAs that have a DNA (DoNotAge) flag set
+
+```
+
+R2#show ip ospf database                               
+
+            OSPF Router with ID (192.168.2.2) (Process ID 1)
+
+(...)
+                Summary Net Link States (Area 0)
+
+Link ID         ADV Router      Age         Seq#       Checksum
+10.1.12.0       192.168.2.2     728         0x80000002 0x00B2FA
+10.1.23.0       192.168.2.2     728         0x80000002 0x003969
+10.1.23.0       192.168.4.4     1039  (DNA) 0x80000001 0x008510
+10.1.34.0       192.168.2.2     728         0x80000002 0x002469
+10.1.34.0       192.168.4.4     1079  (DNA) 0x80000001 0x00A7EC
+10.1.45.0       192.168.4.4     1079  (DNA) 0x80000001 0x002E5B
+192.168.1.1     192.168.2.2     728         0x80000002 0x00094F
+192.168.3.3     192.168.2.2     728         0x80000002 0x00DE75
+192.168.3.3     192.168.4.4     1039  (DNA) 0x80000001 0x00C68A
+192.168.5.5     192.168.4.4     1032  (DNA) 0x80000001 0x009CB0
+
+(...)
+                Summary Net Link States (Area 12)
+
+Link ID         ADV Router      Age         Seq#       Checksum
+10.1.23.0       192.168.2.2     728         0x80000002 0x003969
+10.1.34.0       192.168.2.2     728         0x80000002 0x002469
+10.1.45.0       192.168.2.2     1644        0x80000001 0x001168
+10.2.2.0        192.168.2.2     728         0x80000002 0x00BA05
+10.4.4.0        192.168.2.2     1644        0x80000001 0x005751
+192.168.3.3     192.168.2.2     728         0x80000002 0x00DE75
+192.168.5.5     192.168.2.2     1644        0x80000001 0x007FBD
+
+(...)
+
+                Summary Net Link States (Area 234)
+
+Link ID         ADV Router      Age         Seq#       Checksum
+10.1.12.0       192.168.2.2     728         0x80000002 0x00B2FA
+10.1.45.0       192.168.4.4     694         0x80000002 0x002C5C
+10.2.2.0        192.168.2.2     728         0x80000002 0x00BA05
+10.4.4.0        192.168.4.4     694         0x80000002 0x007245
+192.168.1.1     192.168.2.2     728         0x80000002 0x00094F
+192.168.5.5     192.168.4.4     694         0x80000002 0x009AB1
+
+R2#show ip ospf database summary adv-router 192.168.4.4
+
+            OSPF Router with ID (192.168.2.2) (Process ID 1)
+
+                Summary Net Link States (Area 0)
+
+  LS age: 1039 (DoNotAge)
+  Options: (No TOS-capability, DC, Upward)
+  LS Type: Summary Links(Network)
+  Link State ID: 10.1.23.0 (summary Network Number)
+  Advertising Router: 192.168.4.4
+  LS Seq Number: 80000001
+  Checksum: 0x8510
+  Length: 28
+  Network Mask: /24
+        MTID: 0         Metric: 20 
+
+  LS age: 1079 (DoNotAge)
+  Options: (No TOS-capability, DC, Upward)
+  LS Type: Summary Links(Network)
+  Link State ID: 10.1.34.0 (summary Network Number)
+  Advertising Router: 192.168.4.4
+  LS Seq Number: 80000001
+  Checksum: 0xA7EC
+  Length: 28
+  Network Mask: /24
+        MTID: 0         Metric: 10 
+
+  LS age: 1079 (DoNotAge)
+  Options: (No TOS-capability, DC, Upward)
+  LS Type: Summary Links(Network)
+  Link State ID: 10.1.45.0 (summary Network Number)
+  Advertising Router: 192.168.4.4
+  LS Seq Number: 80000001
+  Checksum: 0x2E5B
+  Length: 28
+  Network Mask: /24
+        MTID: 0         Metric: 10 
+
+  LS age: 1039 (DoNotAge)
+  Options: (No TOS-capability, DC, Upward)
+  LS Type: Summary Links(Network)
+  Link State ID: 192.168.3.3 (summary Network Number)
+  Advertising Router: 192.168.4.4
+  LS Seq Number: 80000001
+  Checksum: 0xC68A
+  Length: 28
+  Network Mask: /32
+        MTID: 0         Metric: 11 
+
+  LS age: 1032 (DoNotAge)
+  Options: (No TOS-capability, DC, Upward)
+  LS Type: Summary Links(Network)
+  Link State ID: 192.168.5.5 (summary Network Number)
+  Advertising Router: 192.168.4.4
+  LS Seq Number: 80000001
+  Checksum: 0x9CB0
+  Length: 28
+  Network Mask: /32
+        MTID: 0         Metric: 11 
+
+
+                Summary Net Link States (Area 234)
+
+  LS age: 646
+  Options: (No TOS-capability, DC, Upward)
+  LS Type: Summary Links(Network)
+  Link State ID: 10.1.45.0 (summary Network Number)
+  Advertising Router: 192.168.4.4
+  LS Seq Number: 80000002
+  Checksum: 0x2C5C
+  Length: 28
+  Network Mask: /24
+        MTID: 0         Metric: 10 
+
+  LS age: 646
+  Options: (No TOS-capability, DC, Upward)
+  LS Type: Summary Links(Network)
+  Link State ID: 10.4.4.0 (summary Network Number)
+  Advertising Router: 192.168.4.4
+  LS Seq Number: 80000002
+  Checksum: 0x7245
+  Length: 28
+  Network Mask: /24
+        MTID: 0         Metric: 1 
+
+  LS age: 646
+  Options: (No TOS-capability, DC, Upward)
+  LS Type: Summary Links(Network)
+  Link State ID: 192.168.5.5 (summary Network Number)
+  Advertising Router: 192.168.4.4
+  LS Seq Number: 80000002
+  Checksum: 0x9AB1
+  Length: 28
+  Network Mask: /32
+        MTID: 0         Metric: 11 
+
+```
+
+- NOTE: When using a virtual link over an OSPF area, the virtual link interface is threated like an demand circuit
+
+- Here the 'DoNotAge (DNA)' LSA flag is allowed, as shown in `show ip ospf virtual-links`
+
+```
+R4#show ip ospf virtual-links 
+Virtual Link OSPF_VL0 to router 192.168.2.2 is up
+  Run as demand circuit
+  DoNotAge LSA allowed.
+  Transit area 234, via interface Ethernet0/0
+ Topology-MTID    Cost    Disabled     Shutdown      Topology Name
+        0           20        no          no            Base
+  Transmit Delay is 1 sec, State POINT_TO_POINT,
+  Timer intervals configured, Hello 10, Dead 40, Wait 40, Retransmit 5
+    Hello due in 00:00:03
+    Adjacency State FULL (Hello suppressed)
+    Index 1/1/2, retransmission queue length 0, number of retransmission 0
+    First 0x0(0)/0x0(0)/0x0(0) Next 0x0(0)/0x0(0)/0x0(0)
+    Last retransmission scan length is 0, maximum is 0
+    Last retransmission scan time is 0 msec, maximum is 0 msec
+```
+
+- As you can see 'Run as demand circuit' is present in output
+
+- Also DoNotAge LSA is allowed
+
+- Hellos are suppressed over the virtual link as they are sent as unicast packets
