@@ -2159,6 +2159,231 @@ R6(config-router)#do sh ip ospf database ext 172.16.0.0
 
 - External summarization can be performed on ABRs only when they match this scenario
 
+- R5 - configure area 56 as NSSA with a default route:
+
+```
+R5(config-router)#do sh run | s router ospf
+router ospf 1
+ router-id 192.168.5.5
+ area 56 nssa default-information-originate
+ passive-interface Loopback0
+ network 10.45.1.0 0.0.0.255 area 0
+ network 0.0.0.0 255.255.255.255 area 56
+```
+
+- R6 - Configure area 56 as NSSA:
+
+```
+R6(config-router)#do sh run | s router ospf
+router ospf 1
+ router-id 192.168.6.6
+ area 56 nssa
+ redistribute eigrp 65001 subnets
+ passive-interface Loopback0
+ network 10.56.1.0 0.0.0.255 area 56
+ network 192.168.6.6 0.0.0.0 area 56
+```
+
+- Database on R5 before:
+
+```
+R5(config-router)#do sh ip ospf database                     
+
+            OSPF Router with ID (192.168.5.5) (Process ID 1)
+
+(...)          
+                Type-7 AS External Link States (Area 56)
+
+Link ID         ADV Router      Age         Seq#       Checksum Tag
+0.0.0.0         192.168.5.5     476         0x80000001 0x00BF7E 0
+10.67.1.0       192.168.6.6     532         0x80000001 0x001746 0
+10.68.1.0       192.168.6.6     532         0x80000001 0x001065 0
+172.16.1.0      192.168.6.6     498         0x80000001 0x003BB2 0
+172.16.2.0      192.168.6.6     498         0x80000001 0x0030BC 0
+172.16.3.0      192.168.6.6     498         0x80000001 0x0025C6 0
+172.16.4.0      192.168.6.6     498         0x80000001 0x001AD0 0
+172.16.5.0      192.168.6.6     498         0x80000001 0x000FDA 0
+172.16.6.0      192.168.6.6     498         0x80000001 0x0004E4 0
+172.16.7.0      192.168.6.6     498         0x80000001 0x00F8EE 0
+172.16.8.0      192.168.6.6     498         0x80000001 0x00EDF8 0
+172.16.9.0      192.168.6.6     498         0x80000001 0x00E203 0
+172.16.10.0     192.168.6.6     498         0x80000001 0x00D70D 0
+172.16.11.0     192.168.6.6     498         0x80000001 0x00CC17 0
+172.16.12.0     192.168.6.6     498         0x80000001 0x00C121 0
+172.16.13.0     192.168.6.6     498         0x80000001 0x00B62B 0
+172.16.14.0     192.168.6.6     498         0x80000001 0x00AB35 0
+172.16.15.0     192.168.6.6     498         0x80000001 0x00A03F 0
+
+                Type-5 AS External Link States
+
+Link ID         ADV Router      Age         Seq#       Checksum Tag
+10.67.1.0       192.168.5.5     465         0x80000001 0x00B8B0 0
+10.68.1.0       192.168.5.5     465         0x80000001 0x00B1CF 0
+172.16.1.0      192.168.5.5     218         0x80000001 0x00DC1D 0
+172.16.2.0      192.168.5.5     218         0x80000001 0x00D127 0
+172.16.3.0      192.168.5.5     218         0x80000001 0x00C631 0
+172.16.4.0      192.168.5.5     218         0x80000001 0x00BB3B 0
+172.16.5.0      192.168.5.5     218         0x80000001 0x00B045 0
+172.16.6.0      192.168.5.5     218         0x80000001 0x00A54F 0
+172.16.7.0      192.168.5.5     218         0x80000001 0x009A59 0
+172.16.8.0      192.168.5.5     218         0x80000001 0x008F63 0
+172.16.9.0      192.168.5.5     218         0x80000001 0x00846D 0
+172.16.10.0     192.168.5.5     218         0x80000001 0x007977 0
+172.16.11.0     192.168.5.5     218         0x80000001 0x006E81 0
+172.16.12.0     192.168.5.5     218         0x80000001 0x00638B 0
+172.16.13.0     192.168.5.5     218         0x80000001 0x005895 0
+172.16.14.0     192.168.5.5     218         0x80000001 0x004D9F 0
+172.16.15.0     192.168.5.5     218         0x80000001 0x0042A9 0
+```
+
+- Configure summary address on R5 (the router that is the ABR that converts Type 7 LSA to Type 5 LSA)
+
+```
+conf t
+ router ospf 1
+  summary-address 172.16.0.0 255.255.240.0
+```
+
+- R4's OSPF routing table before summarization on R5:
+
+```
+R4#show ip route ospf | b Gate
+Gateway of last resort is not set
+
+      10.0.0.0/8 is variably subnetted, 9 subnets, 3 masks
+O        10.3.3.0/24 [110/66] via 10.24.1.2, 00:13:16, GigabitEthernet0/0
+O IA     10.56.1.0/24 [110/2] via 10.45.1.5, 00:12:34, GigabitEthernet0/1
+O E2     10.67.1.0/24 [110/20] via 10.45.1.5, 00:04:17, GigabitEthernet0/1
+O E2     10.68.1.0/24 [110/250] via 10.45.1.5, 00:04:17, GigabitEthernet0/1
+O        10.123.1.0/24 [110/65] via 10.24.1.2, 00:13:16, GigabitEthernet0/0
+      172.16.0.0/24 is subnetted, 15 subnets
+O E2     172.16.1.0 [110/20] via 10.45.1.5, 00:00:11, GigabitEthernet0/1
+O E2     172.16.2.0 [110/20] via 10.45.1.5, 00:00:11, GigabitEthernet0/1
+O E2     172.16.3.0 [110/20] via 10.45.1.5, 00:00:11, GigabitEthernet0/1
+O E2     172.16.4.0 [110/20] via 10.45.1.5, 00:00:11, GigabitEthernet0/1
+O E2     172.16.5.0 [110/20] via 10.45.1.5, 00:00:11, GigabitEthernet0/1
+O E2     172.16.6.0 [110/20] via 10.45.1.5, 00:00:11, GigabitEthernet0/1
+O E2     172.16.7.0 [110/20] via 10.45.1.5, 00:00:11, GigabitEthernet0/1
+O E2     172.16.8.0 [110/20] via 10.45.1.5, 00:00:11, GigabitEthernet0/1
+O E2     172.16.9.0 [110/20] via 10.45.1.5, 00:00:11, GigabitEthernet0/1
+O E2     172.16.10.0 [110/20] via 10.45.1.5, 00:00:11, GigabitEthernet0/1
+O E2     172.16.11.0 [110/20] via 10.45.1.5, 00:00:11, GigabitEthernet0/1
+O E2     172.16.12.0 [110/20] via 10.45.1.5, 00:00:11, GigabitEthernet0/1
+O E2     172.16.13.0 [110/20] via 10.45.1.5, 00:00:11, GigabitEthernet0/1
+O E2     172.16.14.0 [110/20] via 10.45.1.5, 00:00:11, GigabitEthernet0/1
+O E2     172.16.15.0 [110/20] via 10.45.1.5, 00:00:11, GigabitEthernet0/1
+      192.168.1.0/32 is subnetted, 1 subnets
+O        192.168.1.1 [110/66] via 10.24.1.2, 00:13:16, GigabitEthernet0/0
+      192.168.3.0/32 is subnetted, 1 subnets
+O        192.168.3.3 [110/66] via 10.24.1.2, 00:13:16, GigabitEthernet0/0
+      192.168.5.0/32 is subnetted, 1 subnets
+O IA     192.168.5.5 [110/2] via 10.45.1.5, 00:12:34, GigabitEthernet0/1
+      192.168.6.0/32 is subnetted, 1 subnets
+O IA     192.168.6.6 [110/3] via 10.45.1.5, 00:04:18, GigabitEthernet0/1
+```
+
+- R5's OSPF database after summarization:
+
+```
+R5(config-router)#do sh ip ospf database                     
+
+            OSPF Router with ID (192.168.5.5) (Process ID 1)
+
+(...)
+          
+                Type-7 AS External Link States (Area 56)
+
+Link ID         ADV Router      Age         Seq#       Checksum Tag
+0.0.0.0         192.168.5.5     598         0x80000001 0x00BF7E 0
+10.67.1.0       192.168.6.6     654         0x80000001 0x001746 0
+10.68.1.0       192.168.6.6     654         0x80000001 0x001065 0
+172.16.1.0      192.168.6.6     620         0x80000001 0x003BB2 0
+172.16.2.0      192.168.6.6     620         0x80000001 0x0030BC 0
+172.16.3.0      192.168.6.6     620         0x80000001 0x0025C6 0
+172.16.4.0      192.168.6.6     620         0x80000001 0x001AD0 0
+172.16.5.0      192.168.6.6     620         0x80000001 0x000FDA 0
+172.16.6.0      192.168.6.6     620         0x80000001 0x0004E4 0
+172.16.7.0      192.168.6.6     620         0x80000001 0x00F8EE 0
+172.16.8.0      192.168.6.6     620         0x80000001 0x00EDF8 0
+172.16.9.0      192.168.6.6     620         0x80000001 0x00E203 0
+172.16.10.0     192.168.6.6     620         0x80000001 0x00D70D 0
+172.16.11.0     192.168.6.6     620         0x80000001 0x00CC17 0
+172.16.12.0     192.168.6.6     620         0x80000001 0x00C121 0
+172.16.13.0     192.168.6.6     620         0x80000001 0x00B62B 0
+172.16.14.0     192.168.6.6     620         0x80000001 0x00AB35 0
+172.16.15.0     192.168.6.6     620         0x80000001 0x00A03F 0
+
+                Type-5 AS External Link States
+
+Link ID         ADV Router      Age         Seq#       Checksum Tag
+10.67.1.0       192.168.5.5     587         0x80000001 0x00B8B0 0
+10.68.1.0       192.168.5.5     587         0x80000001 0x00B1CF 0
+172.16.0.0      192.168.5.5     11          0x80000001 0x00C9B5 0
+```
+
+- Routing table on R5 is the same (as it prefers NSSA routes by default - RFC3101)
+
+- Also R5 installs an OSPF route to Null0 for the summary prefix
+
+```
+R5(config-router)#do sh ip ro ospf | b Gate
+Gateway of last resort is not set
+
+      10.0.0.0/8 is variably subnetted, 9 subnets, 3 masks
+O IA     10.3.3.0/24 [110/67] via 10.45.1.4, 00:12:06, GigabitEthernet0/0
+O IA     10.24.1.0/29 [110/65] via 10.45.1.4, 00:12:06, GigabitEthernet0/0
+O N2     10.67.1.0/24 [110/20] via 10.56.1.6, 00:11:56, GigabitEthernet0/1
+O N2     10.68.1.0/24 [110/250] via 10.56.1.6, 00:11:56, GigabitEthernet0/1
+O IA     10.123.1.0/24 [110/66] via 10.45.1.4, 00:12:06, GigabitEthernet0/0
+      172.16.0.0/16 is variably subnetted, 16 subnets, 2 masks
+O        172.16.0.0/20 is a summary, 00:02:19, Null0
+O N2     172.16.1.0/24 [110/20] via 10.56.1.6, 00:11:56, GigabitEthernet0/1
+O N2     172.16.2.0/24 [110/20] via 10.56.1.6, 00:11:56, GigabitEthernet0/1
+O N2     172.16.3.0/24 [110/20] via 10.56.1.6, 00:11:56, GigabitEthernet0/1
+O N2     172.16.4.0/24 [110/20] via 10.56.1.6, 00:11:56, GigabitEthernet0/1
+O N2     172.16.5.0/24 [110/20] via 10.56.1.6, 00:11:56, GigabitEthernet0/1
+O N2     172.16.6.0/24 [110/20] via 10.56.1.6, 00:11:56, GigabitEthernet0/1
+O N2     172.16.7.0/24 [110/20] via 10.56.1.6, 00:11:56, GigabitEthernet0/1
+O N2     172.16.8.0/24 [110/20] via 10.56.1.6, 00:11:56, GigabitEthernet0/1
+O N2     172.16.9.0/24 [110/20] via 10.56.1.6, 00:11:56, GigabitEthernet0/1
+O N2     172.16.10.0/24 [110/20] via 10.56.1.6, 00:11:56, GigabitEthernet0/1
+O N2     172.16.11.0/24 [110/20] via 10.56.1.6, 00:11:56, GigabitEthernet0/1
+O N2     172.16.12.0/24 [110/20] via 10.56.1.6, 00:11:56, GigabitEthernet0/1
+O N2     172.16.13.0/24 [110/20] via 10.56.1.6, 00:11:56, GigabitEthernet0/1
+O N2     172.16.14.0/24 [110/20] via 10.56.1.6, 00:11:56, GigabitEthernet0/1
+O N2     172.16.15.0/24 [110/20] via 10.56.1.6, 00:11:56, GigabitEthernet0/1
+      192.168.1.0/32 is subnetted, 1 subnets
+O IA     192.168.1.1 [110/67] via 10.45.1.4, 00:12:06, GigabitEthernet0/0
+      192.168.3.0/32 is subnetted, 1 subnets
+O IA     192.168.3.3 [110/67] via 10.45.1.4, 00:12:06, GigabitEthernet0/0
+      192.168.6.0/32 is subnetted, 1 subnets
+O        192.168.6.6 [110/2] via 10.56.1.6, 00:11:56, GigabitEthernet0/1
+```
+
+- Routing table of R4 now:
+
+```
+R4#show ip route ospf | b Gate
+Gateway of last resort is not set
+
+      10.0.0.0/8 is variably subnetted, 9 subnets, 3 masks
+O        10.3.3.0/24 [110/66] via 10.24.1.2, 00:28:33, GigabitEthernet0/0
+O IA     10.56.1.0/24 [110/2] via 10.45.1.5, 00:27:51, GigabitEthernet0/1
+O E2     10.67.1.0/24 [110/20] via 10.45.1.5, 00:19:34, GigabitEthernet0/1
+O E2     10.68.1.0/24 [110/250] via 10.45.1.5, 00:19:34, GigabitEthernet0/1
+O        10.123.1.0/24 [110/65] via 10.24.1.2, 00:28:33, GigabitEthernet0/0
+      172.16.0.0/20 is subnetted, 1 subnets
+O E2     172.16.0.0 [110/20] via 10.45.1.5, 00:09:59, GigabitEthernet0/1
+      192.168.1.0/32 is subnetted, 1 subnets
+O        192.168.1.1 [110/66] via 10.24.1.2, 00:28:33, GigabitEthernet0/0
+      192.168.3.0/32 is subnetted, 1 subnets
+O        192.168.3.3 [110/66] via 10.24.1.2, 00:28:33, GigabitEthernet0/0
+      192.168.5.0/32 is subnetted, 1 subnets
+O IA     192.168.5.5 [110/2] via 10.45.1.5, 00:27:51, GigabitEthernet0/1
+      192.168.6.0/32 is subnetted, 1 subnets
+O IA     192.168.6.6 [110/3] via 10.45.1.5, 00:19:35, GigabitEthernet0/1
+```
+
 #### Discontiguous Network
 
 - A network engineer who does not fully understand OSPF design might create a topology such as the one from below
