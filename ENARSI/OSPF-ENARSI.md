@@ -1865,3 +1865,93 @@ GigabitEthernet0/0 is up, line protocol is up
   Cryptographic authentication enabled
     Youngest key id is 1
 ```
+
+- On R1 and R2 set authentication with a key chain using hmac-sha-256 authentication on interface level
+
+- R1:
+
+```
+conf t
+ key chain TEST
+  key 1
+   key-string MARIUS12345
+   cryptographic-algorithm hmac-sha-256
+
+ interface g0/0
+  ip ospf authentication key-chain TEST
+```
+
+- Verify the OSPF authentication on the interface:
+
+```
+R1(config-if)#do sh ip ospf int g0/0
+GigabitEthernet0/0 is up, line protocol is up 
+  Internet Address 10.12.1.1/24, Area 12, Attached via Interface Enable
+  Process ID 1, Router ID 192.168.1.1, Network Type BROADCAST, Cost: 1
+  Topology-MTID    Cost    Disabled    Shutdown      Topology Name
+        0           1         no          no            Base
+  Enabled by interface config, including secondary ip addresses
+  Transmit Delay is 1 sec, State BDR, Priority 1
+  Designated Router (ID) 192.168.2.2, Interface address 10.12.1.2
+  Backup Designated router (ID) 192.168.1.1, Interface address 10.12.1.1
+  Flush timer for old DR LSA due in 00:00:07
+  Timer intervals configured, Hello 10, Dead 40, Wait 40, Retransmit 5
+    oob-resync timeout 40
+    Hello due in 00:00:09
+  Supports Link-local Signaling (LLS)
+  Cisco NSF helper support enabled
+  IETF NSF helper support enabled
+  Index 1/2/2, flood queue length 0
+  Next 0x0(0)/0x0(0)/0x0(0)
+  Last flood scan length is 1, maximum is 1
+  Last flood scan time is 0 msec, maximum is 0 msec
+  Neighbor Count is 1, Adjacent neighbor count is 1 
+    Adjacent with neighbor 192.168.2.2  (Designated Router)
+  Suppress hello for 0 neighbor(s)
+  Cryptographic authentication enabled
+    Sending SA: Key 1, Algorithm HMAC-SHA-256 - key chain TEST
+```
+
+- As you can see, it is using hmac-sha-256 for authentication on the interface
+
+- R2 G0/0 - key chain authentication:
+
+```
+conf t
+ key chain TEST
+  key 1
+   key-string MARIUS12345
+   cryptographic-algorithm hmac-sha-256
+  
+ interface g0/0
+  ip ospf authentication key-chain TEST
+```
+
+```
+R2#sh ip ospf int g0/0
+GigabitEthernet0/0 is up, line protocol is up 
+  Internet Address 10.12.1.2/24, Area 12, Attached via Interface Enable
+  Process ID 1, Router ID 192.168.2.2, Network Type BROADCAST, Cost: 1
+  Topology-MTID    Cost    Disabled    Shutdown      Topology Name
+        0           1         no          no            Base
+  Enabled by interface config, including secondary ip addresses
+  Transmit Delay is 1 sec, State DR, Priority 1
+  Designated Router (ID) 192.168.2.2, Interface address 10.12.1.2
+  Backup Designated router (ID) 192.168.1.1, Interface address 10.12.1.1
+  Timer intervals configured, Hello 10, Dead 40, Wait 40, Retransmit 5
+    oob-resync timeout 40
+    Hello due in 00:00:07
+  Supports Link-local Signaling (LLS)
+  Cisco NSF helper support enabled
+  IETF NSF helper support enabled
+  Index 1/1/2, flood queue length 0
+  Next 0x0(0)/0x0(0)/0x0(0)
+  Last flood scan length is 0, maximum is 2
+  Last flood scan time is 0 msec, maximum is 0 msec
+  Neighbor Count is 1, Adjacent neighbor count is 1 
+    Adjacent with neighbor 192.168.1.1  (Backup Designated Router)
+  Suppress hello for 0 neighbor(s)
+  Cryptographic authentication enabled
+    Sending SA: Key 1, Algorithm HMAC-SHA-256 - key chain TEST
+```
+

@@ -569,3 +569,1358 @@ R3(config-router)#
 - To form an OSPF neighbor adjacency, the router interfaces must be on the same subnet
 
 - You can verify this in many ways
+
+- The simplest way is to look at the interface configuration in the running configuration with the `show running-config interface <type> <number>`
+
+- Below is shown the configuration on G1 on R1 and G1 on R2:
+
+```
+R1#sh run int g1 
+Building configuration...
+
+Current configuration : 117 bytes
+!
+interface GigabitEthernet1
+ ip address 10.1.1.1 255.255.255.0
+ negotiation auto
+ no mop enabled
+ no mop sysid
+end
+
+R2(config-if)#do sh run int g1
+Building configuration...
+
+Current configuration : 135 bytes
+!
+interface GigabitEthernet1
+ ip address 10.1.1.2 255.255.255.0
+ ip ospf 1 area 1
+ negotiation auto
+ no mop enabled
+ no mop sysid
+end
+
+```
+
+- Are they in the same subnet? Yes.
+
+- Based on the IP address and subnet mask they are both in the 10.1.1.0/24 subnet
+
+- If the subnet mask does not match, you will see this type of messages with `debug ip ospf hello` enabled
+
+```
+R2(config-if)#
+*Oct 13 08:29:20.449: OSPF-1 HELLO Gi1: Rcv hello from 1.1.1.1 area 1 10.1.1.1
+*Oct 13 08:29:20.449: OSPF-1 HELLO Gi1: Mismatched hello parameters from 10.1.1.1
+*Oct 13 08:29:20.449: OSPF-1 HELLO Gi1: Dead R 40 C 40, Hello R 10 C 10 Mask R 255.255.255.0 C 255.255.255.252
+R2(config-if)#
+*Oct 13 08:29:21.511: OSPF-1 HELLO Gi1: Send hello to 224.0.0.5 area 1 from 10.1.1.2
+R2(config-if)#
+*Oct 13 08:29:29.514: OSPF-1 HELLO Gi1: Rcv hello from 1.1.1.1 area 1 10.1.1.1
+*Oct 13 08:29:29.514: OSPF-1 HELLO Gi1: Mismatched hello parameters from 10.1.1.1
+*Oct 13 08:29:29.514: OSPF-1 HELLO Gi1: Dead R 40 C 40, Hello R 10 C 10 Mask R 255.255.255.0 C 255.255.255.252
+R2(config-if)#
+*Oct 13 08:29:31.104: OSPF-1 HELLO Gi1: Send hello to 224.0.0.5 area 1 from 10.1.1.2
+R2(config-if)#ip add
+R2(config-if)#ip address 10.1.1.
+*Oct 13 08:29:38.590: OSPF-1 HELLO Gi1: Rcv hello from 1.1.1.1 area 1 10.1.1.1
+*Oct 13 08:29:38.590: OSPF-1 HELLO Gi1: Mismatched hello parameters from 10.1.1.1
+*Oct 13 08:29:38.590: OSPF-1 HELLO Gi1: Dead R 40 C 40, Hello R 10 C 10 Mask R 255.255.255.0 C 255.255.255.252
+R2(config-if)#ip address 10.1.1.2 255.255.2
+*Oct 13 08:29:40.694: OSPF-1 HELLO Gi1: Send hello to 224.0.0.5 area 1 from 10.1.1.25
+R2(config-if)#ip address 10.1.1.2 255.255.255.0
+R2(config-if)#
+*Oct 13 08:29:43.823: OSPF-1 HELLO Gi1: Send hello to 224.0.0.5 area 1 from 10.1.1.2
+R2(config-if)#
+```
+
+- NOTE: R = RECEIVED (from neighbor), C = CONFIGURED (on local router)
+
+#### Passive Interface
+
+- The passive interface feature is important for all organizations
+
+- It does two things: reduces the OSPF-related traffic on a network and improves OSPF security
+
+- The passive interface feature turns off the sending and receiving of OSPF packets on an interface while still allowing the interface's network ID to be injected into the OSPF process and advertised to other OSPF neighbors
+
+- This ensures that rogue routers that attach to the network will not be able to form adjacencies with your legitimate router on that interface since your router is not sending or receiving OSPF packets on the interface
+
+- However, if you configure the wrong interface as passive, a legitimate OSPF neighbor relationship is not formed
+
+- As shown in the `show ip protocols` output below, G2 is a passive interface
+
+- If there are no passive interfaces, this section does not appear in the output of `show ip protocols`
+
+```
+R1(config-router)#do sh ip protoc
+*** IP Routing is NSF aware ***
+
+Routing Protocol is "application"
+  Sending updates every 0 seconds
+  Invalid after 0 seconds, hold down 0, flushed after 0
+  Outgoing update filter list for all interfaces is not set
+  Incoming update filter list for all interfaces is not set
+  Maximum path: 32
+  Routing for Networks:
+  Routing Information Sources:
+    Gateway         Distance      Last Update
+  Distance: (default is 4)
+
+Routing Protocol is "ospf 1"
+  Outgoing update filter list for all interfaces is not set
+  Incoming update filter list for all interfaces is not set
+  Router ID 1.1.1.1
+  Number of areas in this router is 1. 0 normal 1 stub 0 nssa
+  Maximum path: 4
+  Routing for Networks:
+    10.1.1.1 0.0.0.0 area 1
+  Routing on Interfaces Configured Explicitly (Area 1):
+    GigabitEthernet2
+  Passive Interface(s):
+    GigabitEthernet2
+  Routing Information Sources:
+    Gateway         Distance      Last Update
+  Distance: (default is 110)
+
+```
+
+- Authentication is used to ensure that your OSPF routers form neighbor relationships only with legitimate routers 
+
+- Therefore, if authentication is implemented, both routers must agree on the settings for a neighbor relationship to form
+
+- With authentication, you can use the spot-the-difference method when troubleshooting
+
+- OSPF supports three types of authentication:
+
+    1. **Null**: Known as type 0 and means no authentication
+
+    2. **Plaintext**: Known as type 1 and sends credentials as plain text
+
+    3. **MD5**: Known as type 2 and sends a hash
+
+- OSPF authentication can be enabled on an interface-by-interface basis or for all interfaces in an area at the same time
+
+- Knowing which commands to use to verify these different authentication configuration methods is important
+
+- When is an authentication mismatch, `debug ip ospf adj` command can be used
+
+```
+R1(config-if)#do debug ip ospf adj
+OSPF adjacency debugging is on
+R1(config-if)#
+*Oct 13 10:03:06.473: OSPF-1 ADJ   Gi0/0: Rcv pkt from 10.12.1.2 : Mismatched Authentication key - ID 1
+*Oct 13 10:03:06.733: OSPF-1 ADJ   Gi0/0: Send with youngest Key 1
+R1(config-if)#
+*Oct 13 10:03:15.621: OSPF-1 ADJ   Gi0/0: Rcv pkt from 10.12.1.2 : Mismatched Authentication key - ID 1
+*Oct 13 10:03:15.890: OSPF-1 ADJ   Gi0/0: Send with youngest Key 1
+R1(config-if)#
+*Oct 13 10:03:25.043: OSPF-1 ADJ   Gi0/0: Send with youngest Key 1
+*Oct 13 10:03:25.211: OSPF-1 ADJ   Gi0/0: Rcv pkt from 10.12.1.2 : Mismatched Authentication key - ID 1
+R1(config-if)#
+*Oct 13 10:03:34.397: OSPF-1 ADJ   Gi0/0: Rcv pkt from 10.12.1.2 : Mismatched Authentication key - ID 1
+*Oct 13 10:03:34.492: OSPF-1 ADJ   Gi0/0: Send with youngest Key 1
+R1(config-if)#
+*Oct 13 10:03:43.781: OSPF-1 ADJ   Gi0/0: Rcv pkt from 10.12.1.2 : Mismatched Authentication key - ID 1
+*Oct 13 10:03:44.219: OSPF-1 ADJ   Gi0/0: Send with youngest Key 1
+R1(config-if)#
+*Oct 13 10:03:53.553: OSPF-1 ADJ   Gi0/0: Rcv pkt from 10.12.1.2 : Mismatched Authentication key - ID 1
+*Oct 13 10:03:53.930: OSPF-1 ADJ   Gi0/0: Send with youngest Key 1
+R1(config-if)#
+*Oct 13 10:04:03.447: OSPF-1 ADJ   Gi0/0: Rcv pkt from 10.12.1.2 : Mismatched Authentication Key - Invalid cryptographic authentication Key ID 0 on interface
+*Oct 13 10:04:03.576: OSPF-1 ADJ   Gi0/0: Send with youngest Key 1
+R1(config-if)#
+*Oct 13 10:04:13.112: OSPF-1 ADJ   Gi0/0: Rcv pkt from 10.12.1.2 : Mismatched Authentication Key - Invalid cryptographic authentication Key ID 0 on interface
+*Oct 13 10:04:13.351: OSPF-1 ADJ   Gi0/0: Send with youngest Key 1
+R1(config-if)#
+*Oct 13 10:04:22.536: OSPF-1 ADJ   Gi0/0: Rcv pkt from 10.12.1.2 : Mismatched Authentication Key - Invalid cryptographic authentication Key ID 0 on interface
+*Oct 13 10:04:22.988: OSPF-1 ADJ   Gi0/0: Send with youngest Key 1
+R1(config-if)#
+*Oct 13 10:04:32.368: OSPF-1 ADJ   Gi0/0: Rcv pkt from 10.12.1.2 : Mismatched Authentication Key - Invalid cryptographic authentication Key ID 0 on interface
+*Oct 13 10:04:32.825: OSPF-1 ADJ   Gi0/0: Send with youngest Key 1
+R1(config-if)#
+*Oct 13 10:04:41.497: OSPF-1 ADJ   Gi0/0: Send with youngest Key 1
+*Oct 13 10:04:41.498: OSPF-1 ADJ   Gi0/0: Rcv DBD from 192.168.2.2 seq 0x9A4 opt 0x52 flag 0x7 len 32  mtu 1500 state INIT
+*Oct 13 10:04:41.498: OSPF-1 ADJ   Gi0/0: 2 Way Communication to 192.168.2.2, state 2WAY
+*Oct 13 10:04:41.498: OSPF-1 ADJ   Gi0/0: Neighbor change event
+*Oct 13 10:04:41.498: OSPF-1 ADJ   Gi0/0: DR/BDR election
+*Oct 13 10:04:41.498: OSPF-1 ADJ   Gi0/0: Elect BDR 0.0.0.0
+*Oct 13 10:04:41.498: OSPF-1 ADJ   Gi0/0: Elect DR 192.168.2.2
+*Oct 13 10:04:41.498: OSPF-1 ADJ   Gi0/0: Elect BDR 192.168.1.1
+*Oct 13 10:04:41.498: OSPF-1 ADJ   Gi0/0: Elect DR 192.168.2.2
+*Oct 13 10:04:41.498: OSPF-1 ADJ   Gi0/0: DR: 192.168.2.2 (Id)
+*Oct 13 10:04:41.498: OSPF-1 ADJ   Gi0/0:    BDR: 192.168.1.1 (Id)
+*Oct 13 10:04:41.498: OSPF-1 ADJ   Gi0/0: Nbr 192.168.2.2: Prepare dbase exchange
+*Oct 13 10:04:41.498: OSPF-1 ADJ   Gi0/0: Send DBD to 192.168.2.2 seq 0x1C7D opt 0x52 flag 0x7 len 32
+*Oct 13 10:04:41.498: OSPF-1 ADJ   Gi0/0: Send with youngest Key 1
+*Oct 13 10:04:41.498: OSPF-1 ADJ   Gi0/0: Set flush timer
+*Oct 13 10:04:41.498: OSPF-1 ADJ   Gi0/0: Remember old DR 192.168.1.1 (id)
+*Oct 13 10:04:41.498: OSPF-1 ADJ   Gi0/0: NBR Negotiation Done. We are the SLAVE
+*Oct 13 10:04:41.498: OSPF-1 ADJ   Gi0/0: Nbr 192.168.2.2: Summary list built, size 6
+*Oct 13 10:04:41.498: OSPF-1 ADJ   Gi0/0: Send DBD to 192.168.2.2 seq 0x9A4 opt 0x52 flag 0x2 len 152
+*Oct 13 10:04:41.498: OSPF-1 ADJ   Gi0/0: Send with youngest Key 1
+*Oct 13 10:04:41.499: OSPF-1 ADJ   Gi0/0: Rcv DBD from 192.168.2.2 seq 0x9A5 opt 0x52 flag 0x1 len 72  mtu 1500 state EXCHANGE
+*Oct 13 10:04:41.499: OSPF-1 ADJ   Gi0/0: Exchange Done with 192.168.2.2
+*Oct 13 10:04:41.499: OSPF-1 ADJ   Gi0/0: Send with youngest Key 1
+*Oct 13 10:04:41.499: OSPF-1 ADJ   Gi0/0: Send LS REQ to 192.168.2.2 length 36
+*Oct 13 10:04:41.499: OSPF-1 ADJ   Gi0/0: Send DBD to 192.168.2.2 seq 0x9A5 opt 0x52 flag 0x0 len 32
+*Oct 13 10:04:41.499: OSPF-1 ADJ   Gi0/0: Send with youngest Key 1
+*Oct 13 10:04:41.500: OSPF-1 ADJ   Gi0/0: Rcv LS UPD from Nbr ID 192.168.2.2 length 64 LSA count 1
+*Oct 13 10:04:41.500: OSPF-1 ADJ   Gi0/0: Synchronized with 192.168.2.2, state FULL
+*Oct 13 10:04:41.500: %OSPF-5-ADJCHG: Process 1, Nbr 192.168.2.2 on GigabitEthernet0/0 from LOADING to FULL, Loading Done
+*Oct 13 10:04:41.500: OSPF-1 ADJ   Gi0/0: Rcv LS REQ from 192.168.2.2 length 48 LSA count 2
+*Oct 13 10:04:41.500: OSPF-1 ADJ   Gi0/0: Send with youngest Key 1
+*Oct 13 10:04:42.005: OSPF-1 ADJ   Gi0/0: Send with youngest Key 1
+*Oct 13 10:04:42.605: OSPF-1 ADJ   Gi0/0: Send with youngest Key 1
+*Oct 13 10:04:44.000: OSPF-1 ADJ   Gi0/0: Send with youngest Key 1
+R1(config-if)#
+R1(config-if)#
+*Oct 13 10:04:49.002: OSPF-1 ADJ   Gi0/0: Send with youngest Key 1
+R1(config-if)#
+*Oct 13 10:04:50.962: OSPF-1 ADJ   Gi0/0: Neighbor change event
+*Oct 13 10:04:50.962: OSPF-1 ADJ   Gi0/0: DR/BDR election
+*Oct 13 10:04:50.962: OSPF-1 ADJ   Gi0/0: Elect BDR 192.168.1.1
+*Oct 13 10:04:50.962: OSPF-1 ADJ   Gi0/0: Elect DR 192.168.2.2
+*Oct 13 10:04:50.962: OSPF-1 ADJ   Gi0/0: DR: 192.168.2.2 (Id)
+*Oct 13 10:04:50.962: OSPF-1 ADJ   Gi0/0:    BDR: 192.168.1.1 (Id)
+*Oct 13 10:04:51.463: OSPF-1 ADJ   Gi0/0: Send with youngest Key 1
+*Oct 13 10:04:51.855: OSPF-1 ADJ   Gi0/0: Send with youngest Key 1
+R1(config-if)#do un all
+All possible debugging has been turned off
+```
+
+- To verify whether authentication has been enabled for the entire area on a router, you use the `show ip ospf` command
+
+```
+R2(config-router)#do sh ip ospf 
+ Routing Process "ospf 1" with ID 2.2.2.2
+ Start time: 00:01:14.006, Time elapsed: 02:07:35.932
+ Supports only single TOS(TOS0) routes
+ Supports opaque LSA
+ Supports Link-local Signaling (LLS)
+ Supports area transit capability
+ Supports NSSA (compatible with RFC 3101)
+ Supports Database Exchange Summary List Optimization (RFC 5243)
+ Event-log enabled, Maximum number of events: 1000, Mode: cyclic
+ Router is not originating router-LSAs with maximum metric
+ Initial SPF schedule delay 50 msecs
+ Minimum hold time between two consecutive SPFs 200 msecs
+ Maximum wait time between two consecutive SPFs 5000 msecs
+ Incremental-SPF disabled
+ Initial LSA throttle delay 50 msecs
+ Minimum hold time for LSA throttle 200 msecs
+ Maximum wait time for LSA throttle 5000 msecs
+ Minimum LSA arrival 100 msecs
+ LSA group pacing timer 240 secs
+ Interface flood pacing timer 33 msecs
+ Retransmission pacing timer 66 msecs
+ EXCHANGE/LOADING adjacency limit: initial 300, process maximum 300
+ Number of external LSA 0. Checksum Sum 0x000000
+ Number of opaque AS LSA 0. Checksum Sum 0x000000
+ Number of DCbitless external and opaque AS LSA 0
+ Number of DoNotAge external and opaque AS LSA 0
+ Number of areas in this router is 1. 0 normal 1 stub 0 nssa
+ Number of areas transit capable is 0
+ External flood list length 0
+ IETF NSF helper support enabled
+ Cisco NSF helper support enabled
+ Reference bandwidth unit is 100000 mbps
+    Area 1
+        Number of interfaces in this area is 1
+        It is a stub area
+        Area has simple password authentication # AUTH per area is enabled
+        SPF algorithm last executed 00:03:06.457 ago
+        SPF algorithm executed 27 times
+        Area ranges are
+        Number of LSA 5. Checksum Sum 0x025CC1
+        Number of opaque link LSA 0. Checksum Sum 0x000000
+        Number of DCbitless LSA 0
+        Number of indication LSA 0
+        Number of DoNotAge LSA 0
+        Flood list length 0
+
+```
+
+- However, with Message Digest 5 (MD5) or key chain authentication, you still have to verify the key ID that is being used on an interface-by-interface basis by using the `show ip ospf interface <type> <number>` command
+
+- In addition, you must verify the case-sensitive string that is being used by using `show running-config interface <type> <number>` or `show key chain` command
+
+```
+2#show ip ospf 
+ Routing Process "ospf 1" with ID 192.168.2.2
+ Start time: 00:00:10.543, Time elapsed: 00:06:26.148
+ Supports only single TOS(TOS0) routes
+ Supports opaque LSA
+ Supports Link-local Signaling (LLS)
+ Supports area transit capability
+ Supports NSSA (compatible with RFC 3101)
+ Supports Database Exchange Summary List Optimization (RFC 5243)
+ Event-log enabled, Maximum number of events: 1000, Mode: cyclic
+ It is an area border router
+ Router is not originating router-LSAs with maximum metric
+ Initial SPF schedule delay 5000 msecs
+ Minimum hold time between two consecutive SPFs 10000 msecs
+ Maximum wait time between two consecutive SPFs 10000 msecs
+ Incremental-SPF disabled
+ Minimum LSA interval 5 secs
+ Minimum LSA arrival 1000 msecs
+ LSA group pacing timer 240 secs
+ Interface flood pacing timer 33 msecs
+ Retransmission pacing timer 66 msecs
+ EXCHANGE/LOADING adjacency limit: initial 300, process maximum 300
+ Number of external LSA 0. Checksum Sum 0x000000
+ Number of opaque AS LSA 0. Checksum Sum 0x000000
+ Number of DCbitless external and opaque AS LSA 0
+ Number of DoNotAge external and opaque AS LSA 0
+ Number of areas in this router is 2. 2 normal 0 stub 0 nssa
+ Number of areas transit capable is 0
+ External flood list length 0
+ IETF NSF helper support enabled
+ Cisco NSF helper support enabled
+ Reference bandwidth unit is 100 mbps
+    Area BACKBONE(0)
+        Number of interfaces in this area is 2 (1 loopback)
+        Area has message digest authentication
+        SPF algorithm last executed 00:05:18.930 ago
+        SPF algorithm executed 4 times
+        Area ranges are
+        Number of LSA 5. Checksum Sum 0x02945F
+        Number of opaque link LSA 0. Checksum Sum 0x000000
+        Number of DCbitless LSA 0
+        Number of indication LSA 0
+        Number of DoNotAge LSA 0
+        Flood list length 0
+    Area 12
+        Number of interfaces in this area is 1
+        Area has simple password authentication
+        SPF algorithm last executed 00:05:28.930 ago
+        SPF algorithm executed 3 times
+        Area ranges are
+        Number of LSA 6. Checksum Sum 0x034CC6
+        Number of opaque link LSA 0. Checksum Sum 0x000000
+        Number of DCbitless LSA 0
+        Number of indication LSA 0
+        Number of DoNotAge LSA 0
+        Flood list length 0
+
+```
+
+```
+R2#show ip ospf interface g0/1
+GigabitEthernet0/1 is up, line protocol is up 
+  Internet Address 10.23.1.2/24, Area 0, Attached via Interface Enable
+  Process ID 1, Router ID 192.168.2.2, Network Type BROADCAST, Cost: 1
+  Topology-MTID    Cost    Disabled    Shutdown      Topology Name
+        0           1         no          no            Base
+  Enabled by interface config, including secondary ip addresses
+  Transmit Delay is 1 sec, State BDR, Priority 1
+  Designated Router (ID) 192.168.3.3, Interface address 10.23.1.3
+  Backup Designated router (ID) 192.168.2.2, Interface address 10.23.1.2
+  Timer intervals configured, Hello 10, Dead 40, Wait 40, Retransmit 5
+    oob-resync timeout 40
+    Hello due in 00:00:04
+  Supports Link-local Signaling (LLS)
+  Cisco NSF helper support enabled
+  IETF NSF helper support enabled
+  Index 1/2/3, flood queue length 0
+  Next 0x0(0)/0x0(0)/0x0(0)
+  Last flood scan length is 1, maximum is 1
+  Last flood scan time is 0 msec, maximum is 0 msec
+  Neighbor Count is 1, Adjacent neighbor count is 1 
+    Adjacent with neighbor 192.168.3.3  (Designated Router)
+  Suppress hello for 0 neighbor(s)
+  Cryptographic authentication enabled
+    Youngest key id is 1
+R2(config-if)#do sh run int g0/1    
+Building configuration...
+
+Current configuration : 211 bytes
+!
+interface GigabitEthernet0/1
+ ip address 10.23.1.2 255.255.255.0
+ ip ospf authentication message-digest
+ ip ospf message-digest-key 1 md5 CISCO
+ ip ospf 1 area 0
+ duplex auto
+ speed auto
+ media-type rj45
+end
+```
+
+- If you configure authentication on an interface-by-interface basis, the output of `show ip ospf` states *Area has no authentication*
+
+- Therefore you need to make sure to check the output of `show ip ospf interface` as well
+
+- You can use the `debug ip ospf adj` command, as shown above, when troubleshooting to find mismatched authentication information
+
+- In the example below the packet received is using null authentication type (type 0) and the local router is using plain text authentication (type 1)
+
+```
+R2(config-if)#
+*Oct 13 10:45:50.384: OSPF-1 ADJ   Gi0/0: Rcv pkt from 10.12.1.1 : Mismatched Authentication type. Input packet specified type 0, we use type 1
+R2(config-if)#
+*Oct 13 10:45:57.713: OSPF-1 ADJ   Gi0/1: Send with youngest Key 1
+R2(config-if)#
+*Oct 13 10:45:59.427: OSPF-1 ADJ   Gi0/0: Rcv pkt from 10.12.1.1 : Mismatched Authentication type. Input packet specified type 0, we use type 1
+R2(config-if)#
+*Oct 13 10:46:01.166: OSPF-1 ADJ   Gi0/0: 192.168.1.1 address 10.12.1.1 is dead
+*Oct 13 10:46:01.166: OSPF-1 ADJ   Gi0/0: 192.168.1.1 address 10.12.1.1 is dead, state DOWN
+*Oct 13 10:46:01.166: %OSPF-5-ADJCHG: Process 1, Nbr 192.168.1.1 on GigabitEthernet0/0 from FULL to DOWN, Neighbor Down: Dead timer expired
+R2(config-if)#
+*Oct 13 10:46:01.166: OSPF-1 ADJ   Gi0/0: Neighbor change event
+*Oct 13 10:46:01.166: OSPF-1 ADJ   Gi0/0: DR/BDR election
+*Oct 13 10:46:01.166: OSPF-1 ADJ   Gi0/0: Elect BDR 0.0.0.0
+*Oct 13 10:46:01.166: OSPF-1 ADJ   Gi0/0: Elect DR 192.168.2.2
+*Oct 13 10:46:01.166: OSPF-1 ADJ   Gi0/0: DR: 192.168.2.2 (Id)
+*Oct 13 10:46:01.166: OSPF-1 ADJ   Gi0/0:    BDR: none 
+R2(config-if)#do  
+*Oct 13 10:46:06.667: OSPF-1 ADJ   Gi0/1: Send with youngest Key 1
+*Oct 13 10:46:07.548: OSPF-1 ADJ   Gi0/1: Send with youngest Key 1
+R2(config-if)#do unb 
+*Oct 13 10:46:08.865: OSPF-1 ADJ   Gi0/0: Rcv pkt from 10.12.1.1 : Mismatched Authentication type. Input packet specified type 0, we use type 1
+R2(config-if)#do un all
+All possible debugging has been turned off
+R2(config-if)#
+*Oct 13 10:46:38.914: %OSPF-5-ADJCHG: Process 1, Nbr 192.168.1.1 on GigabitEthernet0/0 from LOADING to FULL, Loading Done
+```
+
+#### ACLs
+
+- Access control lists (ACLs) are extremely powerful
+
+- How they are implemented determines what they control in a network
+
+- If an ACL is applied to an interface, and the ACL is not permitting OSPF packets, a neighbor relationship does not form
+
+- To determine whether an ACL is applied to an interface, use the `show ip interface <interface-type> <interface-number>` command as shown in the example below
+
+- Notice that in this example, ACL 100 is applied inbound on interface G2
+
+- To verify ACL 100 entries, issue the command `show access-lists 100` 
+
+- In this case, you can see that ACL 100 is denying OSPF traffic, which prevents a neighbor relationship from forming
+
+- Note that outbound ACLs do not affect OSPF packets
+
+- Therefore, if there is an outbound ACL configured on an interface and the neighbor adjacency is not forming, the ACL is not the problem, even though it might be denying OSPF packets, because the outbound ACL does not apply to OSPF packets generated on the local router
+
+```
+R1(config-if)#do sh ip int g2
+GigabitEthernet2 is up, line protocol is up
+  Internet address is 10.1.12.1/24
+  Broadcast address is 255.255.255.255
+  Address determined by non-volatile memory
+  MTU is 1500 bytes
+  Helper address is not set
+  Directed broadcast forwarding is disabled
+  Multicast reserved groups joined: 224.0.0.5 224.0.0.6
+  Outgoing Common access list is not set 
+  Outgoing access list is not set
+  Inbound Common access list is not set 
+  Inbound  access list is 100 ####### Incoming ACL set
+  Proxy ARP is enabled
+  Local Proxy ARP is disabled
+  Security level is default
+  Split horizon is enabled
+  ICMP redirects are always sent
+  ICMP unreachables are always sent
+  ICMP mask replies are never sent
+  IP fast switching is enabled
+  IP Flow switching is disabled
+  IP CEF switching is enabled
+  IP CEF switching turbo vector
+  IP Null turbo vector
+  Associated unicast routing topologies:
+        Topology "base", operation state is UP
+  IP multicast fast switching is enabled
+  IP multicast distributed fast switching is disabled
+  IP route-cache flags are Fast, CEF
+  Router Discovery is disabled
+  IP output packet accounting is disabled
+  IP access violation accounting is disabled
+  TCP/IP header compression is disabled
+  RTP/IP header compression is disabled
+  Probe proxy name replies are disabled
+  Policy routing is disabled
+  Network address translation is disabled
+  BGP Policy Mapping is disabled
+  Input features: Access List, MCI Check
+  IPv4 WCCP Redirect outbound is disabled
+  IPv4 WCCP Redirect inbound is disabled
+  IPv4 WCCP Redirect exclude is disabled
+```
+
+```
+R1(config-if)#do sh access-lists 100
+Extended IP access list 100
+    10 deny ospf any any (12 matches)
+    20 permit ip any any
+```
+
+#### MTU Mismatch
+
+- For OSPF routers to become neighbors and achieve full adjacency state, the interface of each router forming the adjacency must have exactly the same MTU
+
+- If the MTU differs, the routers can see each other but get stuck in the ExStart/ Exchange states
+
+- In the output below, the `show ip ospf neighbor` command indicates that R1 is stuck in the Exchange state and that R2 is stuck in ExStart state
+
+```
+R1#show ip ospf neighbor 
+
+Neighbor ID     Pri   State           Dead Time   Address         Interface
+2.2.2.2           1   EXCHANGE/BDR    00:00:35    10.1.1.2        GigabitEthernet1
+3.3.3.3           1   FULL/DR         00:00:37    10.1.12.2       GigabitEthernet2
+```
+
+```
+R2(config-if)#do sh ip ospf nei
+
+Neighbor ID     Pri   State           Dead Time   Address         Interface
+1.1.1.1           1   EXSTART/DR      00:00:38    10.1.1.1        GigabitEthernet1
+R2(config-if)#
+```
+
+- After some time the interfaces will go into DOWN state due to "Too many retransmissions", use `debug ip ospf adj` to see some debugs
+
+```
+R2(config-if)#do debug ip ospf adj
+OSPF adjacency debugging is on
+R2(config-if)#do sh ip ospf nei       
+
+Neighbor ID     Pri   State           Dead Time   Address         Interface
+1.1.1.1           1   EXSTART/DR      00:00:38    10.1.1.1        GigabitEthernet1
+R2(config-if)#
+*Oct 13 11:46:50.348: OSPF-1 ADJ   Gi1: Send DBD to 1.1.1.1 seq 0x122E opt 0x50 flag 0x7 len 32
+*Oct 13 11:46:50.348: OSPF-1 ADJ   Gi1: Send with youngest Key 1
+*Oct 13 11:46:50.348: OSPF-1 ADJ   Gi1: Retransmitting DBD to 1.1.1.1 [3]
+*Oct 13 11:46:50.349: OSPF-1 ADJ   Gi1: Rcv DBD from 1.1.1.1 seq 0x122E opt 0x50 flag 0x2 len 92  mtu 1500 state EXSTART
+*Oct 13 11:46:50.349: OSPF-1 ADJ   Gi1: Nbr 1.1.1.1 has larger interface MTU
+R2(config-if)#
+R2(config-if)#
+R2(config-if)#do sh ip ospf nei
+
+Neighbor ID     Pri   State           Dead Time   Address         Interface
+1.1.1.1           1   EXSTART/DR      00:00:35    10.1.1.1        GigabitEthernet1
+R2(config-if)#do sh ip ospf nei
+*Oct 13 11:46:54.834: OSPF-1 ADJ   Gi1: Send with youngest Key 1
+*Oct 13 11:46:55.056: OSPF-1 ADJ   Gi1: Send DBD to 1.1.1.1 seq 0x122E opt 0x50 flag 0x7 len 32
+*Oct 13 11:46:55.056: OSPF-1 ADJ   Gi1: Send with youngest Key 1
+*Oct 13 11:46:55.056: OSPF-1 ADJ   Gi1: Retransmitting DBD to 1.1.1.1 [4]
+*Oct 13 11:46:55.056: OSPF-1 ADJ   Gi1: Rcv DBD from 1.1.1.1 seq 0x122E opt 0x50 flag 0x2 len 92  mtu 1500 state EXSTART
+*Oct 13 11:46:55.056: OSPF-1 ADJ   Gi1: Nbr 1.1.1.1 has larger interface MTU
+R2(config-if)#do sh ip ospf nei
+
+Neighbor ID     Pri   State           Dead Time   Address         Interface
+1.1.1.1           1   EXSTART/DR      00:00:38    10.1.1.1        GigabitEthernet1
+R2(config-if)#
+R2(config-if)#
+R2(config-if)#
+*Oct 13 11:46:59.877: OSPF-1 ADJ   Gi1: Send DBD to 1.1.1.1 seq 0x122E opt 0x50 flag 0x7 len 32
+*Oct 13 11:46:59.878: OSPF-1 ADJ   Gi1: Send with youngest Key 1
+*Oct 13 11:46:59.878: OSPF-1 ADJ   Gi1: Retransmitting DBD to 1.1.1.1 [5]
+*Oct 13 11:46:59.879: OSPF-1 ADJ   Gi1: Rcv DBD from 1.1.1.1 seq 0x122E opt 0x50 flag 0x2 len 92  mtu 1500 state EXSTART
+*Oct 13 11:46:59.879: OSPF-1 ADJ   Gi1: Nbr 1.1.1.1 has larger interface MTU
+R2(config-if)#
+*Oct 13 11:47:03.982: OSPF-1 ADJ   Gi1: Send with youngest Key 1
+*Oct 13 11:47:04.444: OSPF-1 ADJ   Gi1: Send DBD to 1.1.1.1 seq 0x122E opt 0x50 flag 0x7 len 32
+*Oct 13 11:47:04.444: OSPF-1 ADJ   Gi1: Send with youngest Key 1
+*Oct 13 11:47:04.444: OSPF-1 ADJ   Gi1: Retransmitting DBD to 1.1.1.1 [6]
+*Oct 13 11:47:04.445: OSPF-1 ADJ   Gi1: Rcv DBD from 1.1.1.1 seq 0x122E opt 0x50 flag 0x2 len 92  mtu 1500 state EXSTART
+*Oct 13 11:47:04.445: OSPF-1 ADJ   Gi1: Nbr 1.1.1.1 has larger interface MTU
+R2(config-if)#
+*Oct 13 11:47:09.386: OSPF-1 ADJ   Gi1: Send DBD to 1.1.1.1 seq 0x122E opt 0x50 flag 0x7 len 32
+*Oct 13 11:47:09.386: OSPF-1 ADJ   Gi1: Send with youngest Key 1
+*Oct 13 11:47:09.386: OSPF-1 ADJ   Gi1: Retransmitting DBD to 1.1.1.1 [7]
+*Oct 13 11:47:09.387: OSPF-1 ADJ   Gi1: Rcv DBD from 1.1.1.1 seq 0x122E opt 0x50 flag 0x2 len 92  mtu 1500 state EXSTART
+*Oct 13 11:47:09.387: OSPF-1 ADJ   Gi1: Nbr 1.1.1.1 has larger interface MTU
+R2(config-if)#
+*Oct 13 11:47:13.955: OSPF-1 ADJ   Gi1: Send with youngest Key 1
+*Oct 13 11:47:14.108: OSPF-1 ADJ   Gi1: Send DBD to 1.1.1.1 seq 0x122E opt 0x50 flag 0x7 len 32
+*Oct 13 11:47:14.108: OSPF-1 ADJ   Gi1: Send with youngest Key 1
+*Oct 13 11:47:14.108: OSPF-1 ADJ   Gi1: Retransmitting DBD to 1.1.1.1 [8]
+*Oct 13 11:47:14.109: OSPF-1 ADJ   Gi1: Rcv DBD from 1.1.1.1 seq 0x122E opt 0x50 flag 0x2 len 92  mtu 1500 state EXSTART
+*Oct 13 11:47:14.109: OSPF-1 ADJ   Gi1: Nbr 1.1.1.1 has larger interface MTU
+R2(config-if)#
+*Oct 13 11:47:18.801: OSPF-1 ADJ   Gi1: Send DBD to 1.1.1.1 seq 0x122E opt 0x50 flag 0x7 len 32
+*Oct 13 11:47:18.801: OSPF-1 ADJ   Gi1: Send with youngest Key 1
+*Oct 13 11:47:18.801: OSPF-1 ADJ   Gi1: Retransmitting DBD to 1.1.1.1 [9]
+*Oct 13 11:47:18.802: OSPF-1 ADJ   Gi1: Rcv DBD from 1.1.1.1 seq 0x122E opt 0x50 flag 0x2 len 92  mtu 1500 state EXSTART
+*Oct 13 11:47:18.802: OSPF-1 ADJ   Gi1: Nbr 1.1.1.1 has larger interface MTU
+R2(config-if)#do un all
+All possible debugging has been turned off
+R2(config-if)#
+R2(config-if)#
+R2(config-if)#
+*Oct 13 11:48:39.109: %OSPF-5-ADJCHG: Process 1, Nbr 1.1.1.1 on GigabitEthernet1 from EXSTART to DOWN, Neighbor Down: Too many retransmissions
+R2(config-if)#do sh ip ospf nei
+
+Neighbor ID     Pri   State           Dead Time   Address         Interface
+1.1.1.1           1   DOWN/DROTHER       -        10.1.1.1        GigabitEthernet1
+R2(config-if)#
+*Oct 13 11:49:39.109: %OSPF-5-ADJCHG: Process 1, Nbr 1.1.1.1 on GigabitEthernet1 from DOWN to DOWN, Neighbor Down: Ignore timer expired
+```
+
+- In the output of `show ip ospf interface brief` you can see the Nbrs F/C column without the expected values
+
+```
+R1#show ip ospf int br
+Interface    PID   Area            IP Address/Mask    Cost  State Nbrs F/C
+Gi1          1     1               10.1.1.1/24        100   BDR   0/1
+Gi2          1     1               10.1.12.1/24       100   BDR   1/1
+```
+
+- Our output shows 0/1 for interface G1 which indicates that there is one neighbor out the interface, but there are 0 full adjacencies
+
+- To verify the MTU configured on an interface, issue the `show run interface <type> <number>` command
+
+- As shown below, the MTU of G1 interface on R2 is 1436, and because nothing is listed on G1 interface on R1, it is using the default value, 1500
+
+```
+R2(config-if)#do sh run int g1
+Building configuration...
+
+Current configuration : 187 bytes
+!
+interface GigabitEthernet1
+ ip address 10.1.1.2 255.255.255.0
+ ip mtu 1436
+ ip ospf authentication key-chain TEST
+ ip ospf 1 area 1
+ negotiation auto
+ no mop enabled
+ no mop sysid
+end
+
+```
+
+```
+R1#sh run int g1
+Building configuration...
+
+Current configuration : 156 bytes
+!
+interface GigabitEthernet1
+ ip address 10.1.1.1 255.255.255.0
+ ip ospf authentication key-chain TEST
+ negotiation auto
+ no mop enabled
+ no mop sysid
+end
+
+```
+
+- To solve the issue, you can either manually modify the MTU values on the interface so that they match, or you can use the `ip ospf mtu-ignore` interface configuration command, which stops OSPF from comparing MTU when trying to form an adjacency
+
+```
+*Oct 13 12:00:21.915: OSPF-1 ADJ   Gi1: Send with youngest Key 1
+*Oct 13 12:00:21.915: OSPF-1 ADJ   Gi1: Send with youngest Key 1
+*Oct 13 12:00:21.916: OSPF-1 ADJ   Gi1: Rcv DBD from 1.1.1.1 seq 0xDFE opt 0x50 flag 0x7 len 32  mtu 1500 state EXSTART
+*Oct 13 12:00:21.916: OSPF-1 ADJ   Gi1: Nbr 1.1.1.1 has larger interface MTU
+*Oct 13 12:00:21.916: OSPF-1 ADJ   Gi1: Rcv DBD from 1.1.1.1 seq 0xF3E opt 0x50 flag 0x2 len 132  mtu 1500 state EXSTART
+*Oct 13 12:00:21.916: OSPF-1 ADJ   Gi1: Nbr 1.1.1.1 has larger interface MTU
+R2(config-if)#
+R2(config-if)#
+R2(config-if)#
+R2(config-if)#
+*Oct 13 12:00:26.520: OSPF-1 ADJ   Gi1: Send DBD to 1.1.1.1 seq 0xF3E opt 0x50 flag 0x7 len 32
+*Oct 13 12:00:26.520: OSPF-1 ADJ   Gi1: Send with youngest Key 1
+*Oct 13 12:00:26.520: OSPF-1 ADJ   Gi1: Retransmitting DBD to 1.1.1.1 [1]
+*Oct 13 12:00:26.521: OSPF-1 ADJ   Gi1: Rcv DBD from 1.1.1.1 seq 0xF3E opt 0x50 flag 0x2 len 132  mtu 1500 state EXSTART
+*Oct 13 12:00:26.521: OSPF-1 ADJ   Gi1: Nbr 1.1.1.1 has larger interface MTU
+R2(config-if)#
+*Oct 13 12:00:29.796: OSPF-1 ADJ   Gi1: Neighbor change event
+*Oct 13 12:00:29.796: OSPF-1 ADJ   Gi1: DR/BDR election
+*Oct 13 12:00:29.796: OSPF-1 ADJ   Gi1: Elect BDR 2.2.2.2
+*Oct 13 12:00:29.796: OSPF-1 ADJ   Gi1: Elect DR 1.1.1.1
+*Oct 13 12:00:29.796: OSPF-1 ADJ   Gi1: DR: 1.1.1.1 (Id)
+*Oct 13 12:00:29.796: OSPF-1 ADJ   Gi1:    BDR: 2.2.2.2 (Id)
+R2(config-if)#
+*Oct 13 12:00:31.084: OSPF-1 ADJ   Gi1: Send DBD to 1.1.1.1 seq 0xF3E opt 0x50 flag 0x7 len 32
+*Oct 13 12:00:31.084: OSPF-1 ADJ   Gi1: Send with youngest Key 1
+*Oct 13 12:00:31.084: OSPF-1 ADJ   Gi1: Retransmitting DBD to 1.1.1.1 [2]
+*Oct 13 12:00:31.085: OSPF-1 ADJ   Gi1: Rcv DBD from 1.1.1.1 seq 0xF3E opt 0x50 flag 0x2 len 132  mtu 1500 state EXSTART
+*Oct 13 12:00:31.085: OSPF-1 ADJ   Gi1: Nbr 1.1.1.1 has larger interface MTU
+*Oct 13 12:00:31.814: OSPF-1 ADJ   Gi1: Send with youngest Key 1
+R2(config-if)#
+*Oct 13 12:00:35.640: OSPF-1 ADJ   Gi1: Send DBD to 1.1.1.1 seq 0xF3E opt 0x50 flag 0x7 len 32
+*Oct 13 12:00:35.640: OSPF-1 ADJ   Gi1: Send with youngest Key 1
+*Oct 13 12:00:35.640: OSPF-1 ADJ   Gi1: Retransmitting DBD to 1.1.1.1 [3]
+*Oct 13 12:00:35.642: OSPF-1 ADJ   Gi1: Rcv DBD from 1.1.1.1 seq 0xF3E opt 0x50 flag 0x2 len 132  mtu 1500 state EXSTART
+*Oct 13 12:00:35.642: OSPF-1 ADJ   Gi1: Nbr 1.1.1.1 has larger interface MTU
+R2(config-if)#ip ospf mtu-ignore    
+R2(config-if)#
+*Oct 13 12:00:40.591: OSPF-1 ADJ   Gi1: Send DBD to 1.1.1.1 seq 0xF3E opt 0x50 flag 0x7 len 32
+*Oct 13 12:00:40.591: OSPF-1 ADJ   Gi1: Send with youngest Key 1
+*Oct 13 12:00:40.591: OSPF-1 ADJ   Gi1: Retransmitting DBD to 1.1.1.1 [4]
+*Oct 13 12:00:40.592: OSPF-1 ADJ   Gi1: Rcv DBD from 1.1.1.1 seq 0xF3E opt 0x50 flag 0x2 len 132  mtu 1500 state EXSTART
+*Oct 13 12:00:40.592: OSPF-1 ADJ   Gi1: Nbr 1.1.1.1 has larger interface MTU
+*Oct 13 12:00:41.225: OSPF-1 ADJ   Gi1: Send with youngest Key 1
+R2(config-if)#
+*Oct 13 12:00:45.187: OSPF-1 ADJ   Gi1: Send DBD to 1.1.1.1 seq 0xF3E opt 0x50 flag 0x7 len 32
+*Oct 13 12:00:45.187: OSPF-1 ADJ   Gi1: Send with youngest Key 1
+*Oct 13 12:00:45.187: OSPF-1 ADJ   Gi1: Retransmitting DBD to 1.1.1.1 [5]
+*Oct 13 12:00:45.188: OSPF-1 ADJ   Gi1: Rcv DBD from 1.1.1.1 seq 0xF3E opt 0x50 flag 0x2 len 132  mtu 1500 state EXSTART
+*Oct 13 12:00:45.188: OSPF-1 ADJ   Gi1: NBR Negotiation Done. We are the MASTER
+*Oct 13 12:00:45.188: OSPF-1 ADJ   Gi1: Nbr 1.1.1.1: Summary list built, size 4
+*Oct 13 12:00:45.188: OSPF-1 ADJ   Gi1: Send DBD to 1.1.1.1 seq 0xF3F opt 0x50 flag 0x1 len 72
+*Oct 13 12:00:45.188: OSPF-1 ADJ   Gi1: Send with youngest Key 1
+*Oct 13 12:00:45.188: OSPF-1 ADJ   Gi1: Rcv LS REQ from 1.1.1.1 length 36 LSA count 1
+*Oct 13 12:00:45.188: OSPF-1 ADJ   Gi1: Send with youngest Key 1
+*Oct 13 12:00:45.188: OSPF-1 ADJ   Gi1: Send LS UPD to 10.1.1.1 length 64 LSA count 1
+*Oct 13 12:00:45.188: OSPF-1 ADJ   Gi1: Rcv DBD from 1.1.1.1 seq 0xF3F opt 0x50 flag 0x0 len 32  mtu 1500 state EXCHANGE
+*Oct 13 12:00:45.188: OSPF-1 ADJ   Gi1: Exchange Done with 1.1.1.1
+*Oct 13 12:00:45.189: OSPF-1 ADJ   Gi1: Send with youngest Key 1
+*Oct 13 12:00:45.189: OSPF-1 ADJ   Gi1: Send LS REQ to 1.1.1.1 length 48
+*Oct 13 12:00:45.189: OSPF-1 ADJ   Gi1: Rcv LS UPD from Nbr ID 1.1.1.1 length 120 LSA count 2
+*Oct 13 12:00:45.189: OSPF-1 ADJ   Gi1: Synchronized with 1.1.1.1, state FULL
+*Oct 13 12:00:45.189: %OSPF-5-ADJCHG: Process 1, Nbr 1.1.1.1 on GigabitEthernet1 from LOADING to FULL, Loading Done
+R2(config-if)#
+*Oct 13 12:00:45.240: OSPF-1 ADJ   Gi1: Send with youngest Key 1
+R2(config-if)#
+*Oct 13 12:00:47.689: OSPF-1 ADJ   Gi1: Send with youngest Key 1
+R2(config-if)#
+*Oct 13 12:00:51.119: OSPF-1 ADJ   Gi1: Send with youngest Key 1
+R2(config-if)#do un all
+All possible debugging has been turned off
+R2(config-if)#
+```
+
+#### Duplicate Router IDs
+
+- RIDs must be unique for many reasons
+
+- One of the reasons is that a neighbor relationship does not form between two routers if they have the same RID
+
+- When a duplicate RID exists, you receive a syslog message similar to the following:
+
+```
+*Oct 13 15:15:13.448: %OSPF-4-DUP_RTRID_NBR: OSPF detected duplicate router-id 1.1.1.1 from 10.1.1.1 on interface GigabitEthernet1
+```
+
+- It also may create problems with SPF calculations
+
+```
+R2(config-router)#do clear ip ospf process
+Reset ALL OSPF processes? [no]: y
+R2(config-router)#
+*Oct 13 15:15:10.980: %OSPF-5-ADJCHG: Process 1, Nbr 1.1.1.1 on GigabitEthernet1 from FULL to DOWN, Neighbor Down: Interface down or detached
+R2(config-router)#
+*Oct 13 15:15:13.448: %OSPF-4-DUP_RTRID_NBR: OSPF detected duplicate router-id 1.1.1.1 from 10.1.1.1 on interface GigabitEthernet1
+R2(config-router)#       
+R2(config-router)#
+R2(config-router)#do debug ip ospf spf    
+OSPF SPF debugging is on
+OSPF SPF intra debugging is on
+OSPF SPF inter debugging is on
+OSPF SPF external debugging is on
+R2(config-router)#
+R2(config-router)#
+R2(config-router)#
+*Oct 13 15:15:51.084: OSPF-1 MON  : Begin SPF 11 at 193.371ms, process time 67ms 
+*Oct 13 15:15:51.084: OSPF-1 INTRA: Running SPF 11 for area 1, SPF-type Full 
+*Oct 13 15:15:51.084: OSPF-1 INTRA: Initializing to run spf 
+*Oct 13 15:15:51.084: OSPF-1 INTRA: spf_intra() - rebuilding the tree 
+*Oct 13 15:15:51.084: OSPF-1 INTRA:  It is a router LSA 1.1.1.1. Link Count 1 
+*Oct 13 15:15:51.084: OSPF-1 INTRA:   Processing link 0, id 10.1.1.0, link data 255.255.255.0, type 3 
+*Oct 13 15:15:51.084: OSPF-1 SPF  :    Add better path to LSA ID 10.1.1.255, gateway 10.1.1.0, dist 100
+*Oct 13 15:15:51.084: OSPF-1 SPF  :    Add path: next-hop 10.1.1.2, interface GigabitEthernet1 
+*Oct 13 15:15:51.084: OSPF-1 INTRA: Adding Stub nets 
+*Oct 13 15:15:51.084: OSPF-1 INTRA: Route update succeeded for 10.1.1.0/255.255.255.0, spt metric 100, path metric 100, Next Hop: GigabitEthernet1/10.1.1.2 area 1 
+*Oct 13 15:15:51.084: OSPF-1 INTRA: Entered intra-area route sync for area 1 
+*Oct 13 15:15:51.084: OSPF-1 INTRA: Entered intra-area route sync for area 1 
+*Oct 13 15:15:51.084: OSPF-1 INTER: Check and generate summary LSA into all areas 
+*Oct 13 15:15:51.084: OSPF-1 INTER: Running spf for summaries area 1 
+*Oct 13 15:15:51.084: OSPF-1 INTER: Entered inter-area route sync for area 1 
+*Oct 13 15:15:51.084: OSPF-1 INTER: Entered inter-area route sync for area 1 
+R2(config-router)#
+*Oct 13 15:15:51.084: OSPF-1 EXTER: Started Building Type 5 External Routes 
+*Oct 13 15:15:51.084: OSPF-1 EXTER: Started Building Type 7 External Routes 
+*Oct 13 15:15:51.084: OSPF-1 EXTER: Entered External route sync for area dummy area 
+*Oct 13 15:15:51.084: OSPF-1 EXTER: Entered External route sync for area dummy area 
+*Oct 13 15:15:51.084: OSPF-1 EXTER: Entered NSSA route sync for area 1 
+*Oct 13 15:15:51.084: OSPF-1 EXTER: Entered NSSA route sync for area 1 
+*Oct 13 15:15:51.084: OSPF-1 MON  : End SPF 11 at 193.371ms, Total elapsed time 0ms 
+R2(config-router)#
+R2(config-router)#do clear ip ospf process
+*Oct 13 15:16:16.551: %OSPF-4-DUP_RTRID_NBR: OSPF detected duplicate router-id 1.1.1.1 from 10.1.1.1 on interface GigabitEthernet1
+R2(config-router)#do debug ip ospf adj     
+OSPF adjacency debugging is on
+R2(config-router)#
+R2(config-router)#
+R2(config-router)#
+*Oct 13 15:16:36.469: OSPF-1 ADJ   Gi1: Send with youngest Key 1
+R2(config-router)#do clear ip ospf process
+Reset ALL OSPF processes? [no]: 
+*Oct 13 15:16:46.380: OSPF-1 ADJ   Gi1: Send with youngest Key 1
+y
+R2(config-router)#
+*Oct 13 15:16:48.199: OSPF-1 ADJ   Gi1: Interface going Down
+*Oct 13 15:16:48.199: OSPF-1 ADJ   Gi1: 1.1.1.1 address 10.1.1.2 is dead, state DOWN
+*Oct 13 15:16:48.199: OSPF-1 ADJ   Gi1: Neighbor change event
+*Oct 13 15:16:48.199: OSPF-1 ADJ   Gi1: DR/BDR election
+*Oct 13 15:16:48.199: OSPF-1 ADJ   Gi1: Elect BDR 0.0.0.0
+*Oct 13 15:16:48.199: OSPF-1 ADJ   Gi1: Elect DR 0.0.0.0
+*Oct 13 15:16:48.199: OSPF-1 ADJ   Gi1: Elect BDR 0.0.0.0
+*Oct 13 15:16:48.199: OSPF-1 ADJ   Gi1: Elect DR 0.0.0.0
+*Oct 13 15:16:48.199: OSPF-1 ADJ   Gi1: DR: none 
+*Oct 13 15:16:48.199: OSPF-1 ADJ   Gi1:    BDR: none 
+*Oct 13 15:16:48.199: OSPF-1 ADJ   Gi1: Flush network LSA immediately
+*Oct 13 15:16:48.199: OSPF-1 ADJ   Gi1: Remember old DR 1.1.1.1 (id)
+*Oct 13 15:16:48.199: OSPF-1 ADJ   Gi1: Interface going Up
+*Oct 13 15:16:48.199: OSPF-1 ADJ   Gi1: Send with youngest Key 1
+*Oct 13 15:16:48.250: OSPF-1 MON  : Begin SPF 12 at 250.537ms, process time 67ms 
+*Oct 13 15:16:48.250: OSPF-1 INTRA: Running SPF 12 for area 1, SPF-type Full 
+*Oct 13 15:16:48.250: OSPF-1 INTRA: Initializing to run spf 
+*Oct 13 15:16:48.250: OSPF-1 INTRA: spf_intra() - rebuilding the tree 
+*Oct 13 15:16:48.250: OSPF-1 INTRA:  It is a router LSA 1.1.1.1. Link Count 1 
+*Oct 13 15:16:48.250: OSPF-1 INTRA:   Processing link 0, id 10.1.1.0, link data 255.255.255.0, type 3 
+*Oct 13 15:16:48.250: OSPF-1 SPF  :    Add better path to LSA ID 10.1.1.255, gateway 10.1.1.0, dist 100
+*Oct 13 15:16:48.250: OSPF-1 SPF  :    Add path: next-hop 10.1.1.2, interface GigabitEthernet1 
+*Oct 13 15:16:48.250: OSPF-1 INTRA: Adding Stub nets 
+*Oct 13 15:16:48.250: OSPF-1 INTRA: Route update succeeded for 10.1.1.0/255.255.255.0, spt metric 100, path metric 100, Next Hop: GigabitEthernet1/10.1.1.2 area 1 
+*Oct 13 15:16:48.250: OSPF-1 INTRA: Entered intra-area route sync for area 1 
+*Oct 13 15:16:48.250: OSPF-1 INTRA: Entered intra-area route sync for area 1 
+*Oct 13 15:16:48.250: OSPF-1 INTER: Check and generate summary LSA into all areas 
+*Oct 13 15:16:48.250: OSPF-1 INTER: Running spf for summaries area 1 
+*Oct 13 15:16:48.250: OSPF-1 INTER: Entered inter-area route sync for area 1 
+*Oct 13 15:16:48.250: OSPF-1 INTER: Entered inter-area route sync for area 1 
+*Oct 13 15:16:48.250: OSPF-1 EXTER: Started Building Type 5 External Routes 
+*Oct 13 15:16:48.250: OSPF-1 EXTER: Started Building Type 7 External Routes 
+*Oct 13 15:16:48.250: OSPF-1 EXTER: Entered External route sync for area dummy area 
+*Oct 13 15:16:48.250: OSPF-1 EXTER: Entered External route sync for area dummy area 
+*Oct 13 15:16:48.250: OSPF-1 EXTER: Entered NSSA route sync for area 1 
+R2(config-router)#
+*Oct 13 15:16:48.250: OSPF-1 EXTER: Entered NSSA route sync for area 1 
+*Oct 13 15:16:48.250: OSPF-1 MON  : End SPF 12 at 250.537ms, Total elapsed time 0ms 
+R2(config-router)#
+*Oct 13 15:16:57.380: OSPF-1 ADJ   Gi1: Send with youngest Key 1
+```
+
+- To verify the RID of an OSPF router, you use the `show ip protocols` command
+
+- If one of the routers that have a duplicate router ID is an ASBR, it may create partial SPF processing and may lead to suboptimal database on neighbors
+
+```
+R6(config-router)#router-id 192.168.4.4 
+% OSPF: Reload or use "clear ip ospf process" command, for this to take effect
+R6(config-router)#do clear ip ospf process
+Reset ALL OSPF processes? [no]: y
+R6(config-router)#
+*Oct 13 15:55:22.498: OSPF-1 ADJ   Lo0: Interface going Down
+*Oct 13 15:55:22.498: OSPF-1 ADJ   Lo0: 192.168.6.6 address 192.168.6.6 is dead, state DOWN
+*Oct 13 15:55:22.498: OSPF-1 ADJ   Gi0/0: Interface going Down
+*Oct 13 15:55:22.498: OSPF-1 ADJ   Gi0/0: 192.168.5.5 address 10.56.1.5 is dead, state DOWN
+*Oct 13 15:55:22.498: %OSPF-5-ADJCHG: Process 1, Nbr 192.168.5.5 on GigabitEthernet0/0 from FULL to DOWN, Neighbor Down: Interface down or detached
+*Oct 13 15:55:22.498: OSPF-1 ADJ   Gi0/0: Neighbor change event
+*Oct 13 15:55:22.498: OSPF-1 ADJ   Gi0/0: DR/BDR election
+*Oct 13 15:55:22.498: OSPF-1 ADJ   Gi0/0: Elect BDR 0.0.0.0
+*Oct 13 15:55:22.498: OSPF-1 ADJ   Gi0/0: Elect DR 192.168.6.6
+*Oct 13 15:55:22.498: OSPF-1 ADJ   Gi0/0: DR: 192.168.6.6 (Id)
+*Oct 13 15:55:22.498: OSPF-1 ADJ   Gi0/0:    BDR: none 
+*Oct 13 15:55:22.498: OSPF-1 ADJ   Gi0/0: 192.168.6.6 address 10.56.1.6 is dead, state DOWN
+*Oct 13 15:55:22.498: OSPF-1 ADJ   Gi0/0: Neighbor change event
+*Oct 13 15:55:22.498: OSPF-1 ADJ   Gi0/0: DR/BDR election
+*Oct 13 15:55:22.498: OSPF-1 ADJ   Gi0/0: Elect BDR 0.0.0.0
+*Oct 13 15:55:22.498: OSPF-1 ADJ   Gi0/0: Elect DR 0.0.0.0
+*Oct 13 15:55:22.498: OSPF-1 ADJ   Gi0/0: Elect BDR 0.0.0.0
+*Oct 13 15:55:22.498: OSPF-1 ADJ   Gi0/0: Elect DR 0.0.0.0
+*Oct 13 15:55:22.498: OSPF-1 ADJ   Gi0/0: DR: none 
+*Oct 13 15:55:22.498: OSPF-1 ADJ   Gi0/0:    BDR: none 
+*Oct 13 15:55:22.498: OSPF-1 ADJ   Gi0/0: Flush network LSA immediately
+*Oct 13 15:55:22.498: OSPF-1 ADJ   Gi0/0: Remember old DR 192.168.6.6 (id)
+*Oct 13 15:55:22.500: OSPF-1 ADJ   Lo0: Interface going Up
+*Oct 13 15:55:22.500: OSPF-1 ADJ   Gi0/0: Interface going Up
+*Oct 13 15:55:22.500: OSPF-1 ADJ   Gi0/0: 2 Way Communication to 192.168.5.5, state 2WAY
+*Oct 13 15:55:22.500: OSPF-1 ADJ   Gi0/0: Backup seen event before WAIT timer
+*Oct 13 15:55:22.500: OSPF-1 ADJ   Gi0/0: DR/BDR election
+*Oct 13 15:55:22.500: OSPF-1 ADJ   Gi0/0: Elect BDR 192.168.5.5
+*Oct 13 15:55:22.500: OSPF-1 ADJ 
+R6(config-rout  Gi0/0: Elect DR 192.168.5.5
+*Oct 13 15:55:22.500: OSPF-1 ADJ   Gi0/0: DR: 192.168.5.5 (Id)
+*Oct 13 15:55:22.500: OSPF-1 ADJ   Gi0/0:    BDR: 192.168.5.5 (Id)
+*Oct 13 15:55:22.500: OSPF-1 ADJ   Gi0/0: Nbr 192.168.5.5: Prepare dbase exchange
+*Oct 13 15:55:22.500: OSPF-1 ADJ   Gi0/0: Send DBD to 192.168.5.5 seq 0x259 opt 0x58 flag 0x7 len 32
+*Oct 13 15:55:22.501: OSPF-1 ADJ   Gi0/0: Rcv DBD from 192.168.5.5 seq 0x4A1 opt 0x58 flag 0x7 len 32  mtu 1500 state EXSTART
+*Oct 13 15:55:22.501: OSPF-1 ADJ   Gi0/0: NBR Negotiation Done. We are the SLAVE
+*Oct 13 15:55:22.501: OSPF-1 ADJ   Gi0/0: Nbr 192.168.5.5: Summary list built, size 0
+*Oct 13 15:55:22.501: OSPF-1 ADJ   Gi0/0: Send DBD to 192.168.5.5 seq 0x4A1 opt 0x58 flag 0x0 len 32
+*Oct 13 15:55:22.502: OSPF-1 ADJ   Gi0/0: Rcv DBD from 192.168.5.5 seq 0x4A2 opt 0x58 flag 0x1 len 192  mtu 1500 state EXCHANGE
+*Oct 13 15:55:22.502: OSPF-1 ADJ   Gi0/0: Exchange Done with 192.168.5.5
+*Oct 13 15:55:22.502: OSPF-1 ADJ   Gi0/0: Send LS REQ to 192.168.5.5 length 120
+*Oct 13 15:55:22.502: OSPF-1 ADJ   Gi0/0: Send DBD to 192.168.5.5 seq 0x4A2 opt 0x58 flag 0x0 len 32
+*Oct 13 15:55:22.503: OSPF-1 ADJ   Gi0/0: Rcv LS UPD from Nbr ID 192.168.5.5 length 280 LSA count 8
+*Oct 13 15:55:22.503: OSPF-1 SPF  : Do not schedule partial SPF type 3, LSID 10.3.3.0, adv_rtr 192.168.5.5, area 56: INTRA/INTER spf scheduled 
+*Oct 13 15:55:22.503: OSPF-1 SPF  : Do not schedule partial SPF type 3, LSID 10.24.1.0, adv_rtr 192.168.5.5, area 56: INTRA/INTER spf scheduled 
+*Oct 13 15:55:22.503: OSPF-1 SPF  : Do not schedule partial SPF type 3, LSID 10.45.1.0, adv_rtr 192.168.5.5, area 56: INTRA/INTER spf scheduled 
+*Oct 13 15:55:22.503: OSPF-1 SPF  : Do not schedule partial SPF type 3, LSID 10.123.1.0, adv_rtr 192.168.5.5, area 56: INTRA/INTER spf scheduled 
+*Oct 13 15:55:22.503: OSPF-1 SPF  : Do not schedule partial SPF type 3, LSID 192.168.1.1, adv_rtr 192.168.5.5, area 56: INTRA/INTER spf scheduled 
+*Oct 13 15:55:22.503: OSPF-1 SPF  : Do not schedule partial SPF type 3, LSID 192.168.3.3, adv_rtr 192.168.5.5, area 56: INTRA/INTER spf scheduled 
+*Oct 13 15:55:22.503: OSPF-1 SPF  : Do not schedule partial SPF type 7, LSID 0.0.0.0, adv_rtr 192.168.5.5, area 56: INTRA/INTER spf scheduled 
+*Oct 13 15:55:22.503: OSPF-1 ADJ   Gi0/0: Synchronized with 192.168.5.5, state FULL
+*Oct 13 15:55:22.503: %OSPF-5-ADJCHG: Process 1, Nbr 192.168.5.5 on GigabitEthernet0/0 from LOADING to FULL, Loading Done
+*Oct 13 15:55:27.503: OSPF-1 MON  : Begin SPF at 1076.605ms, process time 6ms 
+*Oct 13 15:55:27.503: OSPF-1 INTRA: Running SPF for area 56, SPF-type Full 
+*Oct 13 15:55:27.503: OSPF-1 INTRA: Initializing to run spf 
+*Oct 13 15:55:27.503: OSPF-1 INTRA: spf_intra() - rebuilding the tree 
+*Oct 13 15:55:27.503: OSPF-1 INTRA:  It is a router LSA 192.168.4.4. Link Count 2 
+*Oct 13 15:55:27.503: OSPF-1 INTRA:   Processing link 0, id 192.168.6.6, link data 255.255.255.255, type 3 
+*Oct 13 15:55:27.503: OSPF-1 SPF  :    Add better path to LSA ID 192.168.6.6, gateway 192.168.6.6, dist 1
+*Oct 13 15:55:27.503: OSPF-1 SPF  :    Add path: next-hop 192.168.6.6, interface Loopback0 
+*Oct 13 15:55:27.503: OSPF-1 INTRA:   Processing link 1, id 10.56.1.5, link data 10.56.1.6, type 2 
+*Oct 13 15:55:27.503: OSPF-1 INTRA:   Can not find next node 10.56.1.5 listed in LSA LSA type 1, LSID 192.168.4.4 
+*Oct 13 15:55:27.503: OSPF-1 INTRA: Adding Stub nets 
+*Oct 13 15:55:27.503: OSPF-1 INTRA: Route update succeeded for 192.168.6.6/255.255.255.255, metric 1, Next Hop: Loopback0/192.168.6.6 area 56 
+*Oct 13 15:55:27.503: OSPF-1 INTRA: Entered intra-area route sync for area 56 
+*Oct 13 15:55:27.503: OSPF-1 INTRA: Entered intra-area route sync for area 56 
+*Oct 13 15:55:27.503: OSPF-1 INTER: Check and generate summary LSA into all areas 
+*Oct 13 15:55:27.503: OSPF-1 INTER: Running spf for summaries area 56 
+*Oct 13 15:55:27.503: OSPF-1 INTER: Start processing: type 3, LSID 10.3.3.0, mask 255.255.255.0, 
+*Oct 13 15:55:27.503: OSPF-1 INTER:   adv_rtr 192.168.5.5, age 1026, seq 0x80000001, area 56 
+*Oct 13 15:55:27.503: OSPF-1 INTER: ABR not reachable 192.168.5.5 
+*Oct 13 15:55:27.503: OSPF-1 INTER: Start processing: type 3, LSID 10.24.1.0, mask 255.255.255.248, 
+*Oct 13 15:55:27.503: OSPF-1 INTER:   adv_rtr 192.168.5.5, age 1026, seq 0x80000001, area 56 
+*Oct 13 15:55:27.503: OSPF-1 INTER: ABR not reachable 192.168.5.5 
+*Oct 13 15:55:27.503: OSPF-1 INTER: Start processing: type 3, LSID 10.45.1.0, mask 255.255.255.0, 
+*Oct 13 15:55:27.503: OSPF-1 INTER:   adv_rtr 192.168.5.5, age 1071, seq 0x80000001, area 56 
+*Oct 13 15:55:27.503: OSPF-1 INTER: ABR not reachable 192.168.5.5 
+*Oct 13 15:55:27.503: OSPF-1 INTER: Start processing: type 3, LSID 10.123.1.0, mask 255.255.255.0, 
+*Oct 13 15:55:27.503: OSPF-1 INTER:   adv_rtr 192.168.5.5, age 1026, seq 0x80000001, area 56 
+*Oct 13 15:55:27.503: OSPF-1 INTER: ABR not reachable 192.168.5.5 
+*Oct 13 15:55:27.503: OSPF-1 INTER: Start processing: type 3, LSID 192.168.1.1, mask 255.255.255.255, 
+*Oct 13 15:55:27.503: OSPF-1 INTER:   adv_rtr 192.168.5.5, age 1026, seq 0x80000001, area 56 
+*Oct 13 15:55:27.503: OSPF-1 INTER: ABR not reachable 192.168.5.5 
+*Oct 13 15:55:27.503: OSPF-1 INTER: Start processing: type 3, LSID 192.168.3.3, mask 255.255.255.255, 
+*Oct 13 15:55:27.503: OSPF-1 INTER:   adv_rtr 192.168.5.5, age 1026, seq 0x80000001, area 56 
+*Oct 13 15:55:27.503: OSPF-1 INTER: ABR not reachable 192.168.5.5 
+*Oct 13 15:55:27.503: OSPF-1 INTER: Entered inter-area route sync for area 56 
+*Oct 13 15:55:27.503: OSPF-1 INTER: Entered inter-area route sync for area 56 
+*Oct 13 15:55:27.503: OSPF-1 EXTER: Started Building Type 5 External Routes 
+*Oct 13 15:55:27.503: OSPF-1 EXTER: Started Building Type 7 External Routes 
+*Oct 13 15:55:27.503: OSPF-1 EXTER: Start processing AS External LSA 7/0.0.0.0/192.168.5.5, mask 0.0.0.0
+*Oct 13 15:55:27.503: OSPF-1 EXTER:  age 1071, seq 0x80000001, metric 1, metric-type 2, fw-addr 0.0.0.0 
+*Oct 13 15:55:27.503: OSPF-1 EXTER:    Did not find route to ASBR 192.168.5.5 
+*Oct 13 15:55:27.503: OSPF-1 EXTER: Entered External route sync for area dummy area 
+*Oct 13 15:55:27.503: OSPF-1 EXTER: Entered External route sync for area dummy area 
+*Oct 13 15:55:27.503: OSPF-1 EXTER: Entered NSSA route sync for area 56 
+*Oct 13 15:55:27.503: OSPF-1 EXTER: Entered NSSA route sync for area 56 
+*Oct 13 15:55:27.503: OSPF-1 MON  : End SPF at 1076.605ms, Total elapsed time 0ms er)#
+R6(config-router)#
+R6(config-router)#
+R6(config-router)#
+R6(config-router)#
+R6(config-router)#
+R6(config-router)#
+*Oct 13 15:56:02.502: OSPF-1 ADJ   Gi0/0: Nbr 192.168.5.5: Clean-up dbase exchange
+*Oct 13 15:56:02.966: OSPF-1 SPF  : Detect change in LSA type 1, LSID 192.168.5.5 from 192.168.5.5 area 56 
+
+```
+
+- However, almost all OSPF `show` commands display the RID in their output, so you can verify it any way you like
+
+```
+R6#show ip ospf database router 
+
+            OSPF Router with ID (192.168.6.6) (Process ID 1)
+```
+
+```
+R6#show ip ospf rib 
+
+            OSPF Router with ID (192.168.6.6) (Process ID 1)
+
+
+                Base Topology (MTID 0)
+
+OSPF local RIB
+Codes: * - Best, > - Installed in global RIB
+
+*>  10.3.3.0/24, Inter, cost 68, area 56
+      via 10.56.1.5, GigabitEthernet0/0
+*>  10.24.1.0/29, Inter, cost 66, area 56
+      via 10.56.1.5, GigabitEthernet0/0
+*>  10.45.1.0/24, Inter, cost 2, area 56
+      via 10.56.1.5, GigabitEthernet0/0
+*   10.56.1.0/24, Intra, cost 1, area 56, Connected
+      via 10.56.1.6, GigabitEthernet0/0
+*>  10.123.1.0/24, Inter, cost 67, area 56
+      via 10.56.1.5, GigabitEthernet0/0
+*>  192.168.1.1/32, Inter, cost 68, area 56
+      via 10.56.1.5, GigabitEthernet0/0
+*>  192.168.3.3/32, Inter, cost 68, area 56
+      via 10.56.1.5, GigabitEthernet0/0
+*>  192.168.5.5/32, Intra, cost 2, area 56
+      via 10.56.1.5, GigabitEthernet0/0
+*   192.168.6.6/32, Intra, cost 1, area 56, Connected
+      via 192.168.6.6, Loopback0
+*>  0.0.0.0/0, NSSA2, cost 1, fwd cost 1, tag 0, area 56
+      via 10.56.1.5, GigabitEthernet0/0
+```
+
+```
+R6#show ip ospf | i ID
+ Routing Process "ospf 1" with ID 192.168.6.6
+```
+
+```
+R6#show ip ospf interface g0/0 | i Router ID
+  Process ID 1, Router ID 192.168.6.6, Network Type BROADCAST, Cost: 1
+```
+
+(...)
+
+- Below is the output of `show ip protocols` and indicates that the RID on R6 is 192.168.6.6
+
+```
+R6#show ip protocols | s ospf
+Routing Protocol is "ospf 1"
+  Outgoing update filter list for all interfaces is not set
+  Incoming update filter list for all interfaces is not set
+  Router ID 192.168.6.6
+  It is an autonomous system boundary router
+ Redistributing External Routes from,
+    eigrp 65001, includes subnets in redistribution
+    rip with metric mapped to 250, includes subnets in redistribution
+  Number of areas in this router is 1. 0 normal 0 stub 1 nssa
+  Maximum path: 4
+  Routing for Networks:
+    10.56.1.0 0.0.0.255 area 56
+    192.168.6.6 0.0.0.0 area 56
+  Passive Interface(s):
+    Loopback0
+  Routing Information Sources:
+    Gateway         Distance      Last Update
+    192.168.5.5          110      00:24:20
+  Distance: (default is 110)
+```
+
+- If you manually change the RID with the `router-id` command in OSPF process configuration mode, you must reset the OSPF process by using the `clear ip ospf process` command in order for it to take effect
+
+#### Mismatched Network Types
+
+- OSPF supports multiple network types 
+
+- Different network types have different default values
+
+- Therefore, if two OSPF routers that are trying to form a neighbor adjacency are configured with noncompatible network types, a neighbor relationship does not form
+
+- For example, if the network type is Broadcast on R1's interface, and NBMA on R2's interface, the timers do not match, and the adjacency does not form
+
+- Below are listed the OSPF network types and their characteristics
+
+```
+Type                    Default                             Neighbors                       DR/BDR                      Timers
+
+Broadcast               Default on LAN interfaces           Discovered automatically        DR and BDR elected          Hello: 10
+                                                                                            automatically               Dead: 40
+
+NBMA (nonbroadcast)     Default on Frame Relay main         Statically configured           DR must be manually         Hello: 30
+                        and point-to-multipoint                                             configured on the hub       Dead: 120
+                        interfaces                                                          router
+
+Point-to-point          Default on point-to-point           Discovered automatically        No DR or BDR                Hello: 10
+                        serial and point-to-point                                                                       Dead: 40
+                        Frame Relay subinterfaces
+
+Point-to-multipoint     (Not a default) Optimal for         Discovered automatically        No DR or BDR                Hello: 30
+                        hub and spoke topologies                                                                        Dead: 120
+                        (Frame relay)
+
+Point-to-multipoint     (Not a default) Optimal for         Statically configured           No DR or BDR                Hello: 30
+nonbroadcast            hub and spoke topologies                                                                        Dead: 120
+                        (frame relay) that do not
+                        support broadcast or multicast
+                        traffic
+```
+
+- To determine the network type associated with an OSPF-enabled interface, you can issue the command `show ip ospf interface <interface-type> <interface-number>`
+
+- In the output below, R1's interface G1 is using OSPF network type broadcast
+
+- You can use the spot-the-difference troubleshooting method to determine whether the network types match
+
+```
+R1#show ip ospf interface g1
+GigabitEthernet1 is up, line protocol is up 
+  Internet Address 10.1.1.1/24, Interface ID 7, Area 1
+  Attached via Network Statement
+  Process ID 1, Router ID 1.1.1.1, Network Type BROADCAST, Cost: 100
+  Topology-MTID    Cost    Disabled    Shutdown      Topology Name
+        0           100       no          no            Base
+  Transmit Delay is 1 sec, State BDR, Priority 1
+  Designated Router (ID) 2.2.2.2, Interface address 10.1.1.2
+  Backup Designated router (ID) 1.1.1.1, Interface address 10.1.1.1
+  Timer intervals configured, Hello 10, Dead 40, Wait 40, Retransmit 5
+    oob-resync timeout 40
+    Hello due in 00:00:02
+  Supports Link-local Signaling (LLS)
+  Cisco NSF helper support enabled
+  IETF NSF helper support enabled
+  Can be protected by per-prefix Loop-Free FastReroute
+  Can be used for per-prefix Loop-Free FastReroute repair paths
+  Not Protected by per-prefix TI-LFA
+  Index 1/2/2, flood queue length 0
+  Next 0x0(0)/0x0(0)/0x0(0)
+  Last flood scan length is 1, maximum is 2
+  Last flood scan time is 0 msec, maximum is 0 msec
+  Neighbor Count is 1, Adjacent neighbor count is 1 
+    Adjacent with neighbor 2.2.2.2  (Designated Router)
+  Suppress hello for 0 neighbor(s)
+  Cryptographic authentication enabled
+    Sending SA: Key 1, Algorithm HMAC-SHA-256 - key chain TEST
+R1#show ip ospf interface g1 | i Network
+  Attached via Network Statement
+  Process ID 1, Router ID 1.1.1.1, Network Type BROADCAST, Cost: 100
+```
+
+### Troubleshooting OSPFv2 Routes
+
+- OSPF routers receive LSAs from every router within the same area, meaning they learn about routes directly from the source within the same area
+
+- As a result, the LSAs must be flooded through the area
+
+- This is mandatory because every router in an area must have exactly the same link-state database (LSDB) for that area
+
+- This makes troubleshooting missing OSPF routes more difficult that with distance vector routing protocols because it is harder to follow the path, especially in a multi-area OSPF domain
+
+- Examination of the reason OSPF routes might be missing and how to determine the reason a route is missing
+
+- Neighbor relationships are the foundation of OSPF information sharing
+
+- If you have no neighbors, you will not learn any routes
+
+- So, besides the lack of a neighbor, what would be the reason for missing routes in an OSPF network?
+
+- Following are a list of some common reasons OSPF routes might be missing from either the LSDB or the routing table:
+
+    - **Interface not running the OSPF process**: If the interface is not participating in the OSPF process, the network the interface is part of, is not injected into the OSPF process and is therefore not advertised to neighbors
+
+    - **Better source of information**: If exactly the same network is learned from a more reliable source, it is used instead of the OSPF-learned information
+
+    - **Route filtering**: A filter might be preventing a route from being installed in the routing table
+
+    - **Stub area configuration**: If the wrong type of stub area is chosen, you might be receiving a default route instead of the actual route
+
+    - **Interface is shut down**: The OSPF-enabled interface must be up/up for the network associated with the interface to be advertised
+
+    - **Wrong designated router elected**: In a hub-and-spoke environment, if the wrong router is the DR, routes are not exchanged properly
+
+    - **Duplicate RIDs**: If there are two or more routers with the same RID, routes are missing in the topology
+
+- Examining each of these reasons individually and explain how to recognize them in the troubleshooting process
+
+#### Interface Not Running the OSPF process
+
+- When you use the `network <ip_address> <wildcard_mask> area <area-id>` command or the `ip ospf <process-id> area <area-id>` interface command, the OSPF process ID is enabled on interfaces
+
+- OSPF then takes the network/subnet the interface is part of and injects it into the LSDB so it can be advertised to other routers in the autonomous system
+
+- Therefore, even interfaces that do not form neighbor relationships with other routers need to be participating in the OSPF process for the interface's network ID to be advertised
+
+- As shown before, the `show ip protocols` command displays the `network <ip-address> <wildcard-mask> area <area-id>` command in addition to the interfaces that were explicitly configured with the `ip ospf <process-id> area <area-id>` interface command
+
+- On the text below, notice that it states "Routing for Networks:" 
+
+- Those are not the networks you are routing for
+
+- You are routing for the networks associated with the interface on which OSPF will be enabled, based on the network statement
+
+```
+R1#show ip protocols 
+*** IP Routing is NSF aware ***
+
+Routing Protocol is "application"
+  Sending updates every 0 seconds
+  Invalid after 0 seconds, hold down 0, flushed after 0
+  Outgoing update filter list for all interfaces is not set
+  Incoming update filter list for all interfaces is not set
+  Maximum path: 32
+  Routing for Networks:
+  Routing Information Sources:
+    Gateway         Distance      Last Update
+  Distance: (default is 4)
+
+Routing Protocol is "ospf 1"
+  Outgoing update filter list for all interfaces is not set
+  Incoming update filter list for all interfaces is not set
+  Router ID 1.1.1.1
+  Number of areas in this router is 1. 0 normal 1 stub 0 nssa
+  Maximum path: 4
+  Routing for Networks:
+    10.1.1.1 0.0.0.0 area 1
+  Routing on Interfaces Configured Explicitly (Area 1):
+    GigabitEthernet2
+  Routing Information Sources:
+    Gateway         Distance      Last Update
+    2.2.2.2              110      00:19:27
+    3.3.3.3              110      00:19:27
+  Distance: (default is 110)
+
+R1#
+```
+
+- So 10.1.1.1 0.0.0.0 area 1 means to enable OSPF on the interface with the IP address 10.1.1.1 and place it in Area 1
+
+- You can then route for the network associated with that interface
+
+- Also you can see the GigabitEthernet2 interface was explicitly configured to participate in the OSPF process; therefore OSPF routes for the network associated with that interface as well
+
+- So, what networks are you actually routing for? You are routing for the networks associtated with the interfaces that are now enabled for OSPF
+
+- Below you can see the output of `show ip interface g1` and `show ip interface g2` on R1, which was piped to include the Internet address
+
+```
+R1#show ip int g1 | i Inter
+  Internet address is 10.1.1.1/24
+
+R1#show ip int g2 | i Inter
+  Internet address is 10.1.12.1/24
+```
+
+- Notice that the addresses are in a /24 network
+
+- As a result the network IDs are 10.1.1.0/24 and 10.1.12.0/24 
+
+- *These are the networks you are routing for*
+
+#### Better Source of Information
+
+- For an OSPF-learned route to be installed in the routing table, it must be the most believable routing source
+
+- Recall that believability is based on administrative distance (AD)
+
+- OSPF's AD is 110 for all learned routes: intra, inter and external
+
+- Therefore, if there is another source that is educating the same router about exactly the same network and that source has a better AD, the source with the better AD wins, and it's information is installed into the routing table
+
+- Below are shown only the OSPF-installed routes on the router
+
+- Notice that there is no OSPF route for the networks 10.1.1.0/24 and 10.1.12.0/24 
+
+```
+R1#show ip route ospf | b Gate
+Gateway of last resort is 10.1.12.2 to network 0.0.0.0
+
+O*IA  0.0.0.0/0 [110/101] via 10.1.12.2, 00:45:05, GigabitEthernet2
+                [110/101] via 10.1.1.2, 00:44:32, GigabitEthernet1
+      10.0.0.0/8 is variably subnetted, 6 subnets, 2 masks
+O IA     10.1.24.0/24 [110/200] via 10.1.1.2, 00:44:26, GigabitEthernet1
+O IA     10.1.34.0/24 [110/200] via 10.1.12.2, 00:44:57, GigabitEthernet2
+O IA  203.0.113.0/24 [110/101] via 10.1.1.2, 00:02:23, GigabitEthernet1
+```
+
+- In this case, there is a better source for the 10.1.1.0/24 and 10.1.12.0/24 networks
+
+- Below is displayed the output of the `show ip route 10.1.1.0 255.255.255.0` command
+
+- It identifies that the network is directly connected and has an AD of 0
+
+- Because the directly connected network has an AD of 0 and an OSPF route has an AD of 110, the directly connected source is installed in the routing table
+
+```
+R1#show ip route 10.1.1.0 255.255.255.0
+Routing entry for 10.1.1.0/24
+  Known via "connected", distance 0, metric 0 (connected, via interface)
+  Routing Descriptor Blocks:
+  * directly connected, via GigabitEthernet1
+      Route metric is 0, traffic share count is 1
+
+R1#show ip route 10.1.12.0 255.255.255.0
+Routing entry for 10.1.12.0/24
+  Known via "connected", distance 0, metric 0 (connected, via interface)
+  Routing Descriptor Blocks:
+  * directly connected, via GigabitEthernet2
+      Route metric is 0, traffic share count is 1
+```
+
+- You might be questioning whether 10.1.1.0/24 is in the LSDB because it is directly connected
+
+- Remember that when an interface is participating in the routing process, it's network is injected into the LSDB as a Type 1 (Router) LSA
+
+- You can verify this with the `show ip ospf database` command
+
+```
+R1#show ip ospf database 
+
+            OSPF Router with ID (1.1.1.1) (Process ID 1)
+
+                Router Link States (Area 1)
+
+Link ID         ADV Router      Age         Seq#       Checksum Link count
+1.1.1.1         1.1.1.1         1220        0x8000000B 0x0002FD 2         
+2.2.2.2         2.2.2.2         589         0x8000000B 0x006C2E 1         
+3.3.3.3         3.3.3.3         1243        0x80000008 0x001966 1         
+
+                Net Link States (Area 1)
+
+Link ID         ADV Router      Age         Seq#       Checksum
+10.1.1.2        2.2.2.2         1180        0x80000004 0x0044D2
+10.1.12.2       3.3.3.3         1243        0x80000004 0x00CE35
+
+                Summary Net Link States (Area 1)
+
+Link ID         ADV Router      Age         Seq#       Checksum
+0.0.0.0         2.2.2.2         1180        0x80000002 0x0073C1
+0.0.0.0         3.3.3.3         1243        0x80000002 0x0055DB
+10.1.24.0       2.2.2.2         1180        0x80000004 0x00B9F2
+10.1.24.0       3.3.3.3         458         0x80000007 0x0081BF
+10.1.34.0       2.2.2.2         458         0x80000005 0x003508
+10.1.34.0       3.3.3.3         1243        0x80000004 0x002D71
+203.0.113.0     2.2.2.2         585         0x80000001 0x003CBC
+203.0.113.0     3.3.3.3         458         0x80000006 0x00EB3B
+```
+
+- However there is no listing for 10.1.1.0/24 in this example 
+
+- This is because you are only looking at a summary of the LSAs in the LSDB
+
+- If you want to see the specifics of the LSA, you have to open them up
+
+- Below is shown the output of `show ip ospf database router 1.1.1.1`
+
+```
+R1#show ip ospf database router 1.1.1.1
+
+            OSPF Router with ID (1.1.1.1) (Process ID 1)
+
+                Router Link States (Area 1)
+
+  LS age: 16
+  Options: (No TOS-capability, DC)
+  LS Type: Router Links
+  Link State ID: 1.1.1.1
+  Advertising Router: 1.1.1.1
+  LS Seq Number: 8000000D
+  Checksum: 0xFD86
+  Length: 60
+  Number of Links: 3
+
+    Link connected to: another Router (point-to-point)
+     (Link ID) Neighboring Router ID: 2.2.2.2
+     (Link Data) Router Interface address: 10.1.1.1
+      Number of MTID metrics: 0
+       TOS 0 Metrics: 100
+
+    Link connected to: a Stub Network
+     (Link ID) Network/subnet number: 10.1.1.0
+     (Link Data) Network Mask: 255.255.255.0
+      Number of MTID metrics: 0
+       TOS 0 Metrics: 100
+
+    Link connected to: a Transit Network
+     (Link ID) Designated Router address: 10.1.12.2
+     (Link Data) Router Interface address: 10.1.12.1
+      Number of MTID metrics: 0
+       TOS 0 Metrics: 100
+
+
+```
+
+- This command opens the Type 1 (router) LSA advertised by the router with RID 1.1.1.1, which is R1
+
+- It shows that the 10.1.1.0/24 is in the LSDB, and therefore can be advertised to the OSPF process
+
+- Using a suboptimal source of routing information may not cause users to complain or submit a trouble ticket because they will probably still be able to access the resources they need
+
+- However, it might cause suboptimal routing in your network
+
