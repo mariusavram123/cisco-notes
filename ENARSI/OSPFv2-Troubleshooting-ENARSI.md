@@ -3513,4 +3513,880 @@ O     192.168.0.0/16 is a summary, 00:09:56, Null0
 
 - This is a routing loop
 
-- 
+- It is important that you create accurate summary routes to ensure that your router is not advertising networks in the summary route that it does not truly know how to reach
+
+- If it does, it is possible that it might receive packets to destinations that fall within the summary that it realy does not know how to reach
+
+- If it is the case, packets are dropped because of the route to Null0
+
+- Unlike EIGRP, which gives the route to Null0 an AD of 5, OSPF gives the route to Null0 an AD of 110, as shown below
+
+- This does not ensure that it is more believable than most of other sources of routing information
+
+- Therefore, it is possible that a better routing source could end up forwarding the traffic for networks that are included in the summary route to Null0
+
+```
+R3(config-router)#do sh ip route 192.168.0.0 255.255.0.0
+Routing entry for 192.168.0.0/16, supernet
+  Known via "ospf 1", distance 110, metric 101, type intra area
+  Routing Descriptor Blocks:
+  * directly connected, via Null0
+      Route metric is 101, traffic share count is 1
+```
+
+#### Discontiguous Areas
+
+- In a multi-area OSPF network, a backbone area (numbered area 0) must exist, and all other areas must connect to Area 0
+
+- If an area is not physically adjacent to Area 0, routes are not learned successfully by all routers in the OSPF domain
+
+- To solve this issue, a *virtual link* can be configured to logically connect the nonadjacent area with area 0
+
+- Below is shown Area 51 not physically connected to Area 0
+
+- This results in the 10.1.4.0 network not being learned by any other router in the OSPF domain because an ABR is needed to send Type 3 LSAs into area 0
+
+- R4 is not an ABR in this case because the requirement for an ABR is that one interface must be in Area 0 and one or more interfaces in any other OSPF areas
+
+- In this case, R4 has no interfaces in Area 0
+
+![area51-not-connected-area0](./area51-not-connected-area0.png)
+
+- Below is shown another topology but with Area 0 discontiguous
+
+- This results in LSAs not being flooded through the OSPF domain and, as a result, incomplete routing tables
+
+- You need to be able to recognize these OSPF design issues and understood how to troubleshoot them and implement a solution
+
+- The solution for these problems is virtual links
+
+![ospf-discontiguous-area0.png](./ospf-discontiguous-area0.png)
+
+- A virtual link in both of these examples is created through Area 1, which is known as the transit area because it transits LSAs from Area 51 to Area 0 or from Area 0 to Area 0
+
+- Note that virtual links are a temporary solution for these issues
+
+- A permanent redesign/fix should be performed as soon as possible
+
+- A virtual link is created between the routers connected to the transit area by using their RIDs and the transit area number
+
+- The router OSPF configuration mode command on R2 is `area 1 virtual-link 4.4.4.4`, and the command on R4 is `area 1 virtual-link 2.2.2.2`
+
+- When the virtual link is established, R4 becomes an ABR because it has an interface (virtual interface in this case) in Area 0
+
+- Common issues related to failed virtual links include misconfigured area number or RIDs
+
+- If you type the area number you are trying to connect to Area 0 instead of the transit area number, the virtual link fails to form
+
+- If you use the interface IP address rather than the RID, the virtual link fails to form
+
+![ospf-lsa-flooding-virtual-links](./ospf-lsa-flooding-virtual-links.png)
+
+- Below is shown the output of `show ip ospf neighbor` on R2
+
+- Notice that there is a new neighbor relationship with 192.168.4.4, but that the local interface is OSPF_VL0, which refers to the virtual link interface
+
+```
+R2#show ip ospf neighbor 
+
+Neighbor ID     Pri   State           Dead Time   Address         Interface
+192.168.4.4       0   FULL/  -           -        10.1.34.4       OSPF_VL0
+192.168.1.1       1   FULL/BDR        00:00:31    10.1.12.1       Ethernet0/0
+192.168.3.3       1   FULL/DR         00:00:37    10.1.23.3       Ethernet0/1
+```
+
+- Below is shown the output of `show ip ospf virtual-links`, which provides more details about the virtual link
+
+- It is not only important to verify that the virtual link is up but that the state is full, which indicates that LSAs have been successfully exchanged
+
+```
+R2#show ip ospf virtual-links 
+Virtual Link OSPF_VL0 to router 192.168.4.4 is up
+  Run as demand circuit
+  DoNotAge LSA allowed.
+  Transit area 234, via interface Ethernet0/1
+ Topology-MTID    Cost    Disabled     Shutdown      Topology Name
+        0           20        no          no            Base
+  Transmit Delay is 1 sec, State POINT_TO_POINT,
+  Timer intervals configured, Hello 10, Dead 40, Wait 40, Retransmit 5
+    Hello due in 00:00:08
+    Adjacency State FULL (Hello suppressed)
+    Index 1/1/2, retransmission queue length 0, number of retransmission 0
+    First 0x0(0)/0x0(0)/0x0(0) Next 0x0(0)/0x0(0)/0x0(0)
+    Last retransmission scan length is 0, maximum is 0
+    Last retransmission scan time is 0 msec, maximum is 0 msec
+```
+
+#### Load Balancing
+
+- OSPF supports only equal-cost load balancing
+
+- Therefore, when troubleshooting load balancing for OSPF, your two primary points of concern are the overall end-to-end cost and the maximum number of paths permitted for load balancing
+
+- To verify the maximum number of equal-cost paths an OSPF router is currently configured to support, use the `show ip protocols` command, as shown below
+
+- In this example, R1 is using the default value of 4
+
+- If your topology is showing multiple paths to reach certain networks in your organization but they are all not showing up in the routing table, it is likely happening because they are not equal-cost paths or the maximum paths value is configured too low
+
+```
+R2#show ip protocols 
+*** IP Routing is NSF aware ***
+
+Routing Protocol is "application"
+  Sending updates every 0 seconds
+  Invalid after 0 seconds, hold down 0, flushed after 0
+  Outgoing update filter list for all interfaces is not set
+  Incoming update filter list for all interfaces is not set
+  Maximum path: 32
+  Routing for Networks:
+  Routing Information Sources:
+    Gateway         Distance      Last Update
+  Distance: (default is 4)
+
+Routing Protocol is "ospf 1"
+  Outgoing update filter list for all interfaces is not set
+  Incoming update filter list for all interfaces is not set
+  Router ID 192.168.2.2
+  It is an area border router
+  Number of areas in this router is 3. 3 normal 0 stub 0 nssa
+  Maximum path: 4
+  Routing for Networks:
+  Routing on Interfaces Configured Explicitly (Area 0):
+    Loopback0
+  Routing on Interfaces Configured Explicitly (Area 12):
+    Ethernet0/0
+  Routing on Interfaces Configured Explicitly (Area 234):
+    Ethernet0/1
+  Routing Information Sources:
+    Gateway         Distance      Last Update
+    192.168.1.1          110      00:30:48
+    192.168.4.4          110      00:09:30
+    192.168.3.3          110      00:30:56
+  Distance: (default is 110)
+```
+
+#### Default Route
+
+- With OSPF, a default route is injected into the routing process using the `default-information originate` command, not the `redistribute static` command
+
+- Therefore, if you are trying to figure out why a static default route is not being advertised in the OSPF process, use the `show run | section router ospf` command to verify that the `default-information originate` command is being used
+
+### OSPFv2 Trouble Tickets
+
+- Below are presented 3 trouble tickets, related to the OSPF topics discussed until now
+
+- The purpose of these tickets is to show the process that you can use when troubleshooting in the real world or in an exam environment
+
+- All the trouble tickets are based on the topology shown below
+
+![ospf-trouble-tickets-topology](./ospf-trouble-tickets-topology.png)
+
+![ospfv2-troubleshooting-CML-topology](./ospfv2-troubleshooting-CML-topology.png)
+
+#### Trouble Ticket 8.1
+
+- **Problem**: Users in the 10.1.1.0/24 indicate that they are not able to access resources in the 192.168.1.0/24 network
+
+- As always, the first item in the list for troubleshooting is to verify the problem
+
+- In this case you access the PC in the 10.1.1.0/24 network and ping an IP address in the 192.168.1.0/24 network; the ping got rejected by the gateway: 10.1.1.1
+
+```
+PC1#debug ip icmp 
+ICMP packet debugging is on
+PC1#ping 192.168.1.1
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 192.168.1.1, timeout is 2 seconds:
+U
+*Oct 16 18:43:14.499: ICMP: dst (10.1.1.10) host unreachable rcv from 10.1.1.1 .U
+*Oct 16 18:43:16.517: ICMP: dst (10.1.1.10) host unreachable rcv from 10.1.1.1 .U
+Success rate is 0 percent (0/5)
+PC1#
+*Oct 16 18:43:18.532: ICMP: dst (10.1.1.10) host unreachable rcv from 10.1.1.1 
+```
+
+- Notice that the reply is from gateway at 10.1.1.1, and it states "host unreachable"
+
+- Therefore the ping is technically not successful
+
+- The result of the pings tell you two very important things: The PC can reach the default gateway, and the default gateway does not know how to get to the 192.168.1.0/24 network
+
+- Therefore, you can focus your attention on R1 and work from there
+
+- On R1 you issue the same ping and it fails
+
+```
+R1#ping 192.168.1.10
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 192.168.1.10, timeout is 2 seconds:
+.....
+Success rate is 0 percent (0/5)
+```
+
+- Now you check the R1's routing table with the `show ip route` command and notice that there are only connected routes in the routing table
+
+- R1 is not learning any routes from R2
+
+```
+R1#show ip route | b Gate
+Gateway of last resort is not set
+
+      10.0.0.0/8 is variably subnetted, 4 subnets, 2 masks
+C        10.1.1.0/24 is directly connected, GigabitEthernet0/0
+L        10.1.1.1/32 is directly connected, GigabitEthernet0/0
+C        10.1.12.0/24 is directly connected, GigabitEthernet0/1
+L        10.1.12.1/32 is directly connected, GigabitEthernet0/1
+```
+
+- According to the output below, OSPF is the protocol in use
+
+- Therefore you issue the `show ip protocols` command on R1 to verify that OSPF is running
+
+- Below is the output of `show ip protocols` command on R1 and confirms that OSPF process 1 is in operation on R1
+
+```
+R1#sh ip protocols
+*** IP Routing is NSF aware ***
+
+Routing Protocol is "application"
+  Sending updates every 0 seconds
+  Invalid after 0 seconds, hold down 0, flushed after 0
+  Outgoing update filter list for all interfaces is not set
+  Incoming update filter list for all interfaces is not set
+  Maximum path: 32
+  Routing for Networks:
+  Routing Information Sources:
+    Gateway         Distance      Last Update
+  Distance: (default is 4)
+
+Routing Protocol is "ospf 1"
+  Outgoing update filter list for all interfaces is not set
+  Incoming update filter list for all interfaces is not set
+  Router ID 1.1.1.1
+  Number of areas in this router is 1. 1 normal 0 stub 0 nssa
+  Maximum path: 4
+  Routing for Networks:
+    10.1.1.1 0.0.0.0 area 1
+  Routing on Interfaces Configured Explicitly (Area 1):
+    GigabitEthernet0/1
+  Passive Interface(s):
+    GigabitEthernet0/0
+    GigabitEthernet0/1
+  Routing Information Sources:
+    Gateway         Distance      Last Update
+    2.2.2.2              110      00:16:17
+  Distance: (default is 110)
+
+```
+
+
+- Next, you check to see whether R1 has any OSPF neighbors
+
+- According to the topology, R2 should be a neighbor
+
+- To verify the OSPF neighbors, you issue the `show ip ospf neighbor` command on R1
+
+- According to the output, R1 is a neighbor with R2
+
+```
+R1#show ip ospf neighbor 
+
+Neighbor ID     Pri   State           Dead Time   Address         Interface
+2.2.2.2           1   FULL/DR         00:00:34    10.1.12.2       GigabitEthernet0/1
+```
+
+- What is the best next step? Some would consider troubleshooting why the routes are missing on R1 by looking at various features and parameters associated with R1
+
+- However, the 192.168.1.0/24 network is in a different area
+
+- Who is responsible for telling R1 about 192.168.1.0/24? Is it R4? No. Is it R2? Yes. R2 sends a Type 3 summary LSA into Area 1, which tells Area 1 about the 192.168.1.0/24 network
+
+- Therefore, if R2 does not know about 192.168.1.0.24, you can stop troubleshooting on R1
+
+- This is a great example of how understanding the flow of different LSAs can save you time when troubleshooting
+
+- On R2 you issue the `show ip route` command, and confirm that R2 does not know about the 192.168.1.0/24 network either
+
+- In fact, it has not learned about any networks in Area 0
+
+```
+R2(config-router)#do sh ip route | b Gate 
+Gateway of last resort is not set
+
+      10.0.0.0/8 is variably subnetted, 6 subnets, 3 masks
+O        10.1.0.0/16 is a summary, 00:05:49, Null0
+O        10.1.1.0/24 [110/2] via 10.1.12.1, 00:05:49, GigabitEthernet0/0
+C        10.1.12.0/24 is directly connected, GigabitEthernet0/0
+L        10.1.12.2/32 is directly connected, GigabitEthernet0/0
+C        10.1.23.0/24 is directly connected, GigabitEthernet0/1
+L        10.1.23.2/32 is directly connected, GigabitEthernet0/1
+```
+
+- *Wait*! Remember that with OSPF, distribute lists are used to permit or deny routes from being installed in the routing table from the LSDB
+
+- Therefore, you might be learning about them and just not installing them
+
+- Below is the output of the LSDB on R2, and as you can see, there are no Area 0 Type 1 router LSAs from R3 (3.3.3.3) or R4 (4.4.4.4)
+
+- Therefore, you can officially say that R2 has not been educated about the networks that are missing
+
+```
+R2#show ip ospf database 
+
+            OSPF Router with ID (2.2.2.2) (Process ID 1)
+
+                Router Link States (Area 0)
+
+Link ID         ADV Router      Age         Seq#       Checksum Link count
+2.2.2.2         2.2.2.2         25          0x80000010 0x00658A 1
+
+                Summary Net Link States (Area 0)
+
+Link ID         ADV Router      Age         Seq#       Checksum
+10.1.0.0        2.2.2.2         25          0x80000001 0x00C860
+
+                Router Link States (Area 1)
+
+Link ID         ADV Router      Age         Seq#       Checksum Link count
+1.1.1.1         1.1.1.1         21          0x80000018 0x00D0F5 2
+2.2.2.2         2.2.2.2         15          0x80000016 0x0024B7 1
+
+                Net Link States (Area 1)
+
+Link ID         ADV Router      Age         Seq#       Checksum
+10.1.12.1       1.1.1.1         21          0x80000001 0x00EA27
+          
+                Summary Net Link States (Area 1)
+
+Link ID         ADV Router      Age         Seq#       Checksum
+10.1.23.0       2.2.2.2         20          0x80000002 0x00C848
+```
+
+- To receive LSAs, you must have interfaces participating in the OSPF process, and you must have neighbor relationships
+
+- The output of `show cdp neighbors` indicates that R3 is a neighbor, and it's reachable out of R2's local G0/1 interface, as shown below
+
+```
+R2#show cdp neighbors 
+Capability Codes: R - Router, T - Trans Bridge, B - Source Route Bridge
+                  S - Switch, H - Host, I - IGMP, r - Repeater, P - Phone, 
+                  D - Remote, C - CVTA, M - Two-port Mac Relay 
+
+Device ID        Local Intrfce     Holdtme    Capability  Platform  Port ID
+R3               Gig 0/1           141              R B             Gig 0/0
+R1               Gig 0/0           122              R B             Gig 0/1
+
+```
+
+- The output of `show ip ospf interface brief` and `show ip ospf neighbor` shows that R2's local interface G0/1 is participating in the OSPF process but does not have a neighbor on the interface
+
+```
+R2#show ip ospf interface brief 
+Interface    PID   Area            IP Address/Mask    Cost  State Nbrs F/C
+Gi0/1        1     0               10.1.23.2/24       1     DR    0/0
+Gi0/0        1     1               10.1.12.2/24       1     BDR   1/1
+
+
+R2#show ip ospf neighbor 
+
+Neighbor ID     Pri   State           Dead Time   Address         Interface
+1.1.1.1           1   FULL/DR         00:00:31    10.1.12.1       GigabitEthernet0/0
+```
+
+- So you can now hypothesize that the issue is related to R2 and R3 not having a neighbor adjacency
+
+- What would cause this? As in the earlier discussion, many different issues could cause this
+
+- Recall that the majority of them are interface related, and using the spot-the-difference thoubleshooting method would come in handy
+
+- You can do that by using the `show ip ospf interface` for the interfaces connected on R2 and R3 as shown below
+
+```
+R2(config-if)#do sh ip ospf int g0/1
+GigabitEthernet0/1 is up, line protocol is up 
+  Internet Address 10.1.23.2/24, Area 0, Attached via Interface Enable
+  Process ID 1, Router ID 2.2.2.2, Network Type BROADCAST, Cost: 1
+  Topology-MTID    Cost    Disabled    Shutdown      Topology Name
+        0           1         no          no            Base
+  Enabled by interface config, including secondary ip addresses
+  Transmit Delay is 1 sec, State DR, Priority 1
+  Designated Router (ID) 2.2.2.2, Interface address 10.1.23.2
+  No backup designated router on this network
+  Timer intervals configured, Hello 11, Dead 44, Wait 44, Retransmit 5
+    oob-resync timeout 44
+    Hello due in 00:00:01
+  Supports Link-local Signaling (LLS)
+  Cisco NSF helper support enabled
+  IETF NSF helper support enabled
+  Index 1/1/2, flood queue length 0
+  Next 0x0(0)/0x0(0)/0x0(0)
+  Last flood scan length is 0, maximum is 3
+  Last flood scan time is 0 msec, maximum is 0 msec
+  Neighbor Count is 0, Adjacent neighbor count is 0 
+  Suppress hello for 0 neighbor(s)
+  Cryptographic authentication enabled
+    Youngest key id is 1
+
+
+R3(config-if)#do sh ip ospf int g0/0
+GigabitEthernet0/0 is up, line protocol is up 
+  Internet Address 10.1.23.3/24, Area 0, Attached via Interface Enable
+  Process ID 1, Router ID 3.3.3.3, Network Type BROADCAST, Cost: 1
+  Topology-MTID    Cost    Disabled    Shutdown      Topology Name
+        0           1         no          no            Base
+  Enabled by interface config, including secondary ip addresses
+  Transmit Delay is 1 sec, State DR, Priority 1
+  Designated Router (ID) 3.3.3.3, Interface address 10.1.23.3
+  No backup designated router on this network
+  Timer intervals configured, Hello 10, Dead 40, Wait 40, Retransmit 5
+    oob-resync timeout 40
+    Hello due in 00:00:09
+  Supports Link-local Signaling (LLS)
+  Cisco NSF helper support enabled
+  IETF NSF helper support enabled
+  Index 1/2/2, flood queue length 0
+  Next 0x0(0)/0x0(0)/0x0(0)
+  Last flood scan length is 0, maximum is 3
+  Last flood scan time is 0 msec, maximum is 0 msec
+  Neighbor Count is 0, Adjacent neighbor count is 0 
+  Suppress hello for 0 neighbor(s)
+  Cryptographic authentication enabled
+    Youngest key id is 1
+```
+
+- Now you can answer the following questions:
+
+    - Are the interfaces up? Yes
+
+    - Are the interfaces in the same subnet? Yes
+
+    - Are the interfaces in the same area? Yes
+
+    - Do the routers have unique RIDs? Yes
+
+    - Do hello and dead timers match? No (This is a possible reason why the neighbor adjacency is not forming)
+
+    - Do authentication parameters match? Enabled and key match, but not sure about the key string without checking the running configuration (This is a possible reason why the neighbor adjacency is not forming)
+
+- As you can see above the hello and dead timers do not match, but they must
+
+- As you can see, the output of `show running-config interface g0/1` on R2 shows that the command `ip ospf hello-interval 11` is configured
+
+```
+R2(config-if)#do sh run int g0/1
+Building configuration...
+
+Current configuration : 238 bytes
+!
+interface GigabitEthernet0/1
+ ip address 10.1.23.2 255.255.255.0
+ ip ospf authentication message-digest
+ ip ospf message-digest-key 1 md5 CISCO
+ ip ospf hello-interval 11
+ ip ospf 1 area 0
+ duplex auto
+ speed auto
+ media-type rj45
+end
+
+```
+
+- When you run the `no ip ospf hello-interval 11` on R2, you receive the following syslog message:
+
+```
+*Oct 16 20:06:30.092: %OSPF-5-ADJCHG: Process 1, Nbr 3.3.3.3 on GigabitEthernet0/1 from LOADING to FULL, Loading Done
+R2(config-if)#do sh ip ospf nei
+
+Neighbor ID     Pri   State           Dead Time   Address         Interface
+3.3.3.3           1   FULL/DR         00:00:37    10.1.23.3       GigabitEthernet0/1
+1.1.1.1           1   FULL/DR         00:00:37    10.1.12.1       GigabitEthernet0/0
+R2(config-if)#
+```
+
+- This confirms that the adjacency has been formed
+
+- You can also review the output of the routing table on R2 by using the `show ip route` command to confirm that the routes are learned, as shown below
+
+```
+R2(config-if)#do sh ip route | b Gate
+Gateway of last resort is 10.1.23.3 to network 0.0.0.0
+
+O*E2  0.0.0.0/0 [110/1] via 10.1.23.3, 00:00:35, GigabitEthernet0/1
+      10.0.0.0/8 is variably subnetted, 8 subnets, 3 masks
+O        10.1.0.0/16 is a summary, 00:39:41, Null0
+O        10.1.1.0/24 [110/2] via 10.1.12.1, 00:39:31, GigabitEthernet0/0
+O        10.1.3.0/24 [110/2] via 10.1.23.3, 00:04:07, GigabitEthernet0/1
+C        10.1.12.0/24 is directly connected, GigabitEthernet0/0
+L        10.1.12.2/32 is directly connected, GigabitEthernet0/0
+C        10.1.23.0/24 is directly connected, GigabitEthernet0/1
+L        10.1.23.2/32 is directly connected, GigabitEthernet0/1
+O        10.1.34.0/24 [110/2] via 10.1.23.3, 00:04:07, GigabitEthernet0/1
+O     192.168.1.0/24 [110/3] via 10.1.23.3, 00:04:07, GigabitEthernet0/1
+O     203.0.113.0/24 [110/2] via 10.1.23.3, 00:00:57, GigabitEthernet0/1
+```
+
+- R1 also knows about the routes now
+
+```
+R1#sh ip route | b Gate
+Gateway of last resort is 10.1.12.2 to network 0.0.0.0
+
+O*E2  0.0.0.0/0 [110/1] via 10.1.12.2, 00:02:47, GigabitEthernet0/1
+      10.0.0.0/8 is variably subnetted, 7 subnets, 2 masks
+C        10.1.1.0/24 is directly connected, GigabitEthernet0/0
+L        10.1.1.1/32 is directly connected, GigabitEthernet0/0
+O IA     10.1.3.0/24 [110/3] via 10.1.12.2, 00:06:25, GigabitEthernet0/1
+C        10.1.12.0/24 is directly connected, GigabitEthernet0/1
+L        10.1.12.1/32 is directly connected, GigabitEthernet0/1
+O IA     10.1.23.0/24 [110/2] via 10.1.12.2, 00:41:44, GigabitEthernet0/1
+O IA     10.1.34.0/24 [110/3] via 10.1.12.2, 00:06:25, GigabitEthernet0/1
+O IA  192.168.1.0/24 [110/4] via 10.1.12.2, 00:06:25, GigabitEthernet0/1
+O IA  203.0.113.0/24 [110/3] via 10.1.12.2, 00:03:14, GigabitEthernet0/1
+```
+
+- Finally, you ping from the PC again, and the ping is successful
+
+```
+C1#ping 192.168.1.10
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 192.168.1.10, timeout is 2 seconds:
+!!!!!
+Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/1 ms
+PC1#
+PC1#
+PC1#
+*Oct 16 20:14:15.140: ICMP: echo reply rcvd, src 192.168.1.10, dst 10.1.1.10, topology BASE, dscp 0 topoid 0
+*Oct 16 20:14:15.141: ICMP: echo reply rcvd, src 192.168.1.10, dst 10.1.1.10, topology BASE, dscp 0 topoid 0
+*Oct 16 20:14:15.142: ICMP: echo reply rcvd, src 192.168.1.10, dst 10.1.1.10, topology BASE, dscp 0 topoid 0
+*Oct 16 20:14:15.143: ICMP: echo reply rcvd, src 192.168.1.10, dst 10.1.1.10, topology BASE, dscp 0 topoid 0
+*Oct 16 20:14:15.144: ICMP: echo reply rcvd, src 192.168.1.10, dst 10.1.1.10, topology BASE, dscp 0 topoid 0
+PC1#un all
+All possible debugging has been turned off
+```
+
+#### Trouble Ticket 8.2
+
+- **Problem**: Users in the 10.1.1.0/24 network indicate that they are not able to access resources in the 192.168.1.0/24 network
+
+- As always, the first item in the list for troubleshooting is to verify the problem
+
+- You access the PC in the 10.1.1.0.24 network and ping an IP address in the 192.168.1.0/24 network and you see that you receive a reply from 10.1.23.3, and it states, TTL exceeded in transit
+
+```
+PC1#ping 192.168.1.10
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 192.168.1.10, timeout is 2 seconds:
+
+*Oct 17 07:35:39.883: ICMP: time exceeded rcvd from 10.1.23.3.
+*Oct 17 07:35:41.887: ICMP: time exceeded rcvd from 10.1.23.3.
+*Oct 17 07:35:43.885: ICMP: time exceeded rcvd from 10.1.23.3.
+*Oct 17 07:35:45.884: ICMP: time exceeded rcvd from 10.1.23.3.
+*Oct 17 07:35:47.884: ICMP: time exceeded rcvd from 10.1.23.3.
+Success rate is 0 percent (0/5)
+```
+
+- Therefore the ping is not successful
+
+- The result of the ping tells you two very important things: The PC can reach the default gateway at 10.1.1.1, and the device at 10.1.23.3 expired the packet because the TTL reached 0, and the device sent an ICMP time exceeded message back to the PC
+
+- Pause for a moment and think about this
+
+- If the TTL exceeded in transit, it means that the packet did not reach the destination before the TTL decremented to 0
+
+- Each time a router touches the packet, it decrements the TTL by 1
+
+- The operating system that created the packet will determine that the TTL is for the packet, so there is no universally default value
+
+- It can be anything that the operating system is configured to use in the range 0 to 255
+
+- So the worst-case scenario is that the packet bounced around the network and went to aproximatively 255 routers before the device a 10.1.23.3 decremented the TTL to 0 and send the ICMP TTL exceeded message
+
+- Running a traceroute from the PC will help you identify this, as shown below
+
+- This example shows that R3 (10.1.23.3) and R2 (10.1.23.2) are bouncing the packet back and forth
+
+```
+PC1#traceroute 192.168.1.10
+Type escape sequence to abort.
+Tracing the route to 192.168.1.10
+VRF info: (vrf in name/id, vrf out name/id)
+  1 10.1.1.1 1 msec 0 msec 1 msec
+  2 10.1.12.2 0 msec 0 msec 1 msec
+  3 10.1.23.3 1 msec 1 msec 1 msec
+  4 10.1.23.2 0 msec 1 msec 1 msec
+  5 10.1.23.3 1 msec 0 msec 1 msec
+  6 10.1.23.2 1 msec 1 msec 1 msec
+  7 10.1.23.3 1 msec 1 msec 1 msec
+  8 10.1.23.2 1 msec 2 msec 1 msec
+  9 10.1.23.3 1 msec 2 msec 2 msec
+ 10 10.1.23.2 1 msec 3 msec 1 msec
+ 11 10.1.23.3 1 msec 1 msec 1 msec
+ 12 10.1.23.2 2 msec 2 msec 1 msec
+ 13 10.1.23.3 1 msec 2 msec 1 msec
+ 14 10.1.23.2 1 msec 2 msec 1 msec
+ 15 10.1.23.3 2 msec 1 msec 2 msec
+ 16 10.1.23.2 1 msec 2 msec 2 msec
+ 17 10.1.23.3 1 msec 1 msec 1 msec
+ 18 10.1.23.2 2 msec 2 msec 1 msec
+ 19 10.1.23.3 2 msec 2 msec 2 msec
+ 20 10.1.23.2 2 msec 2 msec 2 msec
+ 21 10.1.23.3 1 msec 3 msec 2 msec
+ 22 10.1.23.2 2 msec 2 msec 2 msec
+ 23 10.1.23.3 2 msec 3 msec 2 msec
+ 24  % Name lookup aborted
+10.1.23.2 2 msec
+```
+
+- You can deduce from this that R3 is not routing the packet correctly
+
+- It is sending the packet to R2 instead of R4
+
+- If you access R3 and issue the `show ip ospf database router 4.4.4.4` command as shown below, you can clearly see that R3 is learning about the network 192.168.1.0/24 from R4
+
+- However, instead of using R4 as the next hop, it is using R2 because it is sending the packets to R2, as shown in earlier traceroute
+
+```
+R3#show ip ospf database router 4.4.4.4
+
+            OSPF Router with ID (3.3.3.3) (Process ID 1)
+
+                Router Link States (Area 0)
+
+  LS age: 699
+  Options: (No TOS-capability, DC)
+  LS Type: Router Links
+  Link State ID: 4.4.4.4
+  Advertising Router: 4.4.4.4
+  LS Seq Number: 80000005
+  Checksum: 0x7CB4
+  Length: 48
+  Number of Links: 2
+
+    Link connected to: a Stub Network
+     (Link ID) Network/subnet number: 192.168.1.0
+     (Link Data) Network Mask: 255.255.255.0
+      Number of MTID metrics: 0
+       TOS 0 Metrics: 1
+
+    Link connected to: a Transit Network
+     (Link ID) Designated Router address: 10.1.34.4
+     (Link Data) Router Interface address: 10.1.34.4
+      Number of MTID metrics: 0
+       TOS 0 Metrics: 1
+
+```
+
+- Now you can look at the routing table to see whether this network is being installed in the routing table 
+
+- The output of the command `show ip route ospf` indicates that this OSPF-learned route is not being installed in the routing table
+
+```
+R3#show ip route ospf | b Gate
+Gateway of last resort is 192.0.2.1 to network 0.0.0.0
+
+      10.0.0.0/8 is variably subnetted, 7 subnets, 3 masks
+O IA     10.1.0.0/16 [110/2] via 10.1.23.2, 01:21:27, GigabitEthernet0/0
+```
+
+- It's time to hypothesize! What would be the cause R3 to learn about the route but not install it in the routing table
+
+- If you harness your knowledge and and really focus on what is happening, you can figure it out
+
+- R3 is routing the packets destined to the 192.168.1.0/24, which means there must be some entry in the routing table, or policy based routing has been enforced
+
+- The output of the command `show ip route 192.168.1.0 255.255.255.0` on R3 confirms that there is an entry in the routing table of R3
+
+- However, it is a static entry with an AD of 1 pointing to 10.1.23.2
+
+- It looks like you found the problem. There is a better source of routing information, according to AD
+
+```
+R3#show ip route 192.168.1.0 255.255.255.0
+Routing entry for 192.168.1.0/24
+  Known via "static", distance 1, metric 0
+  Routing Descriptor Blocks:
+  * 10.1.23.2
+      Route metric is 0, traffic share count is 1
+```
+
+- The output of the command `show run | include ip route`, confirms that a static route exists
+
+```
+R3#sh run | i ip route
+ip route 0.0.0.0 0.0.0.0 192.0.2.1
+ip route 192.168.1.0 255.255.255.0 10.1.23.2
+```
+
+- After you remove the command from R3 with `no ip route 192.168.1.0 255.255.255.0 10.1.23.2`, a ping from the PC is successful
+
+```
+PC1#ping 192.168.1.10
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 192.168.1.10, timeout is 2 seconds:
+!!!!!
+Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/1 ms
+PC1#
+*Oct 17 08:30:29.958: ICMP: echo reply rcvd, src 192.168.1.10, dst 10.1.1.10, topology BASE, dscp 0 topoid 0
+*Oct 17 08:30:29.959: ICMP: echo reply rcvd, src 192.168.1.10, dst 10.1.1.10, topology BASE, dscp 0 topoid 0
+*Oct 17 08:30:29.960: ICMP: echo reply rcvd, src 192.168.1.10, dst 10.1.1.10, topology BASE, dscp 0 topoid 0
+*Oct 17 08:30:29.961: ICMP: echo reply rcvd, src 192.168.1.10, dst 10.1.1.10, topology BASE, dscp 0 topoid 0
+*Oct 17 08:30:29.962: ICMP: echo reply rcvd, src 192.168.1.10, dst 10.1.1.10, topology BASE, dscp 0 topoid 0
+PC1#un all 
+All possible debugging has been turned off
+PC1#
+```
+
+#### Same thing with policy routing
+
+- Trying to do the same thing using policy routing
+
+```
+R3(config)#do sh access-lists          
+Extended IP access list 100
+    10 permit ip any 192.168.1.0 0.0.0.255 (635 matches)
+
+R3(config)#do sh route-map 
+route-map SET_OUT_IF, permit, sequence 10
+  Match clauses:
+    ip address (access-lists): 100 
+  Set clauses:
+    ip next-hop 10.1.23.2
+  Policy routing matches: 1270 packets, 144780 bytes
+
+R3#sh run int g0/0
+Building configuration...
+
+Current configuration : 243 bytes
+!
+interface GigabitEthernet0/0
+ ip address 10.1.23.3 255.255.255.0
+ ip policy route-map SET_OUT_IF
+ ip ospf authentication message-digest
+ ip ospf message-digest-key 1 md5 CISCO
+ ip ospf 1 area 0
+ duplex auto
+ speed auto
+ media-type rj45
+end
+
+```
+
+- Ping from PC1 did the same thing as the problem reported initially:
+
+```
+PC1#ping 192.168.1.10 
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 192.168.1.10, timeout is 2 seconds:
+.
+*Oct 17 08:46:13.387: ICMP: time exceeded rcvd from 10.1.23.3.
+*Oct 17 08:46:15.393: ICMP: time exceeded rcvd from 10.1.23.3.
+*Oct 17 08:46:17.393: ICMP: time exceeded rcvd from 10.1.23.3.
+*Oct 17 08:46:19.399: ICMP: time exceeded rcvd from 10.1.23.3.
+Success rate is 0 percent (0/5)
+PC1#
+*Oct 17 08:46:21.400: ICMP: time exceeded rcvd from 10.1.23.3
+```
+
+```
+R3#sh ip int g0/0 | i Policy
+  Policy routing is enabled, using route map SET_OUT_IF
+  BGP Policy Mapping is disabled
+  Input features: Policy Routing, MCI Check
+```
+
+- Resolve by removing the route map policy from the interface:
+
+```
+conf t
+ interface g0/0
+  no ip policy route-map SET_OUT_IF
+
+R3(config-if)#do sh ip int g0/0 | i Policy     
+  Policy routing is disabled
+  BGP Policy Mapping is disabled
+```
+
+#### Trouble Ticket 8.3
+
+- **Problem:** Routers R1 and R2 are not forming a neighbor adjacency
+
+- The first item on the list for troubleshooting is to verify the problem
+
+- You access R1 and use the `show ip ospf neighbor` command, and the output confirms that there is no neighbor relationship to R2
+
+```
+R1(config-if)#do sh ip ospf nei
+R1(config-if)#
+R1(config-if)#
+R1(config-if)#
+```
+
+- You know that to have a neighbor relationship, you need interfaces participating in the OSPF process
+
+- The command `show cdp neighbors` confirms that R2 is connected to R1's local interface G0/1, as shown below
+
+- Therefore you need to enable OSPF on that interface
+
+```
+R1(config-if)#do sh cdp neighbors
+Capability Codes: R - Router, T - Trans Bridge, B - Source Route Bridge
+                  S - Switch, H - Host, I - IGMP, r - Repeater, P - Phone, 
+                  D - Remote, C - CVTA, M - Two-port Mac Relay 
+
+Device ID        Local Intrfce     Holdtme    Capability  Platform  Port ID
+PC1              Gig 0/0           141               R    Linux Uni Eth 0/0
+R2               Gig 0/1           176              R B             Gig 0/0
+
+Total cdp entries displayed : 2
+```
+
+- The output of `show ip ospf interface brief` confirms that G0/1 is participating in the OSPF process, as shown below
+
+- However, based on the output from below it is not in the correct area. It must be in Area 1
+
+```
+R1(config-if)#do sh ip ospf interface brief
+Interface    PID   Area            IP Address/Mask    Cost  State Nbrs F/C
+Gi0/0        1     1               10.1.1.1/24        1     DR    0/0
+Gi0/1        1     51              10.1.12.1/24       1     DR    0/0
+```
+
+- Based on the output from above, G0/1 has the IP address 10.1.12.1/24 
+
+- Therefore you need a network command that includes that IP address and places it in Area 1
+
+- The output of `show run | s router ospf` indicates that there is a network command that will enable the routing process on G0/1 in area 1
+
+```
+R1(config-if)#do sh run | s router ospf
+router ospf 1
+ router-id 1.1.1.1
+ passive-interface GigabitEthernet0/0
+ network 10.1.1.1 0.0.0.0 area 1
+ network 10.1.12.1 0.0.0.0 area 1
+```
+
+- If you are scratching your head, you are not the only one at this point
+
+- The running configuration clearly shows a command that puts G0/1 in area 1, yet the output of `show ip ospf interface brief` clearly shows that it is in area 51. This should be because the command `ip ospf 1 area 51` is present under the interface G0/1 configuration mode
+
+- Recall that there are two ways to enable OSPF on an interface: with the `network <ip-addr> <wildcard-mask> area <area-id>` command in router OSPF configuration mode and with `ip ospf <process-id> area <area-id>` interface configuration mode command
+
+- The `ip ospf area` commmand overrides the `network area` command if both commands are configured
+
+- Below is shown the running config for the G0/1 interface configuration on R1, using the `show run interface g0/1` command
+
+```
+interface GigabitEthernet0/1
+ ip address 10.1.12.1 255.255.255.0
+ ip ospf 1 area 51
+ duplex auto
+ speed auto
+ media-type rj45
+end
+```
+
+- Here is the issue. The `ip ospf 1 area 51` command overrides the `network 10.1.12.1 0.0.0.0 area 1` command 
+
+- You either need to change the `ip ospf 1 area 51` command so that it states `area 1` or remove it completely so that the `network` command can be used
