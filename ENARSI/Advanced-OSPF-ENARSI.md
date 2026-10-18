@@ -2783,3 +2783,389 @@ Virtual Link OSPF_VL0 to router 192.168.2.2 is up
 - Also DoNotAge LSA is allowed
 
 - Hellos are suppressed over the virtual link as they are sent as unicast packets
+
+### OSPFv2 in VRF LITE
+
+- OSPFv2 can run in VRFs
+
+- By default, OSPF expects MPLS to be active/enabled to work in VRFs
+
+- Due to this fact, all routers believe they are ABRs and are connected to a special area named MPLS Superbackbone
+
+```
+R1#show ip ospf | i MPLS
+ Connected to MPLS VPN Superbackbone, VRF TEST
+```
+
+- Due to this, the routers that are in other areas, and not Area 0, do not get the routing table and the OSPF RIB populated with inter-area routes from Area 0
+
+- The solution is below after config explaining
+
+- Topology:
+
+![OSPF-in-vrf-cml](./OSPF-in-vrf-cml.png)
+
+- Create VRFs and assign the interfaces to them
+
+```
+R1#sh run | s vrf
+vrf definition TEST
+ !
+ address-family ipv4
+ exit-address-family
+ !
+ address-family ipv6
+ exit-address-family
+
+R1#show run int g1
+Building configuration...
+
+Current configuration : 161 bytes
+!
+interface GigabitEthernet1
+ vrf forwarding TEST
+ ip address 10.1.12.1 255.255.255.0
+ ip ospf priority 100
+ ip ospf 1 area 0
+ negotiation auto
+ cdp enable
+end
+
+R1#show run int l0
+Building configuration...
+
+Current configuration : 106 bytes
+!
+interface Loopback0
+ vrf forwarding TEST
+ ip address 192.168.1.1 255.255.255.255
+ ip ospf 1 area 0
+end
+
+router ospf 1 vrf TEST
+ router-id 192.168.1.1
+ capability vrf-lite
+```
+
+- Turning on `capability vrf-lite` eliminates the need for the routers to be connected to the MPLS Superbackbone (area 0 only) and allows the routers in other areas to populate the routing table with OSPF routes as needed
+
+- Without `capability vrf-lite`, the router is considered an ABR, even if all interfaces are part of Area 0
+
+```
+R1(config-router)#do sh ip protocols vrf TEST
+*** IP Routing is NSF aware ***
+
+Routing Protocol is "ospf 1"
+  Outgoing update filter list for all interfaces is not set
+  Incoming update filter list for all interfaces is not set
+  Router ID 192.168.1.1
+  It is an area border router
+  Number of areas in this router is 1. 1 normal 0 stub 0 nssa
+  Maximum path: 4
+  Routing for Networks:
+  Routing on Interfaces Configured Explicitly (Area 0):
+    Loopback0
+    GigabitEthernet1
+  Routing Information Sources:
+    Gateway         Distance      Last Update
+    192.168.3.3          110      00:00:04
+    192.168.2.2          110      00:00:04
+  Distance: (default is 110)
+
+R1(config-router)#do sh ip OSPF
+ Routing Process "ospf 1" with ID 192.168.1.1
+   Domain ID type 0x0005, value 0.0.0.1
+ Start time: 00:01:36.213, Time elapsed: 00:25:29.424
+ Supports only single TOS(TOS0) routes
+ Supports opaque LSA
+ Supports Link-local Signaling (LLS)
+ Supports area transit capability
+ Supports NSSA (compatible with RFC 3101)
+ Supports Database Exchange Summary List Optimization (RFC 5243)
+ Connected to MPLS VPN Superbackbone, VRF TEST   ################ CONNECTED TO MPLS SUPERBACKBONE ###############
+ Maximum number of non self-generated LSA allowed 50000
+    Current number of non self-generated LSA 6
+    Threshold for warning message 75%
+    Ignore-time 5 minutes, reset-time 10 minutes
+    Ignore-count allowed 5, current ignore-count 0
+ Event-log disabled
+ It is an area border router
+ Router is not originating router-LSAs with maximum metric
+ Initial SPF schedule delay 50 msecs
+ Minimum hold time between two consecutive SPFs 200 msecs
+ Maximum wait time between two consecutive SPFs 5000 msecs
+ Incremental-SPF disabled
+ Per-prefix-distribution disabled
+ Initial LSA throttle delay 50 msecs
+ Minimum hold time for LSA throttle 200 msecs
+ Maximum wait time for LSA throttle 5000 msecs
+ Minimum LSA arrival 100 msecs
+ LSA group pacing timer 240 secs
+ Interface flood pacing timer 33 msecs
+ Retransmission pacing timer 66 msecs
+ EXCHANGE/LOADING adjacency limit: initial 300, process maximum 300
+ Number of external LSA 0. Checksum Sum 0x000000
+ Number of opaque AS LSA 0. Checksum Sum 0x000000
+ Number of DCbitless external and opaque AS LSA 0
+ Number of DoNotAge external and opaque AS LSA 0
+ Number of areas in this router is 1. 1 normal 0 stub 0 nssa
+ Number of areas transit capable is 0
+ External flood list length 0
+ IETF NSF helper support enabled
+ Cisco NSF helper support enabled
+ Reference bandwidth unit is 100 mbps
+    Area BACKBONE(0)
+        Number of interfaces in this area is 2 (1 loopback)
+        Area has no authentication
+        SPF algorithm last executed 00:00:26.128 ago
+        SPF algorithm executed 5 times
+        Area ranges are
+        Number of LSA 7. Checksum Sum 0x02C950
+        Number of opaque link LSA 0. Checksum Sum 0x000000
+        Number of DCbitless LSA 0
+        Number of indication LSA 0
+        Number of DoNotAge LSA 0
+        Flood list length 0
+
+```
+
+- With `capability vrf-lite` enabled:
+
+```
+R1(config-router)#do sh ip protocols vrf TEST
+*** IP Routing is NSF aware ***
+
+Routing Protocol is "ospf 1"
+  Outgoing update filter list for all interfaces is not set
+  Incoming update filter list for all interfaces is not set
+  Router ID 192.168.1.1
+  Number of areas in this router is 1. 1 normal 0 stub 0 nssa
+  Maximum path: 4
+  Routing for Networks:
+  Routing on Interfaces Configured Explicitly (Area 0):
+    Loopback0
+    GigabitEthernet1
+  Routing Information Sources:
+    Gateway         Distance      Last Update
+    192.168.3.3          110      00:00:00
+    192.168.2.2          110      00:00:00
+  Distance: (default is 110)
+
+```
+
+- The router is no longer an ABR
+
+- No more MPLS superbackbone dependence
+
+```
+R1(config-router)#do sh ip ospf | i MPLS
+R1(config-router)#do sh ip ospf | i MPLS
+R1(config-router)#
+```
+
+- R2:
+
+```
+R2#sh run | s vrf def
+vrf definition TEST
+ !
+ address-family ipv4
+ exit-address-family
+ !
+ address-family ipv6
+ exit-address-family
+
+R2#sh run int g1
+Building configuration...
+
+Current configuration : 139 bytes
+!
+interface GigabitEthernet1
+ vrf forwarding TEST
+ ip address 10.1.12.2 255.255.255.0
+ ip ospf 1 area 0
+ negotiation auto
+ cdp enable
+end
+
+R2#sh run int g2
+Building configuration...
+
+Current configuration : 178 bytes
+!
+interface GigabitEthernet2
+ vrf forwarding TEST
+ ip address 10.1.23.2 255.255.255.0
+ ip ospf authentication key-chain TEST
+ ip ospf 1 area 0
+ negotiation auto
+ cdp enable
+end
+
+R2#sh run | s key chain
+key chain TEST
+ key 1
+  key-string CISCO
+  cryptographic-algorithm hmac-sha-256
+
+R2#sh run int g3       
+Building configuration...
+
+Current configuration : 109 bytes
+!
+interface GigabitEthernet3
+ vrf forwarding TEST
+ ip address 10.1.34.2 255.255.255.0
+ negotiation auto
+end
+
+R2#sh run int l0
+Building configuration...
+
+Current configuration : 106 bytes
+!
+interface Loopback0
+ vrf forwarding TEST
+ ip address 192.168.2.2 255.255.255.255
+ ip ospf 1 area 0
+end
+
+
+R2#sh run | s router ospf
+router ospf 1 vrf TEST
+ router-id 192.168.2.2
+ capability vrf-lite
+ network 10.1.34.2 0.0.0.0 area 1
+```
+
+- R2 is the ABR so the output is correct
+
+- No MPLS dependency
+
+```
+R2#show ip protocols vrf TEST
+*** IP Routing is NSF aware ***
+
+Routing Protocol is "ospf 1"
+  Outgoing update filter list for all interfaces is not set
+  Incoming update filter list for all interfaces is not set
+  Router ID 192.168.2.2
+  It is an area border router
+  Number of areas in this router is 2. 2 normal 0 stub 0 nssa
+  Maximum path: 4
+  Routing for Networks:
+    10.1.34.2 0.0.0.0 area 1
+  Routing on Interfaces Configured Explicitly (Area 0):
+    Loopback0
+    GigabitEthernet2
+    GigabitEthernet1
+  Routing Information Sources:
+    Gateway         Distance      Last Update
+    192.168.4.4          110      00:27:51
+    192.168.3.3          110      00:30:02
+    192.168.1.1          110      00:04:16
+  Distance: (default is 110)
+
+R2#show ip ospf | i MPLS
+R2#
+```
+
+- R3:
+
+```
+R3#show run | s vrf def 
+vrf definition TEST
+ !
+ address-family ipv4
+ exit-address-family
+ !
+ address-family ipv6
+ exit-address-family
+
+R3#show run int g1     
+Building configuration...
+
+Current configuration : 178 bytes
+!
+interface GigabitEthernet1
+ vrf forwarding TEST
+ ip address 10.1.23.3 255.255.255.0
+ ip ospf authentication key-chain test
+ ip ospf 1 area 0
+ negotiation auto
+ cdp enable
+end
+
+R3#show run | s key chain
+key chain test
+ key 1
+  key-string CISCO
+  cryptographic-algorithm hmac-sha-256
+
+R3#sh run | s router ospf
+router ospf 1 vrf TEST
+ router-id 192.168.3.3
+ capability vrf-lite
+
+R3#sh run int l0
+Building configuration...
+
+Current configuration : 106 bytes
+!
+interface Loopback0
+ vrf forwarding TEST
+ ip address 192.168.3.3 255.255.255.255
+ ip ospf 1 area 0
+end
+
+```
+
+- R4 configuration
+
+```
+R4#sh run | s vrf def
+vrf definition TEST
+ !
+ address-family ipv4
+ exit-address-family
+ !
+ address-family ipv6
+ exit-address-family
+
+R4#sh run int g0/0            
+Building configuration...
+
+Current configuration : 135 bytes
+!
+interface GigabitEthernet0/0
+ vrf forwarding TEST
+ ip address 10.1.34.4 255.255.255.0
+ duplex auto
+ speed auto
+ media-type rj45
+end
+
+R4#
+R4#sh run | s router ospf
+router ospf 1 vrf TEST
+ router-id 192.168.4.4
+ capability vrf-lite
+ network 10.1.34.0 0.0.0.255 area 1
+ network 192.168.4.4 0.0.0.0 area 1
+```
+
+```
+R4#show ip route vrf TEST ospf | b Gate
+Gateway of last resort is not set
+
+      10.0.0.0/8 is variably subnetted, 4 subnets, 2 masks
+O IA     10.1.12.0/24 [110/2] via 10.1.34.2, 00:09:35, GigabitEthernet0/0
+O IA     10.1.23.0/24 [110/2] via 10.1.34.2, 00:33:11, GigabitEthernet0/0
+      192.168.1.0/32 is subnetted, 1 subnets
+O IA     192.168.1.1 [110/3] via 10.1.34.2, 00:09:40, GigabitEthernet0/0
+      192.168.2.0/32 is subnetted, 1 subnets
+O IA     192.168.2.2 [110/2] via 10.1.34.2, 00:33:11, GigabitEthernet0/0
+      192.168.3.0/32 is subnetted, 1 subnets
+O IA     192.168.3.3 [110/3] via 10.1.34.2, 00:33:11, GigabitEthernet0/0
+
+```
