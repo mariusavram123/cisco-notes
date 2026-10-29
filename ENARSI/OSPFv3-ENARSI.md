@@ -811,3 +811,421 @@ GigabitEthernet0/1 is up, line protocol is up
 
 - This means that transit links only require IPv6 link-local addresses for forwarding traffic
 
+- Therefore, the global IPv6 unicast addresses can be removed from the transit links between R1 and R4 from the sample topology, and R4 can still communicate R1's 2001:db8:0:1::/64 network
+
+- Below, the global unicast addresses from the transit links on R1, R2 and R3
+
+- R1:
+
+```
+R1(config)#int g0/1
+R1(config-if)#no ipv6 address 2001:DB8:0:12::1/64
+```
+
+- R2:
+
+```
+R2(config)#int g0/0 
+R2(config-if)#no ipv6 address 2001:DB8:0:12::2/64
+
+R2(config-if)#int g0/1
+R2(config-if)#no ipv6 address 2001:DB8:0:23::2/64
+```
+
+- R3:
+
+```
+R3(config)#
+R3(config)#int g0/0
+R3(config-if)#no ipv6 address 2001:DB8:0:23::3/64
+R3(config-if)#int g0/1
+R3(config-if)#no ipv6 address 2001:DB8:0:34::3/64
+```
+
+- Below are shown the OSPFv3 learned routes from R4's perspective
+
+- Notice that the transit networks no longer appear
+
+- The loopback interfaces of R1, R2 and R3 still exists, along with R1's LAN interface 2001:db8:0:1::/64
+
+```
+R4#show ipv6 route ospf | b App
+       lA - LISP away, a - Application
+OI  2001:DB8::1/128 [110/3]
+     via FE80::3, GigabitEthernet0/0
+OI  2001:DB8::2/128 [110/2]
+     via FE80::3, GigabitEthernet0/0
+OI  2001:DB8::3/128 [110/1]
+     via FE80::3, GigabitEthernet0/0
+OI  2001:DB8:0:1::/64 [110/4]
+     via FE80::3, GigabitEthernet0/0
+```
+
+- R4 still maintains full connectivity to those networks because the topology is build using the IPv6 link-local addresses
+
+- As long as the source and destination devices have routes to each other, communication can still exist
+
+- Below we can see that R4 still maintains connectivity to R1's LAN interface (The scenario is shown to demonstrate the underlying mechanisms and is not a design suggestion)
+
+```
+R4#ping 2001:DB8:0:1::1            
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 2001:DB8:0:1::1, timeout is 2 seconds:
+!!!!!
+Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/1 ms
+
+R4#ping 2001:DB8:0:1::1 source g0/1
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 2001:DB8:0:1::1, timeout is 2 seconds:
+Packet sent with a source address of 2001:DB8:0:4::4
+!!!!!
+Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/1 ms
+```
+
+### OSPFv3 LSA Flooding Scope
+
+- There are two LSA flooding scopes in OSPFv2: area and autonomous system
+
+- OSPFv3 allows for three flooding scopes:
+
+    - **Link-local scope**: Limited to the local link
+
+    - **Area scope**: Contains LSA flooding to the local area
+
+    - **Autonomous system scope**: Floods LSAs throughout the entire OSPF routing domain
+
+- The LS type field in OSPFv3 has been modified from 8 bits to 16 bits
+
+- Below is shown the new LS Type Field format
+
+- The 3 high-order bits of the new LS type field allows for the encoding of flood information
+
+- The first bit, U (unrecognized), indicates how a router should handle an LSA if it is unrecognized
+
+- The second and third bits, both S (scope) bits, indicate how LSA should be flooded
+
+- The remaining bits of the link-state field indicate the function code of the LSA
+
+- For example, a function code of 1 maps to the router LSA, which matches the original OSPFv2 LS Type value 1
+
+![ospfv3-lsa-type-field](./ospfv3-lsa-type-field.png)
+
+- Below are all eight OSPFv3 LSA types and flooding scopes
+
+```
+Function code           LS Type             LSA Name                    Flooding scope
+
+1                       0x2001              Device-LSA                  Area
+
+2                       0x2002              Network-LSA                 Area
+
+3                       0x2003              Inter-Area-Prefix-LSA       Area
+
+4                       0x2004              Inter-Area-Router-LSA       Area
+
+5                       0x2005              AS-External-LSA             Autonomous System
+
+7                       0x2007              NSSA-LSA                    Area
+
+8                       0x2008              Link-LSA                    Link-local
+
+9                       0x2009              Intra-Area-Prefix-LSA       Area
+```
+
+- The router LSA describes the router's interface state and cost
+
+- Below is shown the output of the command `show ospfv3 database router <self-originate| adv-router RID>`
+
+- The option `self-originate` keyword filters the LSAs to those created by the router on which the command is executed
+
+- The `adv-router <RID>` keyword allows for selection of the LSAs for a specific router's LSAs that exist in the local router's LSDB
+
+- R1 is advertising a router LSA for the local G0/1 interface (interface ID 3) with a cost of 1
+
+- R1 is the designated router for the segment so it populates it's own RID in the LSA
+
+```
+R1#show ospfv3 database router self-originate      
+
+          OSPFv3 110 address-family ipv4 (router-id 192.168.1.1)
+
+                Router Link States (Area 0)
+
+  LS age: 1155
+  Options: (E-Bit, R-Bit, DC-Bit, AF-Bit)
+  LS Type: Router Links
+  Link State ID: 0
+  Advertising Router: 192.168.1.1
+  LS Seq Number: 80000003
+  Checksum: 0x29F5
+  Length: 40
+  Number of Links: 1
+
+    Link connected to: a Transit Network
+      Link Metric: 1
+      Local Interface ID: 3
+      Neighbor (DR) Interface ID: 2
+      Neighbor (DR) Router ID: 192.168.2.2
+
+
+
+          OSPFv3 110 address-family ipv6 (router-id 192.168.1.1)
+
+                Router Link States (Area 0)
+
+  LS age: 1155
+  Options: (V6-Bit, E-Bit, R-Bit, DC-Bit)
+  LS Type: Router Links
+  Link State ID: 0
+  Advertising Router: 192.168.1.1
+  LS Seq Number: 80000004
+  Checksum: 0x28F5
+  Length: 40
+  Number of Links: 1
+
+    Link connected to: a Transit Network
+      Link Metric: 1
+      Local Interface ID: 3
+      Neighbor (DR) Interface ID: 2
+      Neighbor (DR) Router ID: 192.168.2.2
+```
+
+- As this interface has both IPv4 and IPv6 for OSPF on the interface, the output shows both address families
+
+- To limit the output to a specific address family:
+
+```
+R1#show ospfv3 ipv6 database router self-originate 
+
+          OSPFv3 110 address-family ipv6 (router-id 192.168.1.1)
+
+                Router Link States (Area 0)
+
+  LS age: 1238
+  Options: (V6-Bit, E-Bit, R-Bit, DC-Bit)
+  LS Type: Router Links
+  Link State ID: 0
+  Advertising Router: 192.168.1.1
+  LS Seq Number: 80000004
+  Checksum: 0x28F5
+  Length: 40
+  Number of Links: 1
+
+    Link connected to: a Transit Network
+      Link Metric: 1
+      Local Interface ID: 3
+      Neighbor (DR) Interface ID: 2
+      Neighbor (DR) Router ID: 192.168.2.2
+```
+
+- The OSPFv3 LSAs include an Options field that describes the router's capabilities
+
+- Below are described the various service options
+
+```
+Option                  Description
+
+V6                      The V6 bit indicates that the router participates in IPv6 routing
+
+E                       The E bit indicates that the router is capable of processing external LSAs. A router in a stubby area sets the E bit to clear (0)
+                        Neighboring routers do not form adjacencies if they have mismatched E bit settings
+
+R                       The R bit indicates that the router actively participates in forwarding traffic. The R bit is set to clear(0) indicates that
+                        the router is not used as a transit router for forwarding traffic but is still capable of exchanging route information
+
+DC                      The DC bit is set to indicate that the router is capable of supressing future hellos from being sent over an interface
+                        The interface must be configured as a demand circuit for hello suppression to occur (demand circuits are typically used on costly low-bandwidth legacy ISDN BRI circuits or virtual links (probably))
+
+MC                      The MC bit indicates that the router is capable of multicast extensions for OSPF (MOSPF). This bit is not used and listed only for
+                        reference. In 2008, RFC5340 deprecated MOSPF along with the Group-Membership-LSA
+
+N                       The N bit indicates that the router supports Type 7 LSAs (NSSA area). Neighboring routers do not form an adjacency if they have
+                        mismatched N bit settings
+```
+
+- Below is shown of R3's router LSAs in the LSDB of R1
+
+- The bits indicate the functionality the router can perform in each area
+
+```
+R1#show ipv6 ospf database router adv-router 3.3.3.3
+
+            OSPFv3 Router with ID (1.1.1.1) (Process ID 110)
+
+                Router Link States (Area 0)
+
+  Routing Bit Set on this LSA
+  LS age: 1627
+  Options: (V6-Bit, E-Bit, R-Bit, DC-Bit)
+  LS Type: Router Links
+  Link State ID: 0
+  Advertising Router: 3.3.3.3
+  LS Seq Number: 80000006
+  Checksum: 0xC8DD
+  Length: 56
+  Area Border Router
+  Number of Links: 2
+
+    Link connected to: a Virtual Link
+      Link Metric: 1
+      Local Interface ID: 10
+      Neighbor Interface ID: 7
+      Neighbor Router ID: 4.4.4.4
+
+    Link connected to: a Transit Network
+      Link Metric: 1
+      Local Interface ID: 2
+      Neighbor (DR) Interface ID: 2
+      Neighbor (DR) Router ID: 3.3.3.3
+
+```
+
+- The network LSA describes the known routers on the broadcast interface G0/0, interface ID 2 on R2
+
+- Below is shown the output of `show ospfv3 database network self-originate`, which indicates that there are two routers present for the network: R1 (192.168.1.1) and R2 (192.168.2.2)
+
+```
+R2#show ospfv3 ipv6 database network self-originate 
+
+          OSPFv3 110 address-family ipv6 (router-id 192.168.2.2)
+
+                Net Link States (Area 0)
+
+  LS age: 436
+  Options: (V6-Bit, E-Bit, R-Bit, DC-Bit)
+  LS Type: Network Links
+  Link State ID: 2 (Interface ID of Designated Router)
+  Advertising Router: 192.168.2.2
+  LS Seq Number: 80000001
+  Checksum: 0xB20E
+  Length: 32
+        Attached Router: 192.168.2.2
+        Attached Router: 192.168.1.1
+```
+
+- The link LSA is responsible for providing details about IPv6 prefixes associated with an interface
+
+- Below is shown the output of `show ospfv3 database link [self-originate]` 
+
+- Notice that the prefix 2001:db8:0:12::/64 is associated with interface G0/1 (interface ID 3) and can be reached using the link-local address fe80::1, and that the prefix 2001:db8:0:1::/64 is associated with G0/0 (interface ID 2)
+
+
+```
+R1#show ospfv3 ipv6 database link self-originate 
+
+          OSPFv3 110 address-family ipv6 (router-id 192.168.1.1)
+
+                Link (Type-8) Link States (Area 0)
+
+  LS age: 964
+  Options: (V6-Bit, E-Bit, R-Bit, DC-Bit)
+  LS Type: Link-LSA (Interface: GigabitEthernet0/1)
+  Link State ID: 3 (Interface ID)
+  Advertising Router: 192.168.1.1
+  LS Seq Number: 80000002
+  Checksum: 0x5689
+  Length: 56
+  Router Priority: 1
+  Link Local Address: FE80::1
+  Number of Prefixes: 1
+  Prefix Address: 2001:DB8:0:12::
+  Prefix Length: 64, Options: None
+
+  LS age: 964
+  Options: (V6-Bit, E-Bit, R-Bit, DC-Bit)
+  LS Type: Link-LSA (Interface: GigabitEthernet0/0)
+  Link State ID: 2 (Interface ID)
+  Advertising Router: 192.168.1.1
+  LS Seq Number: 80000002
+  Checksum: 0x7782
+  Length: 56
+  Router Priority: 1
+  Link Local Address: FE80::5054:FF:FE1B:50E9
+  Number of Prefixes: 1
+  Prefix Address: 2001:DB8:0:1::
+  Prefix Length: 64, Options: None
+```
+
+- R3 has backbone connectivity and is the local ABR for Area 34 in the network topology in our example
+
+- As an ABR, it is responsible for advertising inter-area prefix LSAs that describe routes that belong to other areas in the OSPF domain
+
+- The command `show ospfv3 database` display the router's summary view of OSPFv3 database
+
+- Below is shown R3's database
+
+- Notice that R3's router LSA is set to B, indicating that this is an ABR router
+
+- The advertising RID for all the inter-area prefix LSAs originates from 192.168.3.3 (R3)
+
+```
+R3#show ospfv3 database 
+
+          OSPFv3 110 address-family ipv6 (router-id 192.168.3.3)
+
+                Router Link States (Area 0)
+
+ADV Router       Age         Seq#        Fragment ID  Link count  Bits
+ 192.168.1.1     1690        0x80000004  0            1           None
+ 192.168.2.2     1686        0x80000006  0            2           None
+ 192.168.3.3     1735        0x80000002  0            1           B
+
+                Net Link States (Area 0)
+
+ADV Router       Age         Seq#        Link ID    Rtr count
+ 192.168.2.2     1691        0x80000001  2          2
+
+                Inter Area Prefix Link States (Area 0)
+
+ADV Router       Age         Seq#        Prefix
+ 192.168.3.3     1729        0x80000001  2001:DB8:0:34::/64
+ 192.168.3.3     1684        0x80000001  2001:DB8::4/128
+ 192.168.3.3     1684        0x80000001  2001:DB8:0:4::/64
+
+                Link (Type-8) Link States (Area 0)
+          
+ADV Router       Age         Seq#        Link ID    Interface
+ 192.168.2.2     1740        0x80000002  3          Gi0/0
+ 192.168.3.3     1734        0x80000002  2          Gi0/0
+
+                Intra Area Prefix Link States (Area 0)
+
+ADV Router       Age         Seq#        Link ID    Ref-lstype  Ref-LSID
+ 192.168.1.1     1691        0x80000003  0          0x2001      0
+ 192.168.2.2     1691        0x80000003  0          0x2001      0
+ 192.168.2.2     1691        0x80000001  2048       0x2002      2
+ 192.168.3.3     1735        0x80000002  0          0x2001      0
+
+                Router Link States (Area 34)
+
+ADV Router       Age         Seq#        Fragment ID  Link count  Bits
+ 192.168.3.3     1678        0x80000004  0            1           B
+ 192.168.4.4     1674        0x80000004  0            1           None
+
+                Net Link States (Area 34)
+
+ADV Router       Age         Seq#        Link ID    Rtr count
+ 192.168.4.4     1687        0x80000001  2          2
+          
+                Inter Area Prefix Link States (Area 34)
+
+ADV Router       Age         Seq#        Prefix
+ 192.168.3.3     1739        0x80000001  2001:DB8::3/128
+ 192.168.3.3     1729        0x80000001  2001:DB8::2/128
+ 192.168.3.3     1729        0x80000001  2001:DB8:0:23::/64
+ 192.168.3.3     1729        0x80000001  2001:DB8:0:12::/64
+ 192.168.3.3     1684        0x80000001  2001:DB8::1/128
+ 192.168.3.3     1684        0x80000001  2001:DB8:0:1::/64
+
+                Link (Type-8) Link States (Area 34)
+
+ADV Router       Age         Seq#        Link ID    Interface
+ 192.168.3.3     1734        0x80000002  3          Gi0/1
+ 192.168.4.4     1722        0x80000002  2          Gi0/1
+
+                Intra Area Prefix Link States (Area 34)
+
+ADV Router       Age         Seq#        Link ID    Ref-lstype  Ref-LSID
+ 192.168.4.4     1687        0x80000003  0          0x2001      0
+ 192.168.4.4     1687        0x80000001  2048       0x2002      2
+```

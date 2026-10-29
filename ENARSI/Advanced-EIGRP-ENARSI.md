@@ -2314,3 +2314,134 @@ conf t
 
 - Now we have 2 paths to 10.24.35.0/24 network also on R6
 
+### BFD in EIGRP
+
+- BFD use 2 different packets:
+
+    - Control packets (keepalives)
+
+    - Echo packets (optional) (keepalives)
+
+- Control packets use UDP port 3784. These are used to negotiate different timers. These are sent on a periodic level
+
+- Echo packets in BFD are equivalent with the keepalives
+
+- When enabling it, the routers will start sending the control packets to one-another
+
+- They negotiate the timers. In the command we will have: BFD interval, Main_rx, Multiplier
+
+- BFD interval is used to determine when to send the BFD echo packets. This interval is in miliseconds ex: 100 ms
+
+- Main_rx means how often I am prepared to receive a packet from you ex: 50 ms. Recommended - use the same timers for interval and Main_rx
+
+- Multiplier is basically the dead interval. I am going to accept to miss 3 echo packets from you before declaring the adjacency down
+
+- Configuration steps:
+
+    1. Configure BFD on the interface
+
+    2. Configure the routing protocol to use BFD configured on the interface
+
+- After this is done, the router will start sending echo packets on the interfaces
+
+- The L2 destination MAC address of the BFD echo packets will be the MAC address of the neighbor
+
+- The L3 destination IP address is going to be myself (My IP)
+
+- This way, the neighbor router will going to send the packet right back to the originating router
+
+- When missing the number specified of the BFD packets, I am going to drop the BFD adjacency, report back to the routing protocol so that on Failure the protocol can tear down the adjacency with the neighbor
+
+- Topology:
+
+![eigrp-bfd-topology](./eigrp-bfd-topology.png)
+
+- Configure BFD on the interfaces between R1 and R2:
+
+- R1 - EIGRP named mode:
+
+```
+conf t
+ interface GigabitEthernet1
+  ip address 10.1.2.1 255.255.255.0
+  bfd interval 100 min_rx 100 multiplier 5
+
+ router eigrp TEST
+  address-family ipv4 unicast autonomous-system 65001
+   af-interface g1
+    bfd
+```
+
+- R2 - EIGRP classic mode:
+
+```
+conf t
+ interface GigabitEthernet1
+  ip address 10.1.2.2 255.255.255.0
+  bfd interval 100 min_rx 100 multiplier 5
+
+ router eigrp 65001
+  bfd interface GigabitEthernet1
+```
+
+- Verification:
+
+```
+R2(config-if)#do sh bfd nei 
+
+IPv4 Sessions
+NeighAddr                              LD/RD         RH/RS     State     Int
+10.1.2.1                             4097/4097       Up        Up        Gi1
+
+R1#show bfd neighbors 
+
+IPv4 Sessions
+NeighAddr                              LD/RD         RH/RS     State     Int
+10.1.2.2                             4097/4097       Up        Up        Gi1
+```
+
+- Shut down g1 interface on R1. R2 will imediately detect the interface is down and torn down the EIGRP neighbor adjacency
+
+- R1:
+
+```
+R1(config-if)#
+*Oct 29 10:39:26.494: %DUAL-5-NBRCHANGE: EIGRP-IPv4 65001: Neighbor 10.1.2.2 (GigabitEthernet1) is down: interface down
+R1(config-if)#
+*Oct 29 10:39:26.494: %BFD-6-BFD_SESS_DESTROYED: BFD-SYSLOG: bfd_session_destroyed,  ld:4097 neigh proc:EIGRP, handle:1 active
+R1(config-if)#
+*Oct 29 10:39:28.492: %LINK-5-CHANGED: Interface GigabitEthernet1, changed state to administratively down
+*Oct 29 10:39:29.492: %LINEPROTO-5-UPDOWN: Line protocol on Interface GigabitEthernet1, changed state to down
+```
+
+- R2:
+
+```
+R2(config-if)#
+*Oct 29 10:39:27.007: %BFDFSM-6-BFD_SESS_DOWN: BFD-SYSLOG: BFD session ld:4097 handle:1,is going Down Reason: ECHO FAILURE
+*Oct 29 10:39:27.007: %BFD-6-BFD_SESS_DESTROYED: BFD-SYSLOG: bfd_session_destroyed,  ld:4097 neigh proc:EIGRP, handle:1 active
+R2(config-if)#
+*Oct 29 10:39:27.009: %DUAL-5-NBRCHANGE: EIGRP-IPv4 65001: Neighbor 10.1.2.1 (GigabitEthernet1) is down: BFD peer down notified
+```
+
+- By default we rely on the dead timers of EIGRP, which means we are going to wait 15 seconds (by default) before turning down any session
+
+- BFD neighbor comes up even if the timers are mismatched on interfaces:
+
+```
+R1(config-if)#no bfd interval 100 min_rx 100 multiplier 5
+
+R1(config-if)#bfd interval 150 min_rx 150 multiplier 5
+R1(config-if)#
+*Oct 29 10:45:17.197: %BFD-6-BFD_IF_CONFIGURE: BFD-SYSLOG: bfd config apply, idb:GigabitEthernet1 
+*Oct 29 10:45:17.201: %BFD-6-BFD_SESS_CREATED: BFD-SYSLOG: bfd_session_created, neigh 10.1.2.2 proc:EIGRP, idb:GigabitEthernet1 handle:1 act
+*Oct 29 10:45:18.043: %BFDFSM-6-BFD_SESS_UP: BFD-SYSLOG: BFD session ld:4097 handle:1 is going UP
+R1(config-if)#
+R1(config-if)#
+
+R1(config-if)#do sh bfd neig
+
+IPv4 Sessions
+NeighAddr                              LD/RD         RH/RS     State     Int
+10.1.2.2                             4097/4097       Up        Up        Gi1
+```
