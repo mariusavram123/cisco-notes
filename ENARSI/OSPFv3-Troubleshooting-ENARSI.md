@@ -1703,3 +1703,164 @@ OI  2001:DB8:1:1::/64 [110/3]
 O   2001:DB8:2:2::2/128 [110/1]
      via FE80::5054:FF:FE74:153F, GigabitEthernet1
 ```
+
+### OSPFv3 IPv6 with virtual links
+
+- The commands for IPv6 OSPFv3 virtual links are the same as for OSPFv2
+
+- I even managed to "stack" multiple virtual links depending of one-another and the router in the far-end was reachable
+
+Example topology:
+
+![ipv6-ospf-virtual-links-multiple](./ipv6-ospf-virtual-links-multiple.png)
+
+- Configuration on R3:
+
+```
+R3#show run | s router ospf
+ipv6 router ospf 110
+ router-id 3.3.3.3
+ area 34 virtual-link 4.4.4.4
+ passive-interface Loopback0
+
+R3#sh run int g0/1
+Building configuration...
+
+Current configuration : 150 bytes
+!
+interface GigabitEthernet0/1
+ no ip address
+ duplex auto
+ speed auto
+ media-type rj45
+ ipv6 address 2001:DB8:0:34::3/64
+ ipv6 ospf 110 area 34
+end
+```
+
+- Configuration on R4:
+
+```
+R4#show run | s router ospf
+ipv6 router ospf 110
+ router-id 4.4.4.4
+ area 34 virtual-link 3.3.3.3
+ area 115 virtual-link 5.5.5.5
+ passive-interface Loopback0
+
+R4#sh run int e0/0
+Building configuration...
+
+Current configuration : 120 bytes
+!
+interface Ethernet0/0
+ bandwidth 1000000
+ no ip address
+ ipv6 address 2001:DB8:0:34::4/64
+ ipv6 ospf 110 area 34
+end
+
+R4#sh run int e0/1
+Building configuration...
+
+Current configuration : 121 bytes
+!
+interface Ethernet0/1
+ bandwidth 1000000
+ no ip address
+ ipv6 address 2001:DB8:0:45::4/64
+ ipv6 ospf 110 area 115
+end
+```
+
+- Configuration on R5:
+
+```
+R5#show run | s router ospf
+ipv6 router ospf 110
+ router-id 5.5.5.5
+ area 115 virtual-link 4.4.4.4
+ passive-interface Loopback0
+
+R5#sh run int g1
+Building configuration...
+
+Current configuration : 155 bytes
+!
+interface GigabitEthernet1
+ no ip address
+ negotiation auto
+ ipv6 address 2001:DB8:0:45::5/64
+ ipv6 ospf 110 area 115
+ no mop enabled
+ no mop sysid
+end
+```
+
+- Routing table on R6 after the virtual link is up between R4 and R5
+
+```
+R6#show ipv6 route ospf | b App
+       lp - LISP publications, ls - LISP destinations-summary, a - Application
+       m - OMP
+OI  2001:DB8::1/128 [110/14]
+     via FE80::5054:FF:FEA3:633D, Ethernet0/0
+OI  2001:DB8::2/128 [110/13]
+     via FE80::5054:FF:FEA3:633D, Ethernet0/0
+OI  2001:DB8::3/128 [110/12]
+     via FE80::5054:FF:FEA3:633D, Ethernet0/0
+OI  2001:DB8::4/128 [110/11]
+     via FE80::5054:FF:FEA3:633D, Ethernet0/0
+OI  2001:DB8::5/128 [110/10]
+     via FE80::5054:FF:FEA3:633D, Ethernet0/0
+OI  2001:DB8:0:12::/64 [110/14]
+     via FE80::5054:FF:FEA3:633D, Ethernet0/0
+OI  2001:DB8:0:23::/64 [110/13]
+     via FE80::5054:FF:FEA3:633D, Ethernet0/0
+OI  2001:DB8:0:34::/64 [110/12]
+     via FE80::5054:FF:FEA3:633D, Ethernet0/0
+OI  2001:DB8:0:34::3/128 [110/12]
+     via FE80::5054:FF:FEA3:633D, Ethernet0/0
+OI  2001:DB8:0:45::/64 [110/11]
+     via FE80::5054:FF:FEA3:633D, Ethernet0/0
+OI  2001:DB8:0:45::4/128 [110/11]
+     via FE80::5054:FF:FEA3:633D, Ethernet0/0
+```
+
+- R4 OSPF neighbor table
+
+```
+R4#sh ipv6 ospf neighbor 
+
+            OSPFv3 Router with ID (4.4.4.4) (Process ID 110)
+
+Neighbor ID     Pri   State           Dead Time   Interface ID    Interface
+5.5.5.5           0   FULL/  -           -        14              OSPFv3_VL2
+3.3.3.3           0   FULL/  -           -        10              OSPFv3_VL0
+3.3.3.3           1   FULL/BDR        00:00:33    3               Ethernet0/0
+5.5.5.5           1   FULL/BDR        00:00:37    7               Ethernet0/1
+```
+
+- R5 OSPF neighbor table:
+
+```
+5#show ipv6 ospf neighbor 
+
+            OSPFv3 Router with ID (5.5.5.5) (Process ID 110)
+
+Neighbor ID     Pri   State           Dead Time   Interface ID    Interface
+4.4.4.4           0   FULL/  -           -        9               OSPFv3_VL1
+4.4.4.4           1   FULL/DR         00:00:33    2               GigabitEthernet1
+6.6.6.6           1   FULL/DR         00:00:38    1               GigabitEthernet2
+```
+
+- Ping from R1 to R6's loopback
+
+```
+R1#ping 2001:db8:6:6::6 source l0
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 2001:DB8:6:6::6, timeout is 2 seconds:
+Packet sent with a source address of 2001:DB8::1
+!!!!!
+Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/1 ms
+```
