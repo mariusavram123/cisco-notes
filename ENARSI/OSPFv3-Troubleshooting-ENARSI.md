@@ -1195,7 +1195,7 @@ R2#
 *Oct 30 21:26:50.544: OSPFv3-110-IPv4 HELLO Gi0/1: Rcv hello from 3.3.3.3 area 23 from FE80::5054:FF:FE8F:DF92 interface ID 2
 ```
 
-#### OSPFv3 AF Trouble Ticket
+### OSPFv3 AF Trouble Ticket
 
 - A ticket related to OSPFv3 address families
 
@@ -1205,3 +1205,501 @@ R2#
 
 ![ospfv3-af-tt-topology](./ospfv3-af-tt-topology.png)
 
+![ospfv3-af-cml-topology](./ospfv3-af-cml-topology.png)
+
+#### Trouble Ticket 10.3
+
+- **Problem**: Users in BRANCH indicated that they are not able to access any IPv6-enabled resources on the Internet, but they can access IPv4-enabled resources
+
+- An extended ping issued on BRANCH to destination 2001:db8:f::f confirms the issue as shown below
+
+- In addition, you ping 192.0.2.1, and it is successful in confirming connectivity to IPv4-enabled resources
+
+```
+BRANCH#ping 
+Protocol [ip]: ipv6
+Target IPv6 address: 2001:db8:f::f
+Repeat count [5]: 
+Datagram size [100]: 
+Timeout in seconds [2]: 
+Extended commands? [no]: yes
+Source address or interface: 2001:db8:0:4::4
+UDP protocol? [no]: 
+Verbose? [no]: 
+Precedence [0]: 
+DSCP [0]: 
+Include hop by hop option? [no]: 
+Include destination option? [no]: 
+Sweep range of sizes? [no]: 
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 2001:DB8:F::F, timeout is 2 seconds:
+Packet sent with a source address of 2001:DB8:0:4::4
+UUUUU
+Success rate is 0 percent (0/5)
+
+BRANCH#ping 192.0.2.1
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 192.0.2.1, timeout is 2 seconds:
+!!!!!
+Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/1 ms
+```
+
+- On the BRANCH router, you issue the command `show ipv6 route 2001:db8:f::f`, and it indicates that the BRANCH router has a default route that can be used to reach the IPv6 address
+
+- This explains why the ping returned UUUUU. It indicates that the destination is not reachable by some other router. But which router is returning this message?
+
+```
+BRANCH#show ipv6 route 2001:db8:f::f
+Routing entry for ::/0
+  Known via "ospf 110", distance 110, metric 11, type inter area
+  Route count is 1/1, share count 0
+  Routing paths:
+    FE80::5054:FF:FEE6:D4F6, GigabitEthernet0/0
+      From FE80::5054:FF:FEE6:D4F6
+      Last updated 00:14:17 ago
+
+```
+
+- To determine which router returned the message, you issue a trace to see where it fails
+
+- Below we see the results of the command `traceroute 2001:db8:f::f`. The trace indicates that R1 is returning the destination unreachable message
+
+```
+BRANCH#traceroute 2001:db8:f::f
+Type escape sequence to abort.
+Tracing the route to 2001:DB8:F::F
+
+  1 2001:DB8:0:14::1 !U  !U  !U 
+```
+
+- You visit R1 and issue the `show ipv6 route 2001:db8:f::f` command. As shown below, there is no route to reach that IPv6 address
+
+```
+R1#show ipv6 route 2001:db8:f::f
+% Route not found
+```
+
+- Why would BRANCH but not R1 have a default route? When you review the network diagram, you see that Area 1 is a stub area
+
+- Therefore, R1 is generating a default route and injecting it into the area
+
+- This is why the default route on BRANCH is of type inter-area and not external
+
+- It seems that R2 might not be generating a default route when it should be
+
+- You access R2 and issue the command `show ospfv3 ipv6` command, and confirm that it is not an ASBR - although it should be if it is generating a default route
+
+```
+R2#show ospfv3 ipv6
+ OSPFv3 110 address-family ipv6
+ Router ID 22.22.22.22
+ Supports NSSA (compatible with RFC 3101)
+ Supports Database Exchange Summary List Optimization (RFC 5243)
+ Event-log enabled, Maximum number of events: 1000, Mode: cyclic
+ It is an area border router
+ Router is not originating router-LSAs with maximum metric
+ Initial SPF schedule delay 5000 msecs
+ Minimum hold time between two consecutive SPFs 10000 msecs
+ Maximum wait time between two consecutive SPFs 10000 msecs
+ Minimum LSA interval 5 secs
+ Minimum LSA arrival 1000 msecs
+ LSA group pacing timer 240 secs
+ Interface flood pacing timer 33 msecs
+ Retransmission pacing timer 66 msecs
+ Retransmission limit dc 24 non-dc 24
+ EXCHANGE/LOADING adjacency limit: initial 300, process maximum 300
+ Number of external LSA 0. Checksum Sum 0x000000
+ Number of areas in this router is 2. 1 normal 1 stub 0 nssa
+ Graceful restart helper support enabled
+ Reference bandwidth unit is 10000 mbps
+ RFC1583 compatibility enabled
+    Area BACKBONE(0)
+        Number of interfaces in this area is 1
+        SPF algorithm executed 6 times
+        Number of LSA 11. Checksum Sum 0x050275
+        Number of DCbitless LSA 0
+        Number of indication LSA 0
+        Number of DoNotAge LSA 0
+        Flood list length 0
+    Area 23
+        Number of interfaces in this area is 1
+        It is a stub area
+        Generates stub default route with cost 1
+        SPF algorithm executed 6 times
+        Number of LSA 12. Checksum Sum 0x059FFF
+        Number of DCbitless LSA 0
+        Number of indication LSA 0
+        Number of DoNotAge LSA 0
+        Flood list length 0
+```
+
+- Next, you issue the command `show run | section router ospfv3`. The output confirms that the `default-information originate` command is missing from IPv6 AF configuration mode. It is configured only under IPv4 AF configuration mode
+
+```
+R2#sh run | s router ospfv3
+router ospfv3 110
+ router-id 2.2.2.2
+ area 23 stub
+ !
+ address-family ipv4 unicast
+  passive-interface default
+  no passive-interface GigabitEthernet0/0
+  no passive-interface GigabitEthernet0/1
+  default-information originate
+  auto-cost reference-bandwidth 100000
+ exit-address-family
+ !
+ address-family ipv6 unicast
+  passive-interface default
+  no passive-interface GigabitEthernet0/0
+  no passive-interface GigabitEthernet0/1
+  router-id 22.22.22.22
+  auto-cost reference-bandwidth 10000
+ exit-address-family
+```
+
+- You add the `default-information originate` command to IPv6 AF configuration mode and issue the extended IPv6 ping on BRANCH
+
+- The ping is successful
+
+- R2:
+
+```
+conf t
+ router ospfv3 110
+  address-family ipv6
+   default-information originate
+
+R2#sh run | s router ospfv3
+router ospfv3 110
+ router-id 2.2.2.2
+ area 23 stub
+ !
+ address-family ipv4 unicast
+  passive-interface default
+  no passive-interface GigabitEthernet0/0
+  no passive-interface GigabitEthernet0/1
+  default-information originate
+  auto-cost reference-bandwidth 100000
+ exit-address-family
+ !
+ address-family ipv6 unicast
+  passive-interface default
+  no passive-interface GigabitEthernet0/0
+  no passive-interface GigabitEthernet0/1
+  default-information originate
+  router-id 22.22.22.22
+  auto-cost reference-bandwidth 10000
+ exit-address-family
+```
+
+- BRANCH
+
+```
+BRANCH#ping 
+Protocol [ip]: ipv6
+Target IPv6 address: 2001:db8:f::f
+Repeat count [5]: 
+Datagram size [100]: 
+Timeout in seconds [2]: 
+Extended commands? [no]: yes
+Source address or interface: 2001:db8:0:4::4
+UDP protocol? [no]: 
+Verbose? [no]: 
+Precedence [0]: 
+DSCP [0]: 
+Include hop by hop option? [no]: 
+Include destination option? [no]: 
+Sweep range of sizes? [no]: 
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 2001:DB8:F::F, timeout is 2 seconds:
+Packet sent with a source address of 2001:DB8:0:4::4
+!!!!!
+Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/1 ms
+```
+
+### OSPFv3 in VRFs
+
+- The same things apply in regards to OSPFv3 in VRFs as for OSPFv2. The process assumes each router to be connected to the MPLS VPN superbackbone
+
+- Due to this, the routers in areas other than area 0, will not get their routing table populated with routes from other areas
+
+- To get around this, you need to enable `capability vrf-lite` for all the routers (recommanded). This is done per address family
+
+- Topology:
+
+![ospfv3-vrf-ipv4-ipv6](./ospfv3-vrf-ipv4-ipv6.png)
+
+- R1:
+
+```
+R1#sh run | s vrf def
+vrf definition TEST
+ !
+ address-family ipv4
+ exit-address-family
+ !
+ address-family ipv6
+ exit-address-family
+
+R1#sh run | s router ospfv3
+router ospfv3 110
+ router-id 1.1.1.1
+ !
+ address-family ipv4 unicast vrf TEST
+  capability vrf-lite
+ exit-address-family
+ !
+ address-family ipv6 unicast vrf TEST
+  capability vrf-lite
+ exit-address-family
+
+R1#sh run int g1
+Building configuration...
+
+Current configuration : 258 bytes
+!
+interface GigabitEthernet1
+ vrf forwarding TEST
+ ip address 10.1.12.1 255.255.255.0
+ negotiation auto
+ ipv6 address 2001:DB8:0:12::1/64
+ ospfv3 110 network point-to-point
+ ospfv3 110 ipv4 area 12
+ ospfv3 110 ipv6 area 12
+ no mop enabled
+ no mop sysid
+end
+
+R1#sh run int l0           
+Building configuration...
+
+Current configuration : 203 bytes
+!
+interface Loopback0
+ vrf forwarding TEST
+ ip address 10.1.1.1 255.255.255.255
+ ipv6 address 2001:DB8:1:1::1/64
+ ospfv3 110 network point-to-point
+ ospfv3 110 ipv4 area 12
+ ospfv3 110 ipv6 area 12
+end
+```
+
+- R2:
+
+```
+R2#show run | s vrf def
+vrf definition TEST
+ !
+ address-family ipv4
+ exit-address-family
+ !
+ address-family ipv6
+ exit-address-family
+
+R2#show run | s router ospfv3
+router ospfv3 110
+ router-id 2.2.2.2
+ !
+ address-family ipv4 unicast vrf TEST
+  capability vrf-lite
+ exit-address-family
+ !
+ address-family ipv6 unicast vrf TEST
+  capability vrf-lite
+ exit-address-family
+
+R2#sh run int g1
+Building configuration...
+
+Current configuration : 258 bytes
+!
+interface GigabitEthernet1
+ vrf forwarding TEST
+ ip address 10.1.12.2 255.255.255.0
+ negotiation auto
+ ipv6 address 2001:DB8:0:12::2/64
+ ospfv3 110 network point-to-point
+ ospfv3 110 ipv4 area 12
+ ospfv3 110 ipv6 area 12
+ no mop enabled
+ no mop sysid
+end
+
+R2#sh run int l0
+Building configuration...
+
+Current configuration : 197 bytes
+!
+interface Loopback0
+ vrf forwarding TEST
+ ip address 10.2.2.2 255.255.255.255
+ ipv6 address 2001:DB8:2:2::2/128
+ ospfv3 110 ipv6 area 0
+ ospfv3 110 ipv6 priority 100
+ ospfv3 110 ipv4 area 0
+end
+
+R2#sh run int g2
+Building configuration...
+
+Current configuration : 251 bytes
+!
+interface GigabitEthernet2
+ vrf forwarding TEST
+ ip address 10.1.23.2 255.255.255.0
+ negotiation auto
+ ipv6 address 2001:DB8:0:23::2/64
+ ospfv3 110 ipv6 area 0
+ ospfv3 110 ipv6 priority 100
+ ospfv3 110 ipv4 area 0
+ no mop enabled
+ no mop sysid
+end
+
+```
+
+- R3:
+
+```
+R3#sh run | s vrf def
+vrf definition TEST
+ !
+ address-family ipv4
+ exit-address-family
+ !
+ address-family ipv6
+ exit-address-family
+
+R3#sh run | s router ospfv3
+router ospfv3 110
+ router-id 3.3.3.3
+ !
+ address-family ipv4 unicast vrf TEST
+  capability vrf-lite
+ exit-address-family
+ !
+ address-family ipv6 unicast vrf TEST
+  capability vrf-lite
+ exit-address-family
+
+R3#sh run int g1 
+Building configuration...
+
+Current configuration : 251 bytes
+!
+interface GigabitEthernet1
+ vrf forwarding TEST
+ ip address 10.1.23.3 255.255.255.0
+ negotiation auto
+ ipv6 address 2001:DB8:0:23::3/64
+ ospfv3 110 ipv6 area 0
+ ospfv3 110 ipv4 area 0
+ ospfv3 110 ipv4 priority 100
+ no mop enabled
+ no mop sysid
+end
+
+R3#sh run int l0
+Building configuration...
+
+Current configuration : 197 bytes
+!
+interface Loopback0
+ vrf forwarding TEST
+ ip address 10.3.3.3 255.255.255.255
+ ipv6 address 2001:DB8:3:3::3/128
+ ospfv3 110 ipv6 area 0
+ ospfv3 110 ipv4 area 0
+ ospfv3 110 ipv4 priority 100
+end
+
+```
+
+- Show commands - R1:
+
+```
+R3#show ospfv3 vrf TEST
+ OSPFv3 110 address-family ipv4 vrf TEST
+ Router ID 3.3.3.3
+ Supports NSSA (compatible with RFC 3101)
+ Supports Database Exchange Summary List Optimization (RFC 5243)
+ Event-log enabled, Maximum number of events: 1000, Mode: cyclic
+ Router is not originating router-LSAs with maximum metric
+ Initial SPF schedule delay 50 msecs
+ Minimum hold time between two consecutive SPFs 200 msecs
+ Maximum wait time between two consecutive SPFs 5000 msecs
+ Initial LSA throttle delay 50 msecs
+ Minimum hold time for LSA throttle 200 msecs
+ Maximum wait time for LSA throttle 5000 msecs
+ Minimum LSA arrival 100 msecs
+ LSA group pacing timer 240 secs
+ Interface flood pacing timer 33 msecs
+ Retransmission pacing timer 66 msecs
+ Retransmission limit dc 24 non-dc 24
+ EXCHANGE/LOADING adjacency limit: initial 300, process maximum 300
+ Number of external LSA 0. Checksum Sum 0x000000
+ Number of areas in this router is 1. 1 normal 0 stub 0 nssa
+ Graceful restart helper support enabled
+ Reference bandwidth unit is 100 mbps
+ RFC1583 compatibility enabled
+    Area BACKBONE(0)
+        Number of interfaces in this area is 2
+        SPF algorithm executed 4 times
+        Number of LSA 10. Checksum Sum 0x045320
+        Number of DCbitless LSA 0
+        Number of indication LSA 0
+        Number of DoNotAge LSA 0
+        Flood list length 0
+
+ OSPFv3 110 address-family ipv6 vrf TEST
+ Router ID 3.3.3.3
+ Supports NSSA (compatible with RFC 3101)
+ Supports Database Exchange Summary List Optimization (RFC 5243)
+ Event-log enabled, Maximum number of events: 1000, Mode: cyclic
+ Router is not originating router-LSAs with maximum metric
+ Initial SPF schedule delay 50 msecs
+ Minimum hold time between two consecutive SPFs 200 msecs
+ Maximum wait time between two consecutive SPFs 5000 msecs
+ Initial LSA throttle delay 50 msecs
+ Minimum hold time for LSA throttle 200 msecs
+ Maximum wait time for LSA throttle 5000 msecs
+ Minimum LSA arrival 100 msecs
+ LSA group pacing timer 240 secs
+ Interface flood pacing timer 33 msecs
+ Retransmission pacing timer 66 msecs
+ Retransmission limit dc 24 non-dc 24
+ EXCHANGE/LOADING adjacency limit: initial 300, process maximum 300
+ Number of external LSA 0. Checksum Sum 0x000000
+ Number of areas in this router is 1. 1 normal 0 stub 0 nssa
+ Graceful restart helper support enabled
+ Reference bandwidth unit is 100 mbps
+ RFC1583 compatibility enabled
+    Area BACKBONE(0)
+        Number of interfaces in this area is 2
+        SPF algorithm executed 4 times
+        Number of LSA 10. Checksum Sum 0x0500A5
+        Number of DCbitless LSA 0
+        Number of indication LSA 0
+        Number of DoNotAge LSA 0
+        Flood list length 0
+
+
+R3#show ip route vrf TEST ospfv3 | b Gate 
+Gateway of last resort is not set
+
+      10.0.0.0/8 is variably subnetted, 6 subnets, 2 masks
+O IA     10.1.1.1/32 [110/2] via 10.1.23.2, 00:17:54, GigabitEthernet1
+O IA     10.1.12.0/24 [110/2] via 10.1.23.2, 00:17:54, GigabitEthernet1
+O        10.2.2.2/32 [110/1] via 10.1.23.2, 00:17:54, GigabitEthernet1
+
+R3#show ipv6 route vrf TEST ospf | b App
+       lp - LISP publications, a - Application, m - OMP
+OI  2001:DB8:0:12::/64 [110/2]
+     via FE80::5054:FF:FE74:153F, GigabitEthernet1
+OI  2001:DB8:1:1::/64 [110/3]
+     via FE80::5054:FF:FE74:153F, GigabitEthernet1
+O   2001:DB8:2:2::2/128 [110/1]
+     via FE80::5054:FF:FE74:153F, GigabitEthernet1
+```
