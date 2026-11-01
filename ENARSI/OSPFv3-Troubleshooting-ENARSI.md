@@ -1864,3 +1864,268 @@ Packet sent with a source address of 2001:DB8::1
 !!!!!
 Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/1 ms
 ```
+
+### EIGRP-OSPFv3 redistribution for both IPv4 and IPv6
+
+- CML topology:
+
+![eigrp-ospfv3-cml-topology](./eigrp-ospfv3-cml-topology.png)
+
+- In this lab we are using only R1, R2 and R3
+
+- R1 and R3 - run EIGRP AS 13, for both IPv4 and IPv6
+
+- R1 and R2 - run OSPFv3 process 12, for both IPv4 and IPv6
+
+- R1 redistribute routes for between the both protocols for both IPv4 and IPv6
+
+- R3 configuration:
+
+```
+R3(config-if)#do sh run int e0/1
+Building configuration...
+
+Current configuration : 89 bytes
+!
+interface Ethernet0/1
+ ip address 10.1.3.3 255.255.255.0
+ ipv6 address 2017::3/64
+end
+
+R3(config-if)#do sh run int l0  
+Building configuration...
+
+Current configuration : 93 bytes
+!
+interface Loopback0
+ ip address 192.168.3.1 255.255.255.255
+ ipv6 address 2033::3/128
+end
+
+R3(config-if)#do sh ip int br | e ass
+Interface              IP-Address      OK? Method Status                Protocol
+Ethernet0/0            10.3.5.3        YES NVRAM  up                    up      
+Ethernet0/1            10.1.3.3        YES NVRAM  up                    up      
+Ethernet0/2            10.24.35.3      YES NVRAM  up                    up      
+Loopback0              192.168.3.1     YES NVRAM  up                    up      
+Loopback1              192.168.3.2     YES NVRAM  up                    up      
+Loopback2              192.168.3.3     YES NVRAM  up                    up      
+Loopback3              3.3.3.3         YES NVRAM  up                    up      
+
+R3(config-if)#do sh ipv6 int br | e ass|adm
+Ethernet0/0            [up/up]
+Ethernet0/1            [up/up]
+    FE80::A8BB:CCFF:FE00:4D10
+    2017::3
+Ethernet0/2            [up/up]
+Loopback0              [up/up]
+    FE80::A8BB:CCFF:FE00:4D00
+    2033::3
+Loopback1              [up/up]
+Loopback2              [up/up]
+Loopback3              [up/up]
+
+R3(config-if)#do sh run | s router eigrp
+router eigrp OSPFv3
+ !
+ address-family ipv4 unicast autonomous-system 13
+  !
+  topology base
+   redistribute connected
+  exit-af-topology
+  network 10.1.3.3 0.0.0.0
+ exit-address-family
+ !
+ address-family ipv6 unicast autonomous-system 13
+  !
+  topology base
+  exit-af-topology
+ exit-address-family
+```
+
+- R1 - configuration:
+
+```
+R1(config-if)#do sh run int e0/1       
+Building configuration...
+
+Current configuration : 89 bytes
+!
+interface Ethernet0/1
+ ip address 10.1.3.1 255.255.255.0
+ ipv6 address 2017::1/64
+end
+
+R1(config-if)#do sh run int e0/0 
+Building configuration...
+
+Current configuration : 226 bytes
+!
+interface Ethernet0/0
+ ip address 10.1.2.1 255.255.255.0
+ ipv6 address 2012::1/64
+ ipv6 enable
+ ospfv3 12 ipv4 area 0
+ ospfv3 12 ipv4 network point-to-point
+ ospfv3 12 ipv6 area 0
+ ospfv3 12 ipv6 network point-to-point
+end
+
+R1(config-if)#do sh ip int br | e ass
+Interface              IP-Address      OK? Method Status                Protocol
+Ethernet0/0            10.1.2.1        YES NVRAM  up                    up      
+Ethernet0/1            10.1.3.1        YES NVRAM  up                    up      
+Loopback0              192.168.1.1     YES NVRAM  up                    up      
+Loopback1              192.168.1.2     YES NVRAM  up                    up      
+Loopback2              192.168.1.3     YES NVRAM  up                    up      
+Loopback3              1.1.1.1         YES NVRAM  up                    up      
+
+R1(config-if)#do sh ipv6 int br | e ass|adm
+Ethernet0/0            [up/up]
+    FE80::A8BB:CCFF:FE00:4E00
+    2012::1
+Ethernet0/1            [up/up]
+    FE80::A8BB:CCFF:FE00:4E10
+    2017::1
+Loopback0              [up/up]
+    FE80::A8BB:CCFF:FE00:4E00
+    2011::1
+Loopback1              [up/up]
+Loopback2              [up/up]
+Loopback3              [up/up]
+
+
+R1(config-if)#do sh run | s router ospfv3
+router ospfv3 12
+ router-id 1.1.1.1
+ !
+ address-family ipv4 unicast
+  redistribute connected metric-type 1
+  redistribute eigrp 13 metric 10 metric-type 1
+ exit-address-family
+ !
+ address-family ipv6 unicast
+  redistribute eigrp 13 metric 10 metric-type 1
+ exit-address-family
+
+R1(config-if)#do sh run | s router eigrp
+router eigrp OSPFv3
+ !
+ address-family ipv4 unicast autonomous-system 13
+  !
+  topology base
+   redistribute connected
+   redistribute ospfv3 12 metric 10000 10 255 1 1500
+  exit-af-topology
+  network 10.1.3.1 0.0.0.0
+ exit-address-family
+ !
+ address-family ipv6 unicast autonomous-system 13
+  !
+  topology base
+   redistribute ospf 12 match internal external 1 external 2 metric 10000 10 255 1 1500
+  exit-af-topology
+ exit-address-family
+
+```
+
+- R2 configuration:
+
+```
+R2#sh run int e0/0   
+Building configuration...
+
+Current configuration : 258 bytes
+!
+interface Ethernet0/0
+ ip address 10.1.2.2 255.255.255.0
+ ip ospf network point-to-point
+ ipv6 address 2012::2/64
+ ipv6 enable
+ ospfv3 12 ipv4 area 0
+ ospfv3 12 ipv4 network point-to-point
+ ospfv3 12 ipv6 area 0
+ ospfv3 12 ipv6 network point-to-point
+end
+
+R2#sh run int l3
+Building configuration...
+
+Current configuration : 89 bytes
+!
+interface Loopback3
+ ip address 2.2.2.2 255.255.255.255
+ ipv6 address 2022::2/128
+end
+
+R2#sh ip int br | e ass
+Interface              IP-Address      OK? Method Status                Protocol
+Ethernet0/0            10.1.2.2        YES NVRAM  up                    up      
+Ethernet0/1            10.2.4.2        YES NVRAM  up                    up      
+Ethernet0/2            10.24.35.2      YES NVRAM  up                    up      
+Loopback0              192.168.2.1     YES NVRAM  up                    up      
+Loopback1              192.168.2.2     YES NVRAM  up                    up      
+Loopback2              192.168.2.3     YES NVRAM  up                    up      
+Loopback3              2.2.2.2         YES NVRAM  up                    up      
+
+R2#sh ipv6 int br | e ass|adm
+Ethernet0/0            [up/up]
+    FE80::A8BB:CCFF:FE00:4C00
+    2012::2
+Ethernet0/1            [up/up]
+Ethernet0/2            [up/up]
+Loopback0              [up/up]
+Loopback1              [up/up]
+Loopback2              [up/up]
+Loopback3              [up/up]
+    FE80::A8BB:CCFF:FE00:4C00
+    2022::2
+
+R2#sh run | s router ospf
+router ospfv3 12
+ router-id 2.2.2.2
+ !
+ address-family ipv4 unicast
+  redistribute connected metric-type 1
+ exit-address-family
+ !
+ address-family ipv6 unicast
+  redistribute connected metric-type 1
+ exit-address-family
+```
+
+- R3:
+
+```
+R3#sh ipv6 ro eigrp | b App
+       lp - LISP publications, ls - LISP destinations-summary, a - Application
+       m - OMP
+D   2011::1/128 [90/1024640]
+     via FE80::A8BB:CCFF:FE00:4E10, Ethernet0/1
+D   2012::/64 [90/1536000]
+     via FE80::A8BB:CCFF:FE00:4E10, Ethernet0/1
+EX  2022::2/128 [170/1075200]
+     via FE80::A8BB:CCFF:FE00:4E10, Ethernet0/1
+```
+
+- R2:
+
+```
+R2#sh ipv6 ro ospf | b App
+       lp - LISP publications, ls - LISP destinations-summary, a - Application
+       m - OMP
+OE1 2033::3/128 [110/20]
+     via FE80::A8BB:CCFF:FE00:4E00, Ethernet0/0
+```
+
+- Ping:
+
+```
+R2#ping 2033::3 source l3
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 2033::3, timeout is 2 seconds:
+Packet sent with a source address of 2022::2
+!!!!!
+Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/1 ms
+```
+
