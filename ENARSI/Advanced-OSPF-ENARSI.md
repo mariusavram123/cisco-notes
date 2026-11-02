@@ -3169,3 +3169,586 @@ O IA     192.168.2.2 [110/2] via 10.1.34.2, 00:33:11, GigabitEthernet0/0
 O IA     192.168.3.3 [110/3] via 10.1.34.2, 00:33:11, GigabitEthernet0/0
 
 ```
+
+### Using OSPF in a DMVPN network
+
+- In DMVPN, we must use the OSPF point-to-multipoint network type
+
+- In this network type no DR/BDR election takeing place. The timers for this are 30/120, so you might want to adjust them
+
+![ospf-dmvpn-topology](./ospf-dmvpn-topology.png)
+
+- First, OSPF advertises the spoke IP addresses as /32 OSPF routes and add them into the routing table
+
+Example:
+
+```
+R1(config-router)#do sh ip ro ospf | b Gate
+
+Gateway of last resort is 10.1.12.2 to network 0.0.0.0
+
+      10.0.0.0/8 is variably subnetted, 4 subnets, 2 masks
+O        10.1.2.0/24 [110/1001] via 172.16.1.2, 00:44:44, Tunnel1
+O        10.1.3.0/24 [110/1001] via 172.16.1.3, 00:44:17, Tunnel1
+      172.16.0.0/16 is variably subnetted, 5 subnets, 2 masks
+O        172.16.1.2/32 [110/1000] via 172.16.1.2, 00:44:44, Tunnel1
+O        172.16.1.3/32 [110/1000] via 172.16.1.3, 00:44:17, Tunnel1
+O        172.16.1.4/32 [110/1000] via 172.16.1.4, 00:21:23, Tunnel1
+      198.51.1.0/28 is subnetted, 1 subnets
+O        198.51.1.0 [110/1001] via 172.16.1.4, 00:20:47, Tunnel1
+```
+
+- You may want to block these routes from entering the routing table, because you have already a directly connected route for the tunnel interface subnet
+
+```
+R1#show ip route connected | i Tunn  
+C        172.16.1.0/29 is directly connected, Tunnel1
+L        172.16.1.1/32 is directly connected, Tunnel1
+```
+
+- Use a distribute list to block them for entering the routing table
+
+```
+ip prefix-list BLOCK-32 seq 5 deny 172.16.1.0/29 ge 32
+ip prefix-list BLOCK-32 seq 10 permit 0.0.0.0/0 le 32
+
+router ospf 100
+(...)
+ distribute-list prefix BLOCK-32 in
+```
+
+- Do this on all hub and spoke routers
+
+- R1 - underlay, tunnel and OSPF configuration:
+
+```
+R1#sh run int e0/0
+Building configuration...
+
+Current configuration : 65 bytes
+!
+interface Ethernet0/0
+ ip address 10.1.12.1 255.255.255.0
+end
+
+R1#sh run int l0  
+Building configuration...
+
+Current configuration : 63 bytes
+!
+interface Loopback0
+ ip address 1.1.1.1 255.255.255.255
+end
+
+R1#sh run int l1
+Building configuration...
+
+Current configuration : 117 bytes
+!
+interface Loopback1
+ ip address 192.168.1.1 255.255.255.0
+ ip ospf network point-to-point
+ ip ospf 100 area 0
+end
+
+R1#sh run int tun 1
+Building configuration...
+
+Current configuration : 347 bytes
+!
+interface Tunnel1
+ ip address 172.16.1.1 255.255.255.248
+ no ip redirects
+ ip mtu 1400
+ ip nhrp authentication cisco
+ ip nhrp network-id 1
+ ip nhrp redirect
+ ip tcp adjust-mss 1360
+ ip ospf network point-to-multipoint
+ ip ospf dead-interval 40
+ ip ospf hello-interval 10
+ tunnel source Loopback0
+ tunnel mode gre multipoint
+ tunnel key 123
+end
+
+!!!!! Use a default route for underlay prefix routing
+
+R1#sh run | i ip ro 
+ip route 0.0.0.0 0.0.0.0 10.1.12.2
+
+R1#sh run | i prefix
+ip prefix-list BLOCK-32 seq 5 deny 172.16.1.0/29 ge 32
+ip prefix-list BLOCK-32 seq 10 permit 0.0.0.0/0 le 32
+
+R1#sh run | s router ospf
+router ospf 100
+ router-id 1.1.1.2
+ network 172.16.1.0 0.0.0.7 area 0
+ network 192.168.1.0 0.0.0.255 area 0
+ distribute-list prefix BLOCK-32 in
+```
+
+- OSPF interfaces and neighbors on R1:
+
+- (Make sure the OSPF interfaces are shown properly for the correct process ID)
+
+```
+R1#show ip ospf int br
+Interface    PID   Area            IP Address/Mask    Cost  State Nbrs F/C
+Lo1          100   0               192.168.1.1/24     1     P2P   0/0
+Tu1          100   0               172.16.1.1/29      1000  P2MP  3/3
+
+R1#show ip ospf neighbor 
+
+Neighbor ID     Pri   State           Dead Time   Address         Interface
+5.5.5.5           0   FULL/  -        00:00:30    172.16.1.4      Tunnel1
+4.4.4.5           0   FULL/  -        00:00:30    172.16.1.3      Tunnel1
+2.2.2.3           0   FULL/  -        00:00:32    172.16.1.2      Tunnel1
+```
+
+- R2 configuration - it includes only directly connected interfaces and static routes to the loopback addresses of Hub and spokes, as tunnel sources are the loopback interfaces on R1, R3, R4 and R5
+
+```
+R2#sh run int e0/0
+Building configuration...
+
+Current configuration : 65 bytes
+!
+interface Ethernet0/0
+ ip address 10.1.12.2 255.255.255.0
+end
+
+R2#sh run int e0/1
+Building configuration...
+
+Current configuration : 65 bytes
+!
+interface Ethernet0/1
+ ip address 10.1.23.2 255.255.255.0
+end
+
+R2#sh run int e0/2
+Building configuration...
+
+Current configuration : 65 bytes
+!
+interface Ethernet0/2
+ ip address 10.1.24.2 255.255.255.0
+end
+
+R2#sh run int e0/3
+Building configuration...
+
+Current configuration : 65 bytes
+!
+interface Ethernet0/3
+ ip address 10.1.25.2 255.255.255.0
+end
+
+!!!!!! Not needed but present in case of
+R2#sh run int l0
+Building configuration...
+
+Current configuration : 63 bytes
+!
+interface Loopback0
+ ip address 2.2.2.2 255.255.255.255
+end
+
+R2#sh run | s ip route
+ip route 1.1.1.1 255.255.255.255 10.1.12.1
+ip route 3.3.3.3 255.255.255.255 10.1.23.3
+ip route 4.4.4.4 255.255.255.255 10.1.24.4
+ip route 5.5.5.5 255.255.255.255 10.1.25.5
+```
+
+- R3 configuration: underlay, tunnel, OSPF, interfaces
+
+```
+R3#sh run int e0/0
+Building configuration...
+
+Current configuration : 65 bytes
+!
+interface Ethernet0/0
+ ip address 10.1.23.3 255.255.255.0
+end
+
+R3#sh run int l0  
+Building configuration...
+
+Current configuration : 63 bytes
+!
+interface Loopback0
+ ip address 3.3.3.3 255.255.255.255
+end
+
+R3#sh run int l1
+Building configuration...
+
+Current configuration : 114 bytes
+!
+interface Loopback1
+ ip address 10.1.2.1 255.255.255.0
+ ip ospf network point-to-point
+ ip ospf 100 area 0
+end
+
+R3#sh run int tunn 1
+Building configuration...
+
+Current configuration : 436 bytes
+!
+interface Tunnel1
+ ip address 172.16.1.2 255.255.255.248
+ no ip redirects
+ ip mtu 1400
+ ip nhrp authentication cisco
+ ip nhrp map multicast 1.1.1.1
+ ip nhrp map 172.16.1.1 1.1.1.1
+ ip nhrp network-id 1
+ ip nhrp nhs 172.16.1.1
+ ip tcp adjust-mss 1360
+ ip ospf network point-to-multipoint
+ ip ospf dead-interval 40
+ ip ospf hello-interval 10
+ ip ospf 100 area 0
+ tunnel source Loopback0
+ tunnel mode gre multipoint
+ tunnel key 123
+end
+
+R3(config-router)#do sh run | i prefix
+ip prefix-list BLOCK-32 seq 5 deny 172.16.1.0/29 ge 32
+ip prefix-list BLOCK-32 seq 10 permit 0.0.0.0/0 le 32
+
+R3(config-router)#do sh run | s router ospf
+router ospf 100
+ router-id 2.2.2.3
+ network 172.16.1.0 0.0.0.15 area 0
+ distribute-list prefix BLOCK-32 in
+
+R3#sh run | i ip ro
+ip route 0.0.0.0 0.0.0.0 10.1.23.2
+
+R3#sh ip ospf int br
+Interface    PID   Area            IP Address/Mask    Cost  State Nbrs F/C
+Lo1          100   0               10.1.2.1/24        1     P2P   0/0
+Tu1          100   0               172.16.1.2/29      1000  P2MP  1/1
+
+R3#sh ip ro ospf | b Gate
+Gateway of last resort is 10.1.23.2 to network 0.0.0.0
+
+      10.0.0.0/8 is variably subnetted, 5 subnets, 2 masks
+O        10.1.3.0/24 [110/2001] via 172.16.1.1, 01:20:40, Tunnel1
+O     192.168.1.0/24 [110/1001] via 172.16.1.1, 01:20:40, Tunnel1
+      198.51.1.0/28 is subnetted, 1 subnets
+O        198.51.1.0 [110/2001] via 172.16.1.1, 01:20:40, Tunnel1
+```
+
+- R4 configuration: OSPF, tunnel, interfaces and static routes
+
+```
+R4(config)#do sh run int e0/0
+Building configuration...
+
+Current configuration : 65 bytes
+!
+interface Ethernet0/0
+ ip address 10.1.24.4 255.255.255.0
+end
+
+
+R4(config)#do sh run int l0 
+Building configuration...
+
+Current configuration : 63 bytes
+!
+interface Loopback0
+ ip address 4.4.4.4 255.255.255.255
+end
+
+
+R4(config)#do sh run int l1
+Building configuration...
+
+Current configuration : 114 bytes
+!
+interface Loopback1
+ ip address 10.1.3.1 255.255.255.0
+ ip ospf network point-to-point
+ ip ospf 100 area 0
+end
+
+R4(config)#do sh run int tunn 1
+Building configuration...
+
+Current configuration : 436 bytes
+!
+interface Tunnel1
+ ip address 172.16.1.3 255.255.255.248
+ no ip redirects
+ ip mtu 1400
+ ip nhrp authentication cisco
+ ip nhrp map multicast 1.1.1.1
+ ip nhrp map 172.16.1.1 1.1.1.1
+ ip nhrp network-id 1
+ ip nhrp nhs 172.16.1.1
+ ip tcp adjust-mss 1360
+ ip ospf network point-to-multipoint
+ ip ospf dead-interval 40
+ ip ospf hello-interval 10
+ ip ospf 100 area 0
+ tunnel source Loopback0
+ tunnel mode gre multipoint
+ tunnel key 123
+end
+
+R4(config)#do sh run | s ip route
+ip route 0.0.0.0 0.0.0.0 10.1.24.2
+
+R4(config)#do sh run | i prefix  
+ip prefix-list BLOCK-32 seq 5 deny 172.16.1.0/29 le 32
+ip prefix-list BLOCK-32 seq 10 permit 0.0.0.0/0 le 32
+
+R4(config)#do sh run | s router ospf
+router ospf 100
+ router-id 4.4.4.5
+ distribute-list prefix BLOCK-32 in
+
+R4(config)#do sh ip ospf nei 
+
+Neighbor ID     Pri   State           Dead Time   Address         Interface
+1.1.1.2           0   FULL/  -        00:00:38    172.16.1.1      Tunnel1
+
+R4(config)#do sh ip ro ospf | b Gate
+Gateway of last resort is 10.1.24.2 to network 0.0.0.0
+
+      10.0.0.0/8 is variably subnetted, 5 subnets, 2 masks
+O        10.1.2.0/24 [110/2001] via 172.16.1.1, 00:07:49, Tunnel1
+O     192.168.1.0/24 [110/1001] via 172.16.1.1, 00:07:49, Tunnel1
+      198.51.1.0/28 is subnetted, 1 subnets
+O        198.51.1.0 [110/2001] via 172.16.1.1, 00:07:49, Tunnel1
+```
+
+- R5 configuration:
+
+```
+R5#sh run int e0/0
+Building configuration...
+
+Current configuration : 65 bytes
+!
+interface Ethernet0/0
+ ip address 10.1.25.5 255.255.255.0
+end
+
+R5#sh run int l0  
+Building configuration...
+
+Current configuration : 63 bytes
+!
+interface Loopback0
+ ip address 5.5.5.5 255.255.255.255
+end
+
+R5#sh run int l1
+Building configuration...
+
+Current configuration : 118 bytes
+!
+interface Loopback1
+ ip address 198.51.1.1 255.255.255.240
+ ip ospf network point-to-point
+ ip ospf 100 area 0
+end
+
+R5#sh run int tun 1
+Building configuration...
+
+Current configuration : 436 bytes
+!
+interface Tunnel1
+ ip address 172.16.1.4 255.255.255.248
+ no ip redirects
+ ip mtu 1400
+ ip nhrp authentication cisco
+ ip nhrp map multicast 1.1.1.1
+ ip nhrp map 172.16.1.1 1.1.1.1
+ ip nhrp network-id 1
+ ip nhrp nhs 172.16.1.1
+ ip tcp adjust-mss 1360
+ ip ospf network point-to-multipoint
+ ip ospf dead-interval 40
+ ip ospf hello-interval 10
+ ip ospf 100 area 0
+ tunnel source Loopback0
+ tunnel mode gre multipoint
+ tunnel key 123
+end
+
+R5#sh run | s ip ro
+ip route 0.0.0.0 0.0.0.0 10.1.25.2
+
+R5#sh run | i prefix
+ip prefix-list BLOCK-32 seq 5 deny 172.16.1.0/29 ge 32
+ip prefix-list BLOCK-32 seq 10 permit 0.0.0.0/0 le 32
+
+R5#sh run | s router ospf
+router ospf 100
+ router-id 5.5.5.5
+ passive-interface Loopback1
+ distribute-list prefix BLOCK-32 in
+
+R5#sh ip ospf int br
+Interface    PID   Area            IP Address/Mask    Cost  State Nbrs F/C
+Lo1          100   0               198.51.1.1/28      1     P2P   0/0
+Tu1          100   0               172.16.1.4/29      1000  P2MP  1/1
+
+R5#sh ip ospf nei
+
+Neighbor ID     Pri   State           Dead Time   Address         Interface
+1.1.1.2           0   FULL/  -        00:00:34    172.16.1.1      Tunnel1
+```
+
+- Traceroute from R5 to R2's subnet. The second traceroute goes directly to next hop 172.16.1.2 after NHRP kicks in
+
+```
+R5#traceroute 10.1.2.1 source l1
+Type escape sequence to abort.
+Tracing the route to 10.1.2.1
+VRF info: (vrf in name/id, vrf out name/id)
+  1 172.16.1.1 1 msec 1 msec 1 msec
+  2 172.16.1.2 1 msec 2 msec * 
+R5#traceroute 10.1.2.1 source l1
+Type escape sequence to abort.
+Tracing the route to 10.1.2.1
+VRF info: (vrf in name/id, vrf out name/id)
+  1 172.16.1.2 1 msec 2 msec * 
+R5#show dmvpn 
+Legend: Attrb --> S - Static, D - Dynamic, I - Incomplete
+        N - NATed, L - Local, X - No Socket
+        T1 - Route Installed, T2 - Nexthop-override, B - BGP
+        C - CTS Capable, I2 - Temporary
+        # Ent --> Number of NHRP entries with same NBMA peer
+        NHS Status: E --> Expecting Replies, R --> Responding, W --> Waiting
+        UpDn Time --> Up or Down Time for a Tunnel
+==========================================================================
+
+Interface: Tunnel1, IPv4 NHRP Details 
+Type:Spoke, NHRP Peers:2, 
+
+ # Ent  Peer NBMA Addr Peer Tunnel Add State  UpDn Tm Attrb
+ ----- --------------- --------------- ----- -------- -----
+     2 3.3.3.3              172.16.1.2    UP 00:00:37   DT2
+                            172.16.1.2    UP 00:00:37   DT1
+     1 1.1.1.1              172.16.1.1    UP 01:57:30     S
+```
+
+- Ip routing on R5 when DMVPN is up:
+
+```
+R5#show ip route ospf | b Gate
+Gateway of last resort is 10.1.25.2 to network 0.0.0.0
+
+      10.0.0.0/8 is variably subnetted, 4 subnets, 2 masks
+O   %    10.1.2.0/24 [110/2001] via 172.16.1.1, 01:28:59, Tunnel1
+O        10.1.3.0/24 [110/2001] via 172.16.1.1, 01:28:59, Tunnel1
+O     192.168.1.0/24 [110/1001] via 172.16.1.1, 01:28:59, Tunnel1
+
+R5#traceroute 10.1.3.1
+Type escape sequence to abort.
+Tracing the route to 10.1.3.1
+VRF info: (vrf in name/id, vrf out name/id)
+  1 172.16.1.1 1 msec 1 msec 0 msec
+  2 172.16.1.3 1 msec 2 msec * 
+R5#traceroute 10.1.3.1
+Type escape sequence to abort.
+Tracing the route to 10.1.3.1
+VRF info: (vrf in name/id, vrf out name/id)
+  1 172.16.1.3 1 msec 2 msec * 
+R5#sh
+R5#show dm
+R5#show dmvpn 
+Legend: Attrb --> S - Static, D - Dynamic, I - Incomplete
+        N - NATed, L - Local, X - No Socket
+        T1 - Route Installed, T2 - Nexthop-override, B - BGP
+        C - CTS Capable, I2 - Temporary
+        # Ent --> Number of NHRP entries with same NBMA peer
+        NHS Status: E --> Expecting Replies, R --> Responding, W --> Waiting
+        UpDn Time --> Up or Down Time for a Tunnel
+==========================================================================
+
+Interface: Tunnel1, IPv4 NHRP Details 
+Type:Spoke, NHRP Peers:3, 
+
+ # Ent  Peer NBMA Addr Peer Tunnel Add State  UpDn Tm Attrb
+ ----- --------------- --------------- ----- -------- -----
+     2 3.3.3.3              172.16.1.2    UP 00:04:06   DT2
+                            172.16.1.2    UP 00:04:06   DT1
+     2 4.4.4.4              172.16.1.3    UP 00:00:45   DT2
+                            172.16.1.3    UP 00:00:45   DT1
+     1 1.1.1.1              172.16.1.1    UP 02:00:59     S
+
+R5#show ip ro ospf | b Gate
+Gateway of last resort is 10.1.25.2 to network 0.0.0.0
+
+      10.0.0.0/8 is variably subnetted, 4 subnets, 2 masks
+O   %    10.1.2.0/24 [110/2001] via 172.16.1.1, 01:31:19, Tunnel1
+O   %    10.1.3.0/24 [110/2001] via 172.16.1.1, 01:31:19, Tunnel1
+O     192.168.1.0/24 [110/1001] via 172.16.1.1, 01:31:19, Tunnel1
+
+R5#show ip nhrp brief 
+****************************************************************************
+    NOTE: Link-Local, No-socket and Incomplete entries are not displayed
+****************************************************************************
+Legend: Type --> S - Static, D - Dynamic
+        Flags --> u - unique, r - registered, e - temporary, c - claimed
+        a - authoritative, t - route
+============================================================================
+
+Intf     NextHop Address                                    NBMA Address
+         Target Network                              T/Flag
+-------- ------------------------------------------- ------ ----------------
+Tu1      172.16.1.1                                         1.1.1.1
+         172.16.1.1/32                               S/    
+Tu1      172.16.1.2                                         3.3.3.3
+         172.16.1.2/32                               D/t   
+         10.1.2.0/24                                 D/t   
+Tu1      172.16.1.3                                         4.4.4.4
+         172.16.1.3/32                               D/t   
+         10.1.3.0/24                                 D/t   
+
+R5#show ip nhrp tunnel 1
+10.1.2.0/24 via 172.16.1.2
+   Tunnel1 created 00:08:11, expire 00:01:48
+   Type: dynamic, Flags: router rib nho 
+   NBMA address: 3.3.3.3
+10.1.3.0/24 via 172.16.1.3
+   Tunnel1 created 00:04:50, expire 00:05:09
+   Type: dynamic, Flags: router used rib nho 
+   NBMA address: 4.4.4.4
+172.16.1.1/32 via 172.16.1.1
+   Tunnel1 created 02:05:04, never expire 
+   Type: static, Flags: used 
+   NBMA address: 1.1.1.1
+172.16.1.2/32 via 172.16.1.2
+   Tunnel1 created 00:08:11, expire 00:01:48
+   Type: dynamic, Flags: router nhop rib 
+   NBMA address: 3.3.3.3
+172.16.1.3/32 via 172.16.1.3
+   Tunnel1 created 00:04:50, expire 00:05:09
+   Type: dynamic, Flags: router nhop rib 
+   NBMA address: 4.4.4.4
+172.16.1.4/32 via 172.16.1.4
+   Tunnel1 created 00:04:50, expire 00:05:09
+   Type: dynamic, Flags: router unique local 
+   NBMA address: 5.5.5.5
+    (no-socket) 
+198.51.1.0/28 via 172.16.1.4
+   Tunnel1 created 00:08:11, expire 00:01:48
+   Type: dynamic, Flags: router unique local 
+   NBMA address: 5.5.5.5
+    (no-socket) 
+```
