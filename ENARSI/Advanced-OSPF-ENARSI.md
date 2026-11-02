@@ -3752,3 +3752,168 @@ R5#show ip nhrp tunnel 1
    NBMA address: 5.5.5.5
     (no-socket) 
 ```
+
+### More OSPF things:
+
+- To prevent Area 0 in certain situation from becoming a transit area, we may want to advertise some type 1 LSAs in some areas with a maximum metric
+
+- To configure this:
+
+```
+conf t
+ router ospf 123
+  max-metric router-lsa 
+```
+
+```
+R3(config)#do sh run | s router ospf
+router ospf 123
+ router-id 3.3.3.3
+ max-metric router-lsa
+ network 10.1.3.3 0.0.0.0 area 123
+ network 10.3.5.3 0.0.0.0 area 35
+ network 10.24.35.3 0.0.0.0 area 0
+```
+
+- R1 - before setting this up:
+
+```
+R1#show ip route ospf | b Gate
+
+Gateway of last resort is not set
+
+      10.0.0.0/8 is variably subnetted, 6 subnets, 2 masks
+O IA     10.3.5.0/24 [110/2] via 10.1.3.3, 00:01:16, Ethernet0/1
+O IA     10.24.35.0/24 [110/2] via 10.1.3.3, 00:01:16, Ethernet0/1
+                       [110/2] via 10.1.2.2, 00:02:05, Ethernet0/0
+```
+
+- R1 after setting this up:
+
+```
+R1#show ip route ospf | b Gate
+Gateway of last resort is not set
+
+      10.0.0.0/8 is variably subnetted, 6 subnets, 2 masks
+O IA     10.3.5.0/24 [110/2] via 10.1.3.3, 00:09:26, Ethernet0/1
+O IA     10.24.35.0/24 [110/2] via 10.1.2.2, 00:10:15, Ethernet0/0
+```
+
+```
+R1#show ip ospf database router adv-router 3.3.3.3
+
+            OSPF Router with ID (1.1.1.1) (Process ID 123)
+
+                Router Link States (Area 123)
+
+  LS age: 303
+  Options: (No TOS-capability, DC)
+  LS Type: Router Links
+  Link State ID: 3.3.3.3
+  Advertising Router: 3.3.3.3
+  LS Seq Number: 80000006
+  Checksum: 0x6C76
+  Length: 48
+  Area Border Router
+  Number of Links: 2
+
+    Link connected to: another Router (point-to-point)
+     (Link ID) Neighboring Router ID: 1.1.1.1
+     (Link Data) Router Interface address: 10.1.3.3
+      Number of MTID metrics: 0
+       TOS 0 Metrics: 65535
+
+    Link connected to: a Stub Network
+     (Link ID) Network/subnet number: 10.1.3.0
+     (Link Data) Network Mask: 255.255.255.0
+      Number of MTID metrics: 0
+       TOS 0 Metrics: 1
+```
+
+- As you can see R3 is advertising a router LSA with maximum metric for P2P link on it's interface
+
+- R3 is originating router LSAs with maximum metric as shown below
+
+```
+R3(config)#do sh ip ospf
+ Routing Process "ospf 123" with ID 3.3.3.3
+ Start time: 00:40:09.213, Time elapsed: 00:18:22.157
+ Supports only single TOS(TOS0) routes
+ Supports opaque LSA
+ Supports Link-local Signaling (LLS)
+ Supports area transit capability
+ Supports NSSA (compatible with RFC 3101)
+ Supports Database Exchange Summary List Optimization (RFC 5243)
+ Maximum number of non self-generated LSA allowed 50000
+    Current number of non self-generated LSA 9
+    Threshold for warning message 75%
+    Ignore-time 5 minutes, reset-time 10 minutes
+    Ignore-count allowed 5, current ignore-count 0
+ Event-log enabled, Maximum number of events: 1000, Mode: cyclic
+ It is an area border router
+ Originating router-LSAs with maximum metric !!!!!!!!
+    Condition: always, State: active
+ Initial SPF schedule delay 50 msecs
+ Minimum hold time between two consecutive SPFs 200 msecs
+ Maximum wait time between two consecutive SPFs 5000 msecs
+ Incremental-SPF disabled
+ Per-prefix-distribution disabled
+ Initial LSA throttle delay 50 msecs
+ Minimum hold time for LSA throttle 200 msecs
+ Maximum wait time for LSA throttle 5000 msecs
+ Minimum LSA arrival 100 msecs
+ LSA group pacing timer 240 secs
+ Interface flood pacing timer 33 msecs
+ Retransmission pacing timer 66 msecs
+ EXCHANGE/LOADING adjacency limit: initial 300, process maximum 300
+ Number of external LSA 0. Checksum Sum 0x000000
+ Number of opaque AS LSA 0. Checksum Sum 0x000000
+ Number of DCbitless external and opaque AS LSA 0
+ Number of DoNotAge external and opaque AS LSA 0
+ Number of areas in this router is 3. 3 normal 0 stub 0 nssa
+ Number of areas transit capable is 0
+ External flood list length 0
+ IETF NSF helper support enabled
+ Cisco NSF helper support enabled
+ Reference bandwidth unit is 100 mbps
+    Area BACKBONE(0)
+        Number of interfaces in this area is 1
+        Area has no authentication
+        SPF algorithm last executed 00:03:36.204 ago
+        SPF algorithm executed 4 times
+        Area ranges are
+        Number of LSA 8. Checksum Sum 0x03A4E5
+        Number of opaque link LSA 0. Checksum Sum 0x000000
+        Number of DCbitless LSA 0
+        Number of indication LSA 0
+        Number of DoNotAge LSA 0
+        Flood list length 0
+    Area 35
+        Number of interfaces in this area is 1
+        Area has no authentication
+        SPF algorithm last executed 00:03:36.204 ago
+        SPF algorithm executed 4 times
+        Area ranges are
+        Number of LSA 5. Checksum Sum 0x026156
+        Number of opaque link LSA 0. Checksum Sum 0x000000
+        Number of DCbitless LSA 0
+        Number of indication LSA 0
+        Number of DoNotAge LSA 0
+        Flood list length 0
+    Area 123
+        Number of interfaces in this area is 1
+        Area has no authentication
+        SPF algorithm last executed 00:03:36.204 ago
+        SPF algorithm executed 5 times
+        Area ranges are
+        Number of LSA 7. Checksum Sum 0x026F1C
+        Number of opaque link LSA 0. Checksum Sum 0x000000
+        Number of DCbitless LSA 0
+        Number of indication LSA 0
+        Number of DoNotAge LSA 0
+        Flood list length 0
+ Maintenance Mode ID:     131857716519648
+ Maintenance Mode:        disabled
+ Maintenance Mode Timer:  stopped (0)
+  Graceful Reload FSU Global status : None (global: None)
+```

@@ -2128,4 +2128,3 @@ Packet sent with a source address of 2022::2
 !!!!!
 Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/1 ms
 ```
-
