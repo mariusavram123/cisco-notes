@@ -1860,7 +1860,7 @@ conf t
 
 ![ospf-interarea-summarization-concept](./ospf-interarea-summarization-concept.png)
 
-- Summarization works only on Type 1 LSAs and is normally configured, or designed so that summarization occurs as routes enter the backbone area from nonbackbone areas
+- Summarization works only on Type 1 LSAs and is normally configured, or designed so that summarization occurs as routes enter the backbone area from nonbackbone areas (or goes from the backbone to another area)
 
 - Cisco IOS-XE set the default metric for the summary LSA to be the lowest metric associated with a LSA based on RFC1583 guidelines
 
@@ -1884,6 +1884,7 @@ conf t
 conf t
  router ospf 1
   area 1 range 10.1.0.0 255.255.192.0
+  !!! THE AREA ID IS THE AREA FROM WHERE THE RANGE IS ADVERTISED
 ```
 
 - The default behaviour is to advertise the summary prefix, so the keyword `advertise` is not necessary
@@ -1969,6 +1970,10 @@ O        192.168.1.1 [110/2] via 10.1.12.1, 00:08:17, GigabitEthernet0/0
       192.168.3.0/32 is subnetted, 1 subnets
 O        192.168.3.3 [110/2] via 10.1.23.3, 00:08:17, GigabitEthernet0/1
 ```
+
+- Area ramge - O IA routes - summarization performed by the ABR
+
+- Area ID in the command is the origin area of the routes (FROM where the routes are coming)
 
 #### External Summarization
 
@@ -2074,6 +2079,8 @@ Routing entry for 172.16.0.0/20
   * 10.56.1.6, from 192.168.6.6, 00:00:33 ago, via GigabitEthernet0/1
       Route metric is 20, traffic share count is 1
 ```
+
+- Summary-address command - O E1/O E2/O N1/ O N2 routes - Summarization performed by the ASBR
 
 - You also can use `not-advertise` keyword when creating a summary external route. The route will not be advertised to other OSPF routers
 
@@ -3753,7 +3760,9 @@ R5#show ip nhrp tunnel 1
     (no-socket) 
 ```
 
-### More OSPF things:
+### More OSPF things
+
+#### Maximum metric LSAs
 
 - To prevent Area 0 in certain situation from becoming a transit area, we may want to advertise some type 1 LSAs in some areas with a maximum metric
 
@@ -3917,3 +3926,432 @@ R3(config)#do sh ip ospf
  Maintenance Mode Timer:  stopped (0)
   Graceful Reload FSU Global status : None (global: None)
 ```
+
+#### Manipulating AD (Administrative distance) for OSPF
+
+- There are two options to manipulate the AD for a router:
+
+    1. Based on Router ID of a neighbor
+
+    2. Based on LSA/Route types
+
+1. Based on Router ID of a neighbor:
+
+```
+conf t
+ router ospf 110
+  distance <1-255> ...
+
+
+  distance 125 3.3.3.3 0.0.0.0 
+
+
+R1(config-router)#distance ?    
+  <1-255>  Administrative distance
+
+R1(config-router)#distance 125 ?  !!!!!!! THIS IS WRONG. SHOULD BE THE NEIGHBOR'S ROUTER ID, NOT IP ADDRESS
+  A.B.C.D  IP Source address
+  <cr>     <cr>
+
+```
+
+```
+R1(config-router)#do sh ip ro ospf 
+(...)
+
+Gateway of last resort is not set
+
+      2.0.0.0/32 is subnetted, 1 subnets
+O E2     2.2.2.2 [110/20] via 10.1.2.2, 00:03:20, Ethernet0/0
+      3.0.0.0/32 is subnetted, 1 subnets
+O E2     3.3.3.3 [125/20] via 10.1.3.3, 00:03:20, Ethernet0/1
+      10.0.0.0/8 is variably subnetted, 7 subnets, 2 masks
+O E2     10.2.4.0/24 [110/20] via 10.1.2.2, 00:03:20, Ethernet0/0
+O E2     10.3.5.0/24 [125/20] via 10.1.3.3, 00:03:20, Ethernet0/1
+O IA     10.24.35.0/24 [125/2] via 10.1.3.3, 00:03:20, Ethernet0/1
+                       [125/2] via 10.1.2.2, 00:03:20, Ethernet0/0
+      192.168.2.0/32 is subnetted, 3 subnets
+O E2     192.168.2.1 [110/20] via 10.1.2.2, 00:03:20, Ethernet0/0
+O E2     192.168.2.2 [110/20] via 10.1.2.2, 00:03:20, Ethernet0/0
+O E2     192.168.2.3 [110/20] via 10.1.2.2, 00:03:20, Ethernet0/0
+      192.168.3.0/32 is subnetted, 3 subnets
+O E2     192.168.3.1 [125/20] via 10.1.3.3, 00:03:20, Ethernet0/1
+O E2     192.168.3.2 [125/20] via 10.1.3.3, 00:03:20, Ethernet0/1
+O E2     192.168.3.3 [125/20] via 10.1.3.3, 00:03:20, Ethernet0/1
+```
+
+2. Based on specific LSA or route types:
+
+```
+conf t
+ router ospf 110
+  distance ospf ?
+
+R1(config-router)#distance  ospf ?
+external    External type 5 and type 7 routes
+inter-area  Inter-area routes
+intra-area  Intra-area routes
+```
+
+- Cannot use both of them on the same time
+
+- Modify the AD of some routes only based on an access-list:
+
+- R1:
+
+```
+conf t
+ router ospf 110
+ distance 125 3.3.3.3 0.0.0.0 1
+
+ access-list 1 permit 192.168.3.0 0.0.0.3
+```
+
+- Now the AD changed only for routes in the 192.168.3.X range
+
+```
+R1(config)#do sh ip ro ospf | b Gate
+Gateway of last resort is not set
+
+      2.0.0.0/32 is subnetted, 1 subnets
+O E2     2.2.2.2 [110/20] via 10.1.2.2, 00:02:37, Ethernet0/0
+      3.0.0.0/32 is subnetted, 1 subnets
+O E2     3.3.3.3 [110/20] via 10.1.3.3, 00:02:37, Ethernet0/1
+      10.0.0.0/8 is variably subnetted, 7 subnets, 2 masks
+O E2     10.2.4.0/24 [110/20] via 10.1.2.2, 00:02:37, Ethernet0/0
+O E2     10.3.5.0/24 [110/20] via 10.1.3.3, 00:02:37, Ethernet0/1
+O IA     10.24.35.0/24 [110/2] via 10.1.3.3, 00:02:37, Ethernet0/1
+                       [110/2] via 10.1.2.2, 00:02:37, Ethernet0/0
+      192.168.2.0/32 is subnetted, 3 subnets
+O E2     192.168.2.1 [110/20] via 10.1.2.2, 00:02:37, Ethernet0/0
+O E2     192.168.2.2 [110/20] via 10.1.2.2, 00:02:37, Ethernet0/0
+O E2     192.168.2.3 [110/20] via 10.1.2.2, 00:02:37, Ethernet0/0
+      192.168.3.0/32 is subnetted, 3 subnets
+O E2     192.168.3.1 [125/20] via 10.1.3.3, 00:02:37, Ethernet0/1
+O E2     192.168.3.2 [125/20] via 10.1.3.3, 00:02:37, Ethernet0/1
+O E2     192.168.3.3 [125/20] via 10.1.3.3, 00:02:37, Ethernet0/1
+```
+
+- The process can also take 2 or more distance commands for different routers at the same time
+
+```
+R1(config-router)#do sh run | s router ospf
+router ospf 110
+ router-id 1.1.1.1
+ network 0.0.0.0 255.255.255.255 area 0
+ distance 125 3.3.3.3 0.0.0.0 1
+ distance 115 2.2.2.2 0.0.0.0
+```
+
+- You cannot have duplicate entries for the same router ID
+
+- Modify ADs based on the route types:
+
+```
+conf t
+ router ospf 110
+  distance ospf intra-area 210 inter-area 220 external 225
+```
+
+```
+R1(config-router)#do sh ip ro ospf | b Gate
+Gateway of last resort is not set
+
+      3.0.0.0/32 is subnetted, 1 subnets
+O E2     3.3.3.3 [225/20] via 10.1.3.3, 00:01:05, Ethernet0/1
+      10.0.0.0/8 is variably subnetted, 6 subnets, 2 masks
+O E2     10.3.5.0/24 [225/20] via 10.1.3.3, 00:01:05, Ethernet0/1
+O IA     10.24.35.0/24 [220/2] via 10.1.3.3, 00:01:05, Ethernet0/1
+                       [220/2] via 10.1.2.2, 00:01:05, Ethernet0/0
+      192.168.2.0/32 is subnetted, 3 subnets
+O        192.168.2.1 [210/2] via 10.1.2.2, 00:01:05, Ethernet0/0
+O        192.168.2.2 [210/2] via 10.1.2.2, 00:01:05, Ethernet0/0
+O        192.168.2.3 [210/2] via 10.1.2.2, 00:01:05, Ethernet0/0
+      192.168.3.0/32 is subnetted, 3 subnets
+O E2     192.168.3.1 [225/20] via 10.1.3.3, 00:01:05, Ethernet0/1
+O E2     192.168.3.2 [225/20] via 10.1.3.3, 00:01:05, Ethernet0/1
+O E2     192.168.3.3 [225/20] via 10.1.3.3, 00:01:05, Ethernet0/1
+```
+
+#### OSPF Graceful Restart
+
+- Used when we want to perform maintenaince on some router participating in OSPF
+
+- The router will be dropping the router ID of the neighbor from the hello packet
+
+- From the perspective of the neighboring router, the adjancency will not be killed completely but it will be left in the INIT state until the dead interval for that router will be reached
+
+- Topology:
+
+![ospf-general-topology](./ospf-general-topology.png)
+
+- Here R3 has an adjacency with R5. We will perform maintenaince on R5
+
+- Configuration for this:
+
+- R3:
+
+```
+debug ip ospf adj
+
+R3(config-router)#do debug ip ospf adj
+
+*Nov  8 12:16:44.985: OSPF-110 ADJ   Et0/0: Cannot see ourself in hello from 5.5.5.5, state INIT
+R3(config-router)#
+```
+
+- R5
+
+```
+conf t
+ router ospf 110
+  shutdown
+```
+
+- Debug when the adjacency comes back. It comes back almost instantly
+
+```
+R3(config-router)#         
+*Nov  8 12:16:44.985: OSPF-110 ADJ   Et0/0: Cannot see ourself in hello from 5.5.5.5, state INIT
+R3(config-router)#
+*Nov  8 12:17:24.985: OSPF-110 ADJ   Et0/0: 5.5.5.5 address 10.3.5.5 is dead
+*Nov  8 12:17:24.985: OSPF-110 ADJ   Et0/0: 5.5.5.5 address 10.3.5.5 is dead, state DOWN
+R3(config-router)#
+*Nov  8 12:17:24.985: %OSPF-5-ADJCHG: Process 110, Nbr 5.5.5.5 on Ethernet0/0 from INIT to DOWN, Neighbor Down: Dead timer expired
+R3(config-router)#
+*Nov  8 12:17:51.154: OSPF-110 ADJ   Et0/0: 2 Way Communication to 5.5.5.5, state 2WAY
+*Nov  8 12:17:51.154: OSPF-110 ADJ   Et0/0: Nbr 5.5.5.5: Prepare dbase exchange
+*Nov  8 12:17:51.154: OSPF-110 ADJ   Et0/0: Send DBD to 5.5.5.5 seq 0x1A1A opt 0x52 flag 0x7 len 32
+*Nov  8 12:17:51.155: OSPF-110 ADJ   Et0/0: Rcv DBD from 5.5.5.5 seq 0x744 opt 0x52 flag 0x7 len 32  mtu 1500 state EXSTART
+*Nov  8 12:17:51.155: OSPF-110 ADJ   Et0/0: NBR Negotiation Done. We are the SLAVE
+*Nov  8 12:17:51.155: OSPF-110 ADJ   Et0/0: Nbr 5.5.5.5: Summary list built, size 6
+*Nov  8 12:17:51.155: OSPF-110 ADJ   Et0/0: Send DBD to 5.5.5.5 seq 0x744 opt 0x52 flag 0x2 len 152
+*Nov  8 12:17:51.155: OSPF-110 ADJ   Et0/0: Rcv DBD from 5.5.5.5 seq 0x745 opt 0x52 flag 0x1 len 32  mtu 1500 state EXCHANGE
+*Nov  8 12:17:51.155: OSPF-110 ADJ   Et0/0: Exchange Done with 5.5.5.5
+*Nov  8 12:17:51.155: OSPF-110 ADJ   Et0/0: Synchronized with 5.5.5.5, state FULL
+*Nov  8 12:17:51.155: %OSPF-5-ADJCHG: Process 110, Nbr 5.5.5.5 on Ethernet0/0 from LOADING to FULL, Loading Done
+R3(config-router)#
+*Nov  8 12:17:51.155: OSPF-110 ADJ   Et0/0: Send DBD to 5.5.5.5 seq 0x745 opt 0x52 flag 0x0 len 32
+*Nov  8 12:17:51.155: OSPF-110 ADJ   Et0/0: Rcv LS REQ from 5.5.5.5 length 96 LSA count 6
+R3(config-router)#
+*Nov  8 12:18:31.155: OSPF-110 ADJ   Et0/0: Nbr 5.5.5.5: Clean-up dbase exchange
+R3(config-router)#
+```
+
+- This also can be done on the interface level:
+
+```
+conf t
+ interface e0/0
+  ip ospf shutdown
+```
+
+- The effect is the same:
+
+```
+R3(config-router)#
+*Nov  8 12:25:25.444: OSPF-110 ADJ   Et0/0: Cannot see ourself in hello from 5.5.5.5, state INIT
+*Nov  8 12:25:25.444: OSPF-110 ADJ   Et0/0: Nbr 5.5.5.5: Clean-up dbase exchange
+
+R3(config-router)#do sh ip ospf nei 
+
+Neighbor ID     Pri   State           Dead Time   Address         Interface
+5.5.5.5           0   INIT/  -        00:00:30    10.3.5.5        Ethernet0/0
+1.1.1.1           0   FULL/  -        00:00:36    10.1.3.1        Ethernet0/1
+R3(config-router)#
+R3(config-router)#
+R3(config-router)#
+*Nov  8 12:26:05.444: OSPF-110 ADJ   Et0/0: 5.5.5.5 address 10.3.5.5 is dead
+*Nov  8 12:26:05.444: OSPF-110 ADJ   Et0/0: 5.5.5.5 address 10.3.5.5 is dead, state DOWN
+R3(config-router)#
+*Nov  8 12:26:05.444: %OSPF-5-ADJCHG: Process 110, Nbr 5.5.5.5 on Ethernet0/0 from INIT to DOWN, Neighbor Down: Dead timer expired
+R3(config-router)#
+*Nov  8 12:26:54.492: OSPF-110 ADJ   Et0/0: 2 Way Communication to 5.5.5.5, state 2WAY
+*Nov  8 12:26:54.492: OSPF-110 ADJ   Et0/0: Nbr 5.5.5.5: Prepare dbase exchange
+*Nov  8 12:26:54.492: OSPF-110 ADJ   Et0/0: Send DBD to 5.5.5.5 seq 0xC75 opt 0x52 flag 0x7 len 32
+*Nov  8 12:26:54.493: OSPF-110 ADJ   Et0/0: Rcv DBD from 5.5.5.5 seq 0x187 opt 0x52 flag 0x7 len 32  mtu 1500 state EXSTART
+*Nov  8 12:26:54.493: OSPF-110 ADJ   Et0/0: NBR Negotiation Done. We are the SLAVE
+*Nov  8 12:26:54.493: OSPF-110 ADJ   Et0/0: Nbr 5.5.5.5: Summary list built, size 7
+*Nov  8 12:26:54.493: OSPF-110 ADJ   Et0/0: Send DBD to 5.5.5.5 seq 0x187 opt 0x52 flag 0x2 len 172
+*Nov  8 12:26:54.493: OSPF-110 ADJ   Et0/0: Rcv DBD from 5.5.5.5 seq 0x188 opt 0x52 flag 0x1 len 72  mtu 1500 state EXCHANGE
+*Nov  8 12:26:54.493: OSPF-110 ADJ   Et0/0: Exchange Done with 5.5.5.5
+*Nov  8 12:26:54.493: OSPF-110 ADJ   Et0/0: Send LS REQ to 5.5.5.5 length 36
+*Nov  8 12:26:54.493: OSPF-110 ADJ   Et0/0: Send DBD to 5.5.5.5 seq 0x188 opt 0x52 flag 0x0 len 32
+*Nov  8 12:26:54.493: OSPF-110 ADJ   Et0/0: Rcv LS UPD from Nbr ID 5.5.5.5 length 52 LSA count 1
+*Nov  8 12:26:54.493: OSPF-110 ADJ   Et0/0: Synchronized with 5.5.5.5, state FULL
+*Nov  8 12:26:54.493: %OSPF-5-ADJCHG: Process 110, Nbr 5.5.5.5 on Ethernet0/0 from LOADING to FULL, Loading Done
+R3(config-router)#
+*Nov  8 12:26:54.493: OSPF-110 ADJ   Et0/0: Rcv LS REQ from 5.5.5.5 length 36 LSA count 1
+R3(config-router)#
+```
+
+- Enabling this feature for OSPFv3:
+
+```
+conf t
+ ipv6 unicast-routing
+ router ospfv3 100
+  shutdown
+```
+
+- R5:
+
+```
+R5(config-if)#do sh ospfv3 nei
+
+          OSPFv3 100 address-family ipv4 (router-id 5.5.5.6)
+
+Neighbor ID     Pri   State           Dead Time   Interface ID    Interface
+3.3.3.4           1   FULL/DR         00:00:37    1               Ethernet0/0
+
+          OSPFv3 100 address-family ipv6 (router-id 5.5.5.6)
+
+Neighbor ID     Pri   State           Dead Time   Interface ID    Interface
+3.3.3.4           1   FULL/DR         00:00:38    1               Ethernet0/0
+
+5(config-if)#router ospfv3 100
+R5(config-router)#sh
+R5(config-router)#shutdown 
+R5(config-router)#
+*Nov  8 12:37:45.751: %OSPFv3-6-SHUTDOWN_START: OSPFv3-100-IPv4 Shutdown started
+*Nov  8 12:37:45.751: %OSPFv3-6-SHUTDOWN_START: OSPFv3-100-IPv6 Shutdown started
+R5(config-router)#
+*Nov  8 12:38:15.850: %OSPFv3-5-ADJCHG: Process 100, IPv6, Nbr 3.3.3.4 on Ethernet0/0 from FULL to DOWN, Neighbor Down: Interface down or detached
+*Nov  8 12:38:15.851: %OSPFv3-6-SHUTDOWN_COMPLETE: OSPFv3-100-IPv6 Shutdown completed
+*Nov  8 12:38:15.851: %OSPFv3-5-ADJCHG: Process 100, IPv4, Nbr 3.3.3.4 on Ethernet0/0 from FULL to DOWN, Neighbor Down: Interface down or detached
+R5(config-router)#
+*Nov  8 12:38:15.851: %OSPFv3-6-SHUTDOWN_COMPLETE: OSPFv3-100-IPv4 Shutdown completed
+R5(config-router)#no sh
+R5(config-router)#no shutdown 
+R5(config-router)#
+*Nov  8 12:38:43.442: %OSPFv3-5-ADJCHG: Process 100, IPv6, Nbr 3.3.3.4 on Ethernet0/0 from LOADING to FULL, Loading Done
+*Nov  8 12:38:43.442: %OSPFv3-5-ADJCHG: Process 100, IPv4, Nbr 3.3.3.4 on Ethernet0/0 from LOADING to FULL, Loading Done
+```
+
+- R3:
+
+```
+R3#debug ospfv3 adj
+
+R3#sh ospfv3 nei   
+
+          OSPFv3 100 address-family ipv4 (router-id 3.3.3.4)
+
+Neighbor ID     Pri   State           Dead Time   Interface ID    Interface
+5.5.5.6           0   FULL/DROTHER    00:00:34    1               Ethernet0/0
+
+          OSPFv3 100 address-family ipv6 (router-id 3.3.3.4)
+
+Neighbor ID     Pri   State           Dead Time   Interface ID    Interface
+5.5.5.6           0   FULL/DROTHER    00:00:37    1               Ethernet0/0
+R3#
+*Nov  8 12:38:15.752: OSPFv3-100-IPv6 ADJ   Et0/0: Cannot see ourself in hello from 5.5.5.6 , state INIT
+*Nov  8 12:38:15.752: OSPFv3-100-IPv6 ADJ   Et0/0: Neighbor change Event
+*Nov  8 12:38:15.752: OSPFv3-100-IPv6 ADJ   Et0/0: DR/BDR election
+*Nov  8 12:38:15.752: OSPFv3-100-IPv6 ADJ   Et0/0: Elect BDR 0.0.0.0
+*Nov  8 12:38:15.752: OSPFv3-100-IPv6 ADJ   Et0/0: Elect DR 3.3.3.4
+*Nov  8 12:38:15.752: OSPFv3-100-IPv6 ADJ   Et0/0: DR: 3.3.3.4 (Id)
+*Nov  8 12:38:15.752: OSPFv3-100-IPv6 ADJ   Et0/0:    BDR: none 
+*Nov  8 12:38:15.752: OSPFv3-100-IPv4 ADJ   Et0/0: Cannot see ourself in hello from 5.5.5.6 , state INIT
+R3#
+*Nov  8 12:38:15.752: OSPFv3-100-IPv4 ADJ   Et0/0: Neighbor change Event
+*Nov  8 12:38:15.752: OSPFv3-100-IPv4 ADJ   Et0/0: DR/BDR election
+*Nov  8 12:38:15.752: OSPFv3-100-IPv4 ADJ   Et0/0: Elect BDR 0.0.0.0
+*Nov  8 12:38:15.752: OSPFv3-100-IPv4 ADJ   Et0/0: Elect DR 3.3.3.4
+*Nov  8 12:38:15.752: OSPFv3-100-IPv4 ADJ   Et0/0: DR: 3.3.3.4 (Id)
+*Nov  8 12:38:15.752: OSPFv3-100-IPv4 ADJ   Et0/0:    BDR: none 
+R3#sh ospfv3 nei
+
+          OSPFv3 100 address-family ipv4 (router-id 3.3.3.4)
+
+Neighbor ID     Pri   State           Dead Time   Interface ID    Interface
+5.5.5.6           0   INIT/DROTHER    00:00:34    1               Ethernet0/0
+
+          OSPFv3 100 address-family ipv6 (router-id 3.3.3.4)
+
+Neighbor ID     Pri   State           Dead Time   Interface ID    Interface
+5.5.5.6           0   INIT/DROTHER    00:00:34    1               Ethernet0/0
+R3#sh ospfv3 nei
+
+          OSPFv3 100 address-family ipv4 (router-id 3.3.3.4)
+
+Neighbor ID     Pri   State           Dead Time   Interface ID    Interface
+5.5.5.6           0   INIT/DROTHER    00:00:16    1               Ethernet0/0
+
+          OSPFv3 100 address-family ipv6 (router-id 3.3.3.4)
+
+Neighbor ID     Pri   State           Dead Time   Interface ID    Interface
+5.5.5.6           0   INIT/DROTHER    00:00:16    1               Ethernet0/0
+R3#
+*Nov  8 12:38:43.440: OSPFv3-100-IPv4 ADJ   Et0/0: 2 Way Communication to 5.5.5.6, state 2WAY
+*Nov  8 12:38:43.440: OSPFv3-100-IPv4 ADJ   Et0/0: Neighbor change Event
+*Nov  8 12:38:43.440: OSPFv3-100-IPv4 ADJ   Et0/0: DR/BDR election
+*Nov  8 12:38:43.440: OSPFv3-100-IPv4 ADJ   Et0/0: Elect BDR 5.5.5.6
+*Nov  8 12:38:43.440: OSPFv3-100-IPv4 ADJ   Et0/0: Elect DR 3.3.3.4
+*Nov  8 12:38:43.440: OSPFv3-100-IPv4 ADJ   Et0/0: DR: 3.3.3.4 (Id)
+*Nov  8 12:38:43.440: OSPFv3-100-IPv4 ADJ   Et0/0:    BDR: 5.5.5.6 (Id)
+*Nov  8 12:38:43.440: OSPFv3-100-IPv4 ADJ   Et0/0: Nbr 5.5.5.6: Prepare dbase exchange
+*Nov  8 12:38:43.440: OSPFv3-100-IPv4 ADJ   Et0/0: Send DBD to 5.5.5.6 seq 0xACB2549 opt 0x112 flag 0x7 len 28
+*Nov  8 12:38:43.440: OSPFv3-100-IPv4 ADJ   Et0/0: Neighbor change Event
+*Nov  8 12:38:43.440: OSPFv3-100-IPv4 ADJ   Et0/0: DR/BDR election
+*Nov  8 12:38:43.440: OSPFv3-100-IPv4 ADJ   Et0/0: Elect BDR 5.5.5.6
+*Nov  8 12:38:43.440: OSPFv3-100-IPv4 ADJ   Et0/0: Elect DR 3.3.3.4
+*Nov  8 12:38:43.440: OSPFv3-100-IPv4 ADJ   Et0/0: DR: 3.3.3.4 (Id)
+*Nov  8 12:38:43.440: OSPFv3-100-IPv4 ADJ   Et0/0:    BDR: 5.5.5.6 (Id)
+*Nov  8 12:38:43.440: OSPFv3-100-IPv4 ADJ   Et0/0: Neighbor change Event
+*Nov  8 12:38:43.441: OSPFv3-100-IPv4 ADJ   Et0/0: DR/BDR election
+*Nov  8 12:38:43.441: OSPFv3-100-IPv4 ADJ   Et0/0: Elect BDR 5.5.5.6
+*Nov  8 12:38:43.441: OSPFv3-100-IPv4 ADJ   Et0/0: Elect DR 3.3.3.4
+*Nov  8 12:38:43.441: OSPFv3-100-IPv4 ADJ   Et0/0: DR: 3.3.3.4 (Id)
+*Nov  8 12:38:43.441: OSPFv3-100-IPv4 ADJ   Et0/0:    BDR: 5.5.5.6 (Id)
+*Nov  8 12:38:43.441: OSPFv3-100-IPv6 ADJ   Et0/0: 2 Way Communication to 5.5.5.6, state 2WAY
+*Nov  8 12:38:43.441: OSPFv3-100-IPv6 ADJ   Et0/0: Neighbor change Event
+*Nov  8 12:38:43.441: OSPFv3-100-IPv6 ADJ   Et0/0: DR/BDR election
+*Nov  8 12:38:43.441: OSPFv3-100-IPv6 ADJ   Et0/0: Elect BDR 5.5.5.6
+*Nov  8 12:38:43.441: OSPFv3-100-IPv6 ADJ   Et0/0: Elect DR 3.3.3.4
+*Nov  8 12:38:43.441: OSPFv3-100-IPv6 ADJ   Et0/0: DR: 3.3.3.4 (Id)
+*Nov  8 12:38:43.441: OSPFv3-100-IPv6 ADJ   Et0/0:    BDR: 5.5.5.6 (Id)
+*Nov  8 12:38:43.441: OSPFv3-100-IPv6 ADJ   Et0/0: Nbr 5.5.5.6: Prepare dbase exchange
+*Nov  8 12:38:43.441: OSPFv3-100-IPv6 ADJ   Et0/0: Send DBD to 5.5.5.6 seq 0x35D80D09 opt 0x13 flag 0x7 len 28
+*Nov  8 12:38:43.441: OSPFv3-100-IPv6 ADJ   Et0/0: Neighbor change Event
+*Nov  8 12:38:43.441: OSPFv3-100-IPv6 ADJ   Et0/0: DR/BDR election
+*Nov  8 12:38:43.441: OSPFv3-100-IPv6 ADJ   Et0/0: Elect BDR 5.5.5.6
+*Nov  8 12:38:43.441: OSPFv3-100-IPv6 ADJ   Et0/0: Elect DR 3.3.3.4
+*Nov  8 12:38:43.441: OSPFv3-100-IPv6 ADJ   Et0/0: DR: 3.3.3.4 (Id)
+*Nov  8 12:38:43.441: OSPFv3-100-IPv6 ADJ   Et0/0:    BDR: 5.5.5.6 (Id)
+*Nov  8 12:38:43.441: OSPFv3-100-IPv6 ADJ   Et0/0: Neighbor change Event
+*Nov  8 12:38:43.441: OSPFv3-100-IPv6 ADJ   Et0/0: DR/BDR election
+*Nov  8 12:38:43.441: OSPFv3-100-IPv6 ADJ   Et0/0: Elect BDR 5.5.5.6
+*Nov  8 12:38:43.441: OSPFv3-100-IPv6 ADJ   Et0/0: Elect DR 3.3.3.4
+*Nov  8 12:38:43.441: OSPFv3-100-IPv6 ADJ   Et0/0: DR: 3.3.3.4 (Id)
+*Nov  8 12:38:43.441: OSPFv3-100-IPv6 ADJ   Et0/0:    BDR: 5.5.5.6 (Id)
+*Nov  8 12:38:43.441: OSPFv3-100-IPv4 ADJ   Et0/0: Rcv DBD from 5.5.5.6 seq 0x8185937 opt 0x112 flag 0x7 len 28 mtu 1500 state EXSTART
+*Nov  8 12:38:43.441: OSPFv3-100-IPv4 ADJ   Et0/0: NBR Negotiation Done. We are the SLAVE
+*Nov  8 12:38:43.441: OSPFv3-100-IPv4 ADJ   Et0/0: Nbr 5.5.5.6: Summary list built, size 4
+*Nov  8 12:38:43.441: OSPFv3-100-IPv4 ADJ   Et0/0: Send DBD to 5.5.5.6 seq 0x8185937 opt 0x112 flag 0x2 len 108
+*Nov  8 12:38:43.441: OSPFv3-100-IPv6 ADJ   Et0/0: Rcv DBD from 5.5.5.6 seq 0x6173AA0 opt 0x13 flag 0x7 len 28 mtu 1500 state EXSTART
+*Nov  8 12:38:43.441: OSPFv3-100-IPv6 ADJ   Et0/0: NBR Negotiation Done. We are the SLAVE
+*Nov  8 12:38:43.441: OSPFv3-100-IPv6 ADJ   Et0/0: Nbr 5.5.5.6: Summary list built, size 3
+*Nov  8 12:38:43.441: OSPFv3-100-IPv6 ADJ   Et0/0: Send DBD to 5.5.5.6 seq 0x6173AA0 opt 0x13 flag 0x2 len 88
+*Nov  8 12:38:43.441: OSPFv3-100-IPv4 ADJ   Et0/0: Rcv DBD from 5.5.5.6 seq 0x8185938 opt 0x112 flag 0x1 len 88 mtu 1500 state EXCHANGE
+*Nov  8 12:38:43.441: OSPFv3-100-IPv4 ADJ   Et0/0: Exchange Done with 5.5.5.6
+*Nov  8 12:38:43.441: OSPFv3-100-IPv4 ADJ   Et0/0: Send LS REQ to 5.5.5.6 length 52
+*Nov  8 12:38:43.441: OSPFv3-100-IPv4 ADJ   Et0/0: Send DBD to 5.5.5.6 seq 0x8185938 opt 0x112 flag 0x0 len 28
+*Nov  8 12:38:43.441: OSPFv3-100-IPv6 ADJ   Et0/0: Rcv DBD from 5.5.5.6 seq 0x6173AA1 opt 0x13 flag 0x1 len 68 mtu 1500 state EXCHANGE
+*Nov  8 12:38:43.441: OSPFv3-100-IPv6 ADJ   Et0/0: Exchange Done with 5.5.5.6
+*Nov  8 12:38:43.441: OSPFv3-100-IPv6 ADJ   Et0/0: Send LS REQ to 5.5.5.6 length 40
+*Nov  8 12:38:43.441: OSPFv3-100-IPv6 ADJ   Et0/0: Send DBD to 5.5.5.6 seq 0x6173AA1 opt 0x13 flag 0x0 len 28
+*Nov  8 12:38:43.442: OSPFv3-100-IPv6 ADJ   Et0/0: Rcv LS UPD from Nbr ID 5.5.5.6 length 88 LSA count 2
+*Nov  8 12:38:43.442: OSPFv3-100-IPv6 ADJ   Et0/0: Synchronized with 5.5.5.6, state FULL
+*Nov  8 12:38:43.442: %OSPFv3-5-ADJCHG: Process 100, IPv6, Nbr 5.5.5.6 on Ethernet0/0 from LOADING to FULL, Loading Done
+*Nov  8 12:38:43.442: OSPFv3-100-IPv6 ADJ   Et0/0: Rcv LS REQ from 5.5.5.6 length 40 LSA count 2
+*Nov  8 12:38:43.442: OSPFv3-100-IPv4 ADJ   Et0/0: Rcv LS UPD from Nbr ID 5.5.5.6 length 136 LSA count 3
+*Nov  8 12:38:43.442: OSPFv3-100-IPv4 ADJ   Et0/0: Synchronized with 5.5.5.6, state FULL
+*Nov  8 12:38:43.442: %OSPFv3-5-ADJCHG: Process 100, IPv4, Nbr 5.5.5.6 on Ethernet0/0 from LOADING to FULL, Loading Done
+R3#
+*Nov  8 12:38:43.442: OSPFv3-100-IPv4 ADJ   Et0/0: Rcv LS REQ from 5.5.5.6 length 52 LSA count 3
+R3#
+*Nov  8 12:38:58.441: OSPFv3-100-IPv4 ADJ   Et0/0: Nbr 5.5.5.6: Clean-up dbase exchange
+*Nov  8 12:38:58.441: OSPFv3-100-IPv6 ADJ   Et0/0: Nbr 5.5.5.6: Clean-up dbase exchange
+```
+
