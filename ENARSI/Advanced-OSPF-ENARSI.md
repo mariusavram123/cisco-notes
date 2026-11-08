@@ -1279,7 +1279,7 @@ Gateway of last resort is 10.1.34.3 to network 0.0.0.0
 O*IA  0.0.0.0/0 [110/2] via 10.1.34.3, 00:04:46, GigabitEthernet1
 ```
 
-#### Not-So-Stubby Areas
+#### Not-so-Stubby Areas
 
 - An OSPF stub area prohibits Type 5 LSAs (external routes) and Type 4 LSAs (ASBR summary LSAs) from entering the area at the ABR, and it prohibits redistribution of external routes into the stub area too
 
@@ -4355,3 +4355,582 @@ R3#
 *Nov  8 12:38:58.441: OSPFv3-100-IPv6 ADJ   Et0/0: Nbr 5.5.5.6: Clean-up dbase exchange
 ```
 
+#### OSPF TTL Security
+
+- Can be enabled globally or per interface
+
+- It is required to protect OSPF packets from being forwarded further than it needs to be
+
+- Enabling it between R1 and R2
+
+- R2:
+
+```
+conf t
+ router ospf 12
+  ttl-security all-interfaces
+```
+
+```
+R2(config-router)#do debug ip ospf adj
+OSPF adjacency debugging is on
+R2(config-router)#
+R2(config-router)#
+R2(config-router)#do debug ip ospf adh
+*Nov  8 13:04:49.581: OSPF-122 ADJ   Et0/0: Drop packet from 10.1.2.1 with TTL: 1
+R2(config-router)#                    
+R2(config-router)#
+R2(config-router)#
+*Nov  8 13:04:58.723: OSPF-122 ADJ   Et0/0: Drop packet from 10.1.2.1 with TTL: 1
+R2(config-router)#
+*Nov  8 13:05:08.395: OSPF-122 ADJ   Et0/0: Drop packet from 10.1.2.1 with TTL: 1
+R2(config-router)#
+*Nov  8 13:05:17.636: OSPF-122 ADJ   Et0/0: Drop packet from 10.1.2.1 with TTL: 1
+R2(config-router)#
+*Nov  8 13:05:27.472: OSPF-122 ADJ   Et0/0: Drop packet from 10.1.2.1 with TTL: 1
+R2(config-router)#
+*Nov  8 13:05:36.556: OSPF-122 ADJ   Et0/0: Drop packet from 10.1.2.1 with TTL: 1
+R2(config-router)#
+*Nov  8 13:05:46.095: OSPF-122 ADJ   Et0/0: Drop packet from 10.1.2.1 with TTL: 1
+R2(config-router)#
+*Nov  8 13:05:55.594: OSPF-122 ADJ   Et0/0: Drop packet from 10.1.2.1 with TTL: 1
+R2(config-router)#
+*Nov  8 13:06:05.567: OSPF-122 ADJ   Et0/0: Drop packet from 10.1.2.1 with TTL: 1
+R2(config-router)#
+*Nov  8 13:06:14.799: OSPF-122 ADJ   Et0/0: Drop packet from 10.1.2.1 with TTL: 1
+R2(config-router)#
+*Nov  8 13:06:24.157: OSPF-122 ADJ   Et0/0: Drop packet from 10.1.2.1 with TTL: 1
+R2(config-router)#
+*Nov  8 13:06:33.655: OSPF-122 ADJ   Et0/0: Drop packet from 10.1.2.1 with TTL: 1
+R2(config-router)#
+*Nov  8 13:06:43.001: OSPF-122 ADJ   Et0/0: Drop packet from 10.1.2.1 with TTL: 1
+R2(config-router)#
+*Nov  8 13:06:52.211: OSPF-122 ADJ   Et0/0: Drop packet from 10.1.2.1 with TTL: 1
+R2(config-router)#
+```
+
+- After configuring TTL security on R1:
+
+```
+R2(config-router)#
+*Nov  8 13:07:20.554: OSPF-122 ADJ   Et0/0: Drop packet from 10.1.2.1 with TTL: 1
+R2(config-router)#
+*Nov  8 13:07:29.621: OSPF-122 ADJ   Et0/0: 2 Way Communication to 1.1.1.1, state 2WAY
+*Nov  8 13:07:29.621: OSPF-122 ADJ   Et0/0: Nbr 1.1.1.1: Prepare dbase exchange
+*Nov  8 13:07:29.621: OSPF-122 ADJ   Et0/0: Send DBD to 1.1.1.1 seq 0x2508 opt 0x52 flag 0x7 len 32
+*Nov  8 13:07:29.622: OSPF-122 ADJ   Et0/0: Rcv DBD from 1.1.1.1 seq 0x7B8 opt 0x52 flag 0x7 len 32  mtu 1500 state EXSTART
+*Nov  8 13:07:29.622: OSPF-122 ADJ   Et0/0: First DBD and we are not SLAVE
+*Nov  8 13:07:29.622: OSPF-122 ADJ   Et0/0: Rcv DBD from 1.1.1.1 seq 0x2508 opt 0x52 flag 0x2 len 72  mtu 1500 state EXSTART
+*Nov  8 13:07:29.622: OSPF-122 ADJ   Et0/0: NBR Negotiation Done. We are the MASTER
+*Nov  8 13:07:29.622: OSPF-122 ADJ   Et0/0: Nbr 1.1.1.1: Summary list built, size 2
+*Nov  8 13:07:29.622: OSPF-122 ADJ   Et0/0: Send DBD to 1.1.1.1 seq 0x2509 opt 0x52 flag 0x1 len 72
+*Nov  8 13:07:29.622: OSPF-122 ADJ   Et0/0: Rcv LS REQ from 1.1.1.1 length 36 LSA count 1
+*Nov  8 13:07:29.622: OSPF-122 ADJ   Et0/0: Send LS UPD to 10.1.2.1 length 136 LSA count 1
+*Nov  8 13:07:29.622: OSPF-122 ADJ   Et0/0: Rcv DBD from 1.1.1.1 seq 0x2509 opt 0x52 flag 0x0 len 32  mtu 1500 state EXCHANGE
+*Nov  8 13:07:29.622: OSPF-122 ADJ   Et0/0: Exchange Done with 1.1.1.1
+*Nov  8 13:07:29.622: OSPF-122 ADJ   Et0/0: Send LS REQ to 1.1.1.1 length 36
+*Nov  8 13:07:29.623: OSPF-122 ADJ   Et0/0: Rcv LS UPD from Nbr ID 1.1.1.1 length 124 LSA count 1
+*Nov  8 13:07:29.623: OSPF-122 ADJ   Et0/0: Synchronized with 1.1.1.1, state FULL
+R2(config-router)#
+*Nov  8 13:07:29.623: %OSPF-5-ADJCHG: Process 122, Nbr 1.1.1.1 on Ethernet0/0 from LOADING to FULL, Loading Done
+R2(config-router)#do un all
+```
+
+- R1:
+
+```
+R1(config-router)#ttl-security all-interfaces 
+R1(config-router)#int e0/1
+R1(config-if)#no ip os
+R1(config-if)#no ip ospf tt
+R1(config-if)#no ip ospf ttl-security 
+*Nov  8 13:07:29.621: OSPF-12 ADJ   Et0/0: 2 Way Communication to 2.2.2.2, state 2WAY
+*Nov  8 13:07:29.621: OSPF-12 ADJ   Et0/0: Nbr 2.2.2.2: Prepare dbase exchange
+*Nov  8 13:07:29.621: OSPF-12 ADJ   Et0/0: Send DBD to 2.2.2.2 seq 0x7B8 opt 0x52 flag 0x7 len 32
+*Nov  8 13:07:29.621: OSPF-12 ADJ   Et0/0: Rcv DBD from 2.2.2.2 seq 0x2508 opt 0x52 flag 0x7 len 32  mtu 1500 state EXSTART
+*Nov  8 13:07:29.621: OSPF-12 ADJ   Et0/0: NBR Negotiation Done. We are the SLAVE
+*Nov  8 13:07:29.621: OSPF-12 ADJ   Et0/0: Nbr 2.2.2.2: Summary list built, size 2
+*Nov  8 13:07:29.621: OSPF-12 ADJ   Et0/0: Send DBD to 2.2.2.2 seq 0x2508 opt 0x52 flag 0x2 len 72
+*Nov  8 13:07:29.622: OSPF-12 ADJ   Et0/0: Rcv DBD from 2.2.2.2 seq 0x2509 opt 0x52 flag 0x1 len 72  mtu 1500 state EXCHANGE
+*Nov  8 13:07:29.622: OSPF-12 ADJ   Et0/0: Exchange Done with 2.2.2.2
+*Nov  8 13:07:29.622: OSPF-12 ADJ   Et0/0: Send LS REQ to 2.2.2.2 length 36
+*Nov  8 13:07:29.622: OSPF-12 ADJ   Et0/0: Send DBD to 2.2.2.2 seq 0x2509 opt 0x52 flag 0x0 len 32
+*Nov  8 13:07:29.623: OSPF-12 ADJ   Et0/0: Rcv LS UPD from Nbr ID 2.2.2.2 length 136 LSA count 1
+*Nov  8 13:07:29.623: OSPF-12 ADJ   Et0/0: Synchronized with 2.2.2.2, state FULL
+*Nov  8 13:07:29.623: %OSPF-5-ADJCHG: Process 12, Nbr 2.2.2.2 on Ethernet0/0 from LOADING to FULL, Loading Done
+R1(config-if)#no ip ospf ttl-security ?
+  <cr>  <cr>
+
+R1(config-if)#no ip ospf ttl-security 
+*Nov  8 13:07:29.623: OSPF-12 ADJ   Et0/0: Rcv LS REQ from 2.2.2.2 length 36 LSA count 1
+R1(config-if)#no ip ospf ttl-security 
+R1(config-if)#do wr
+Building configuration...
+[OK]
+R1(config-if)#
+*Nov  8 13:08:09.622: OSPF-12 ADJ   Et0/0: Nbr 2.2.2.2: Clean-up dbase exchange
+R1(config-if)#
+```
+
+- This can also be enabled/disabled at the interface level
+
+- Enabling TTL security at the interface level on R1:
+
+```
+conf t
+ int e0/0
+  ip ospf ttl-security
+```
+
+- We can see in the capture that now the devices sent the hello packets with TTL 255
+
+![ospf-ttl-security-255](./ospf-ttl-security-255.png)
+
+- Disabling TTL security on the interface
+
+- R2:
+
+```
+conf t
+ int e0/0
+  ip ospf ttl-security disable !!!! Use this when leaving ttl-security enabled at the interface level for OSPF
+```
+
+- R1:
+
+```
+conf t
+ int e0/0
+  no ip ospf ttl-security
+```
+
+```
+R2(config-router)#do sh ip ospf nei
+
+Neighbor ID     Pri   State           Dead Time   Address         Interface
+1.1.1.1           0   FULL/  -        00:00:34    10.1.2.1        Ethernet0/0
+```
+
+- Verify that TTL security is enabled for OSPF on the interface:
+
+```
+R2(config-if)#do sh ip ospf int e0/0
+Ethernet0/0 is up, line protocol is up 
+  Internet Address 10.1.2.2/24, Interface ID 2, Area 0
+  Attached via Network Statement
+  Process ID 122, Router ID 2.2.2.2, Network Type POINT_TO_POINT, Cost: 1
+  Topology-MTID    Cost    Disabled    Shutdown      Topology Name
+        0           1         no          no            Base
+  Transmit Delay is 1 sec, State POINT_TO_POINT
+  Timer intervals configured, Hello 10, Dead 40, Wait 40, Retransmit 5
+    oob-resync timeout 40
+    Hello due in 00:00:04
+  Supports Link-local Signaling (LLS)
+  Cisco NSF helper support enabled
+  IETF NSF helper support enabled
+  Strict TTL checking enabled  !!! TTL security enabled
+  Can be protected by per-prefix Loop-Free FastReroute
+  Can be used for per-prefix Loop-Free FastReroute repair paths
+  Not Protected by per-prefix TI-LFA
+  Index 1/1/1, flood queue length 0
+  Next 0x0(0)/0x0(0)/0x0(0)
+  Last flood scan length is 1, maximum is 2
+  Last flood scan time is 0 msec, maximum is 1 msec
+  Neighbor Count is 1, Adjacent neighbor count is 1 
+    Adjacent with neighbor 1.1.1.1
+  Suppress hello for 0 neighbor(s)
+```
+
+#### OSPF LSA Throttling
+
+- By default OSPF will wait 5 seconds in case a link flaps before reconverging the SPF tree. This happens every time there is a link flap (up, wait 5 seconds, down, wait 5 seconds), etc
+
+- LSA Throttling enables us to reconverge the network within miliseconds
+
+- It also adds a few timers
+
+- This allows to bring a network where some OSPF links flap, into a more stable network
+
+```
+R2(config-router)#do sh run all | s router ospf
+router ospf 110
+ router-id 2.2.2.2
+ priority 64
+ queue-depth update 200
+ queue-depth hello unlimited
+ compatible rfc1583
+ no compatible rfc1587
+ compatible rfc5243
+ no interface-id snmp-if-index
+ no ignore lsa mospf
+ adjacency stagger 300 300
+ event-log size 1000
+ log-adjacency-changes
+ discard-route external 254 internal 110
+ no local-rib-criteria
+ auto-cost reference-bandwidth 100
+ max-lsa 50000 75 ignore-time 5 reset-time 10 ignore-count 5
+ limit retransmissions dc 24 non-dc 24
+ no shutdown
+ no prefix-suppression
+ nsf cisco helper
+ nsf ietf helper
+ capability opaque
+ capability lls
+ capability transit
+ no multicast-intact
+ no area 0 authentication
+ area 0 default-cost 1
+ timers throttle spf 50 200 5000
+ timers throttle lsa 50 200 5000 !!! THESE ARE THE INTERESTING TIMERS
+ timers lsa arrival 100
+ timers pacing lsa-group 240
+ timers pacing flood 33
+ timers pacing retransmission 66
+ timers nsf flush 60
+ timers nsf wait 20
+ redistribute maximum-prefix 10240 75
+ network 10.1.2.2 0.0.0.0 area 0
+ no maximum-paths per-prefix-distribution
+ maximum-paths 4
+ default-metric 20
+ distance 110
+ no bfd all-interfaces
+```
+
+- These timers are: initial start time, min hold time, and max hold time
+
+- First is the initial start time (50 ms in our case). How much should I wait before joining a link flapping event
+
+- The second timer tells how long should the router hold before having a duplicate LSA. If a link comes back up and I just sent out an LSA, how much should I wait, after the link comes back in order to send the same LSA (duplicate) again (also known as hold time for dup LSA)
+
+- The third timer is the max wait time. Every time I do this, if I have duplicate LSAs, this timer is going to duble it's value. Each time a link flap happens, this timer will duble itself until it reaches the maximum timer set here
+
+- Configuration:
+
+```
+conf t
+ router ospf 110
+  timers throttle lsa 0 1000 2000
+```
+
+```
+R2(config-router)#do sh ip ospf | i LSA
+ Supports opaque LSA
+ Maximum number of non self-generated LSA allowed 50000
+    Current number of non self-generated LSA 2
+ Router is not originating router-LSAs with maximum metric
+ Initial LSA throttle delay 0 msecs
+ Minimum hold time for LSA throttle 1000 msecs !!! These are the interesting timers
+ Maximum wait time for LSA throttle 2000 msecs !!! These are the interesting timers
+ Minimum LSA arrival 100 msecs
+ LSA group pacing timer 240 secs
+ Number of external LSA 0. Checksum Sum 0x000000
+ Number of opaque AS LSA 0. Checksum Sum 0x000000
+ Number of DCbitless external and opaque AS LSA 0
+ Number of DoNotAge external and opaque AS LSA 0
+        Number of LSA 3. Checksum Sum 0x019DF1
+        Number of opaque link LSA 0. Checksum Sum 0x000000
+        Number of DCbitless LSA 0
+        Number of indication LSA 0
+        Number of DoNotAge LSA 0
+```
+
+- When you modify these timers, you should tell OSPF when it should be allowed to receive these LSAs
+
+- "Minimum LSA arrival 100 msecs" is the timer that OSPF should wait before receiving inbound duplicate LSAs 
+
+- Cisco recommends that "Minimum LSA arrival" timer to be equal or less than "Minimum hold time for LSA throttle"
+
+- Typical is to set the "Minimum LSA arrival" timer to less than "Minimum hold time for LSA throttle"
+
+```
+conf t
+ router ospf 110
+  timers lsa arrival 500
+```
+
+```
+R2(config-router)#do sh ip ospf | i LSA
+ Supports opaque LSA
+ Maximum number of non self-generated LSA allowed 50000
+    Current number of non self-generated LSA 2
+ Router is not originating router-LSAs with maximum metric
+ Initial LSA throttle delay 0 msecs
+ Minimum hold time for LSA throttle 1000 msecs
+ Maximum wait time for LSA throttle 2000 msecs
+ Minimum LSA arrival 500 msecs
+ LSA group pacing timer 240 secs
+ Number of external LSA 0. Checksum Sum 0x000000
+ Number of opaque AS LSA 0. Checksum Sum 0x000000
+ Number of DCbitless external and opaque AS LSA 0
+ Number of DoNotAge external and opaque AS LSA 0
+        Number of LSA 3. Checksum Sum 0x019DF1
+        Number of opaque link LSA 0. Checksum Sum 0x000000
+        Number of DCbitless LSA 0
+        Number of indication LSA 0
+        Number of DoNotAge LSA 0
+```
+
+- Default timers IOSv:
+
+```
+ timers throttle spf 5000 10000 10000
+ timers throttle lsa 0 5000 5000
+ timers lsa arrival 1000
+```
+
+- Default timers IOS XE:
+
+```
+ timers throttle spf 50 200 5000
+ timers throttle lsa 50 200 5000
+ timers lsa arrival 100
+```
+
+- R2 configuration:
+
+```
+router ospf 110
+ router-id 2.2.2.2
+ timers throttle lsa 0 1000 2000
+ timers lsa arrival 500
+ network 10.1.2.2 0.0.0.0 area 0
+```
+
+#### OSPF SPF Throttling
+
+- SPF Throttling feature is a waiting period. When receiving the LSAs, do not process them imediately. Add them to the LSDB first and then we will have a waiting period
+
+- Once the waiting period expires, then we will run the SPF algorithm to process the LSAs, and add the networks to the routing table
+
+- The waiting period is as follows:
+
+- IOS XE
+
+```
+timers throttle spf 50 200 5000
+```
+
+- IOSV
+
+```
+timers throttle spf 5000 10000 10000
+```
+
+```
+R2(config-router)#do sh ip ospf | i SPF
+ Initial SPF schedule delay 50 msecs
+ Minimum hold time between two consecutive SPFs 200 msecs
+ Maximum wait time between two consecutive SPFs 5000 msecs
+ Incremental-SPF disabled
+        SPF algorithm last executed 00:01:15.623 ago
+        SPF algorithm executed 8 times
+
+R1-IOSV(config-router)#do sh ip ospf | i SPF 
+ Initial SPF schedule delay 5000 msecs
+ Minimum hold time between two consecutive SPFs 10000 msecs
+ Maximum wait time between two consecutive SPFs 10000 msecs
+ Incremental-SPF disabled
+        SPF algorithm last executed 00:02:34.979 ago
+        SPF algorithm executed 4 times
+```
+
+- We have 3 timers for SPF
+
+- The first is the initial SPF schedule delay - this tells what is the initial delay that should we wait before we perform the SPF algorithm
+
+- The next timer is the minimum hold time between two consecutive SPFs - what is the minimum timer that we should wait before having a consecutive SPF calculation
+
+- The last timer is the maximum hold time between two consecutive SPF calculations - what is the maximum timer we should wait before having another SPF calculation
+
+- Changing the timers:
+
+```
+conf t
+ router ospf 110
+  timers throttle spf 1 100 1000
+```
+
+```
+R1(config-router)#do sh run all | s router ospf             
+router ospf 1
+ router-id 1.1.1.1
+ priority 64
+ queue-depth update 200
+ queue-depth hello unlimited
+ compatible rfc1583
+ no compatible rfc1587
+ compatible rfc5243
+ no interface-id snmp-if-index
+ no ignore lsa mospf
+ adjacency stagger 300 300
+ event-log size 1000
+ log-adjacency-changes
+ discard-route external 254 internal 110
+ no local-rib-criteria
+ auto-cost reference-bandwidth 100
+ max-lsa 50000 75 ignore-time 5 reset-time 10 ignore-count 5
+ limit retransmissions dc 24 non-dc 24
+ no shutdown
+ no prefix-suppression
+ nsf cisco helper
+ nsf ietf helper
+ capability opaque
+ capability lls
+ capability transit
+ no multicast-intact
+ no area 0 authentication
+ area 0 default-cost 1
+ timers throttle spf 1 100 1000 !!! TIMERS AFTER CHANGE
+ timers throttle lsa 50 200 5000
+ timers lsa arrival 100
+ timers pacing lsa-group 240
+ timers pacing flood 33
+ timers pacing retransmission 66
+ timers nsf flush 60
+ timers nsf wait 20
+ redistribute maximum-prefix 10240 75
+ network 0.0.0.0 255.255.255.255 area 0
+ no maximum-paths per-prefix-distribution
+ maximum-paths 4
+ default-metric 20
+ distance 110
+ no bfd all-interfaces
+```
+
+```
+R1(config-router)#do sh run | s router ospf
+router ospf 1
+ router-id 1.1.1.1
+ timers throttle spf 1 100 1000
+ network 0.0.0.0 255.255.255.255 area 0
+```
+
+#### OSPF Fast Hellos
+
+- Confuguring timers is done per interface in OSPF
+
+- R1:
+
+```
+conf t
+ int e0/0
+  ip ospf hello-interval 10
+  ip ospf dead-interval 40
+```
+
+- There are also some other timers. One of them is the retransmit timer. If no LS ACK is received for a LS Update, the LS ACK packet will be retransmitted
+
+- The retransmit delay by default is 5 seconds
+
+- Setting the retransmit timer on the interface:
+
+```
+conf t
+ interface e0/0
+  ip ospf retramsmit-interval 1
+```
+
+```
+R2(config-if)#do sh ip ospf int e0/0
+Ethernet0/0 is up, line protocol is up 
+  Internet Address 10.1.2.2/24, Interface ID 2, Area 0
+  Attached via Network Statement
+  Process ID 110, Router ID 2.2.2.2, Network Type POINT_TO_POINT, Cost: 1
+  Topology-MTID    Cost    Disabled    Shutdown      Topology Name
+        0           1         no          no            Base
+  Transmit Delay is 1 sec, State POINT_TO_POINT
+  Timer intervals configured, Hello 10, Dead 40, Wait 40, Retransmit 1
+    oob-resync timeout 40
+    Hello due in 00:00:02
+  Supports Link-local Signaling (LLS)
+  Cisco NSF helper support enabled
+  IETF NSF helper support enabled
+  Can be protected by per-prefix Loop-Free FastReroute
+  Can be used for per-prefix Loop-Free FastReroute repair paths
+  Not Protected by per-prefix TI-LFA
+  Index 1/1/1, flood queue length 0
+  Next 0x0(0)/0x0(0)/0x0(0)
+  Last flood scan length is 1, maximum is 6
+  Last flood scan time is 0 msec, maximum is 1 msec
+  Neighbor Count is 1, Adjacent neighbor count is 1 
+    Adjacent with neighbor 1.1.1.1
+  Suppress hello for 0 neighbor(s)
+```
+
+- Setting the fast hellos for OSPF
+
+```
+conf t
+ interface e0/0
+  ip ospf dead-interval minimal hello-multiplier 5
+```
+
+```
+R2(config-if)#do sh ip ospf int e0/0
+Ethernet0/0 is up, line protocol is up 
+  Internet Address 10.1.2.2/24, Interface ID 2, Area 0
+  Attached via Network Statement
+  Process ID 110, Router ID 2.2.2.2, Network Type POINT_TO_POINT, Cost: 1
+  Topology-MTID    Cost    Disabled    Shutdown      Topology Name
+        0           1         no          no            Base
+  Transmit Delay is 1 sec, State POINT_TO_POINT
+  Timer intervals configured, Hello 200 msec, Dead 1, Wait 1, Retransmit 1
+    oob-resync timeout 40
+    Hello due in 148 msec
+  Supports Link-local Signaling (LLS)
+  Cisco NSF helper support enabled
+  IETF NSF helper support enabled
+  Can be protected by per-prefix Loop-Free FastReroute
+  Can be used for per-prefix Loop-Free FastReroute repair paths
+  Not Protected by per-prefix TI-LFA
+  Index 1/1/1, flood queue length 0
+  Next 0x0(0)/0x0(0)/0x0(0)
+  Last flood scan length is 1, maximum is 6
+  Last flood scan time is 0 msec, maximum is 1 msec
+  Neighbor Count is 1, Adjacent neighbor count is 1 
+    Adjacent with neighbor 1.1.1.1
+  Suppress hello for 0 neighbor(s)
+```
+
+- As you can see now we have sub-second timers
+
+- On the other side of the link, the retransmit interval still remained at the default 5 seconds
+
+```
+R1(config-if)#do sh ip ospf int e0/0
+Ethernet0/0 is up, line protocol is up 
+  Internet Address 10.1.2.1/24, Interface ID 2, Area 0
+  Attached via Network Statement
+  Process ID 1, Router ID 1.1.1.1, Network Type POINT_TO_POINT, Cost: 1
+  Topology-MTID    Cost    Disabled    Shutdown      Topology Name
+        0           1         no          no            Base
+  Transmit Delay is 1 sec, State POINT_TO_POINT
+  Timer intervals configured, Hello 200 msec, Dead 1, Wait 1, Retransmit 5
+    oob-resync timeout 40
+    Hello due in 133 msec
+  Supports Link-local Signaling (LLS)
+  Cisco NSF helper support enabled
+  IETF NSF helper support enabled
+  Can be protected by per-prefix Loop-Free FastReroute
+  Can be used for per-prefix Loop-Free FastReroute repair paths
+  Not Protected by per-prefix TI-LFA
+  Index 1/1/1, flood queue length 0
+  Next 0x0(0)/0x0(0)/0x0(0)
+  Last flood scan length is 1, maximum is 5
+  Last flood scan time is 0 msec, maximum is 0 msec
+  Neighbor Count is 1, Adjacent neighbor count is 1 
+    Adjacent with neighbor 2.2.2.2
+  Suppress hello for 0 neighbor(s)
+```
+
+- Modifiying this timer on R1:
+
+```
+conf t
+ int e0/0
+  ip ospf retransmit-interval 1
+```
+
+- 

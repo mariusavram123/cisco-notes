@@ -2729,6 +2729,207 @@ Codes: * - Best, > - Installed in global RIB
       via 10.56.1.6, GigabitEthernet0/1
 ```
 
+##### Route filtering using a distribute list in `out` direction
+
+- This is used to filter out Type 5 or Type 7 LSAs advertised to a neighbor from the ASBR
+
+- **TODO**: Test this without the NSSA Area
+
+![ospf-filtering-topology](./ospf-filtering-topology.png)
+
+- Here Area 56 is a NSSA area
+
+- R6 is redistributing 172.16.1.0/24 through 172.16.31.0/24 from EIGRP into OSPF
+
+- R6 EIGRP routing table
+
+```
+R6(config-router)#do sh ip ro eigrp | b Gate
+Gateway of last resort is 10.56.1.5 to network 0.0.0.0
+
+      172.16.0.0/24 is subnetted, 16 subnets
+D        172.16.1.0 [90/130816] via 10.67.1.7, 00:31:52, GigabitEthernet0/1
+D        172.16.2.0 [90/130816] via 10.67.1.7, 00:31:52, GigabitEthernet0/1
+D        172.16.3.0 [90/130816] via 10.67.1.7, 00:31:52, GigabitEthernet0/1
+D        172.16.4.0 [90/130816] via 10.67.1.7, 00:31:52, GigabitEthernet0/1
+D        172.16.5.0 [90/130816] via 10.67.1.7, 00:31:52, GigabitEthernet0/1
+D        172.16.6.0 [90/130816] via 10.67.1.7, 00:31:52, GigabitEthernet0/1
+D        172.16.7.0 [90/130816] via 10.67.1.7, 00:31:52, GigabitEthernet0/1
+D        172.16.8.0 [90/130816] via 10.67.1.7, 00:31:52, GigabitEthernet0/1
+D        172.16.9.0 [90/130816] via 10.67.1.7, 00:31:52, GigabitEthernet0/1
+D        172.16.10.0 [90/130816] via 10.67.1.7, 00:31:52, GigabitEthernet0/1
+D        172.16.11.0 [90/130816] via 10.67.1.7, 00:31:52, GigabitEthernet0/1
+D        172.16.12.0 [90/130816] via 10.67.1.7, 00:31:52, GigabitEthernet0/1
+D        172.16.13.0 [90/130816] via 10.67.1.7, 00:31:52, GigabitEthernet0/1
+D        172.16.14.0 [90/130816] via 10.67.1.7, 00:31:52, GigabitEthernet0/1
+D        172.16.15.0 [90/130816] via 10.67.1.7, 00:31:52, GigabitEthernet0/1
+```
+
+- Now we want to filter out all these LSAs from beigh advertised to OSPF routers in Area 56
+
+- We can do that with a distribute list in `out` direction
+
+```
+R6(config-router)#do sh run | s router ospf
+router ospf 1
+ router-id 192.168.6.6
+ area 56 nssa
+ redistribute eigrp 65001 subnets
+ redistribute rip metric 250 subnets
+ passive-interface Loopback0
+ network 10.56.1.0 0.0.0.255 area 56
+ network 192.168.6.6 0.0.0.0 area 56
+ distribute-list prefix BLOCK-EXTERNALS out
+
+ip prefix-list BLOCK-EXTERNALS seq 5 deny 172.16.0.0/20 ge 24
+ip prefix-list BLOCK-EXTERNALS seq 10 permit 0.0.0.0/0 le 32
+
+```
+
+- As we can see now the 172.16.1.0...172.16.15.0 LSAs are not present on the LSDB of R6
+
+- The only Type 7 LSAs present are from the RIP redistribution
+
+```
+R6(config-router)#do sh ip ospf database
+
+            OSPF Router with ID (192.168.6.6) (Process ID 1)
+
+                Router Link States (Area 56)
+
+Link ID         ADV Router      Age         Seq#       Checksum Link count
+192.168.5.5     192.168.5.5     718         0x8000000B 0x000E15 2
+192.168.6.6     192.168.6.6     583         0x8000000A 0x001806 2
+
+                Net Link States (Area 56)
+
+Link ID         ADV Router      Age         Seq#       Checksum
+10.56.1.6       192.168.6.6     1465        0x80000003 0x002F5B
+
+                Summary Net Link States (Area 56)
+
+Link ID         ADV Router      Age         Seq#       Checksum
+0.0.0.0         192.168.5.5     1463        0x80000001 0x00EBD6
+
+                Type-7 AS External Link States (Area 56)
+
+Link ID         ADV Router      Age         Seq#       Checksum Tag
+10.67.1.0       192.168.6.6     1469        0x80000001 0x001746 0
+10.68.1.0       192.168.6.6     1469        0x80000001 0x001065 0
+172.16.31.0     192.168.6.6     1469        0x80000001 0x00F4F3 0
+```
+
+- These LSAs are also not present on R5 or R4:
+
+```
+R5#show ip ospf database nssa-external 
+
+            OSPF Router with ID (192.168.5.5) (Process ID 1)
+
+                Type-7 AS External Link States (Area 56)
+
+  LS age: 1604
+  Options: (No TOS-capability, Type 7/5 translation, DC, Upward)
+  LS Type: AS External Link
+  Link State ID: 10.67.1.0 (External Network Number )
+  Advertising Router: 192.168.6.6
+  LS Seq Number: 80000001
+  Checksum: 0x1746
+  Length: 36
+  Network Mask: /24
+        Metric Type: 2 (Larger than any link state path)
+        MTID: 0 
+        Metric: 20 
+        Forward Address: 192.168.6.6
+        External Route Tag: 0
+
+  LS age: 1604
+  Options: (No TOS-capability, Type 7/5 translation, DC, Upward)
+  LS Type: AS External Link
+  Link State ID: 10.68.1.0 (External Network Number )
+  Advertising Router: 192.168.6.6
+  LS Seq Number: 80000001
+  Checksum: 0x1065
+  Length: 36
+  Network Mask: /24
+        Metric Type: 2 (Larger than any link state path)
+        MTID: 0 
+        Metric: 250 
+        Forward Address: 192.168.6.6
+        External Route Tag: 0
+
+  LS age: 1604
+  Options: (No TOS-capability, Type 7/5 translation, DC, Upward)
+  LS Type: AS External Link
+  Link State ID: 172.16.31.0 (External Network Number )
+  Advertising Router: 192.168.6.6
+  LS Seq Number: 80000001
+  Checksum: 0xF4F3
+  Length: 36
+  Network Mask: /24
+        Metric Type: 2 (Larger than any link state path)
+        MTID: 0 
+        Metric: 250 
+        Forward Address: 192.168.6.6
+        External Route Tag: 0
+
+R4#show ip ospf database external 
+
+            OSPF Router with ID (192.168.4.4) (Process ID 1)
+
+                Type-5 AS External Link States
+
+  LS age: 1626
+  Options: (No TOS-capability, DC, Upward)
+  LS Type: AS External Link
+  Link State ID: 10.67.1.0 (External Network Number )
+  Advertising Router: 192.168.5.5
+  LS Seq Number: 80000001
+  Checksum: 0xB8B0
+  Length: 36
+  Network Mask: /24
+        Metric Type: 2 (Larger than any link state path)
+        MTID: 0 
+        Metric: 20 
+        Forward Address: 192.168.6.6
+        External Route Tag: 0
+
+  LS age: 1626
+  Options: (No TOS-capability, DC, Upward)
+  LS Type: AS External Link
+  Link State ID: 10.68.1.0 (External Network Number )
+  Advertising Router: 192.168.5.5
+  LS Seq Number: 80000001
+  Checksum: 0xB1CF
+  Length: 36
+  Network Mask: /24
+        Metric Type: 2 (Larger than any link state path)
+        MTID: 0 
+        Metric: 250 
+        Forward Address: 192.168.6.6
+        External Route Tag: 0
+
+  LS age: 1626
+  Options: (No TOS-capability, DC, Upward)
+  LS Type: AS External Link
+  Link State ID: 172.16.31.0 (External Network Number )
+  Advertising Router: 192.168.5.5
+  LS Seq Number: 80000001
+  Checksum: 0x965E
+  Length: 36
+  Network Mask: /24
+        Metric Type: 2 (Larger than any link state path)
+        MTID: 0 
+        Metric: 250 
+        Forward Address: 192.168.6.6
+        External Route Tag: 0
+
+```
+
+- **TODO DONE**: Distribute list with `out` direction works for areas that are not NSSAs too. The requirement is that the ASBR is actually the one that is redistributing them. It will not work if the distribute-list command is applied on another ASBR.
+
+- **THIS WORKS FOR FILTERING TYPE 5 AND TYPE 7 LSAs from entering the LSDB**
+
 #### Stub Area Configuration
 
 - Because all the routers in an area need to have the same LSDB, you cannot manipulate the LSAs within an area; however you can manipulate LSAs that are flowing between areas by using the stub and NSSA OSPF features
