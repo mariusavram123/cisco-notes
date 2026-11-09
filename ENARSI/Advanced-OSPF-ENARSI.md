@@ -4933,4 +4933,491 @@ conf t
   ip ospf retransmit-interval 1
 ```
 
-- 
+#### Route filtering - Distribute lists
+
+- Distribute lists are used to filter prefixes from entering in the routing table. They will not filter the LSDB, the LSDB needs to be the same on all routers in the same area
+
+- The distribute lists will not work with the `out` options to filter for routes on the same area
+
+- The `out` option will work on type 5 or type 7 LSAs and only on the router that redistributes them.
+
+- Topology:
+
+![distribute-list-filtering-topology](./distribute-list-filtering-topology.png)
+
+- Here, R1, R2 and R3 are in Area 0
+
+- Each router has 3 loopbacks: R1: 192.168.1.1/32, 192.168.1.2/32, 192.168.1.3/32, R2: 192.168.2.1/32, 192.168.2.2/32, 192.168.2.3/32, R3: 192.168.3.1/32, 192.168.3.2/32, 192.168.3.3/32
+
+- R2 and R3 have `redistribute connected` in their configuration
+
+- R1 has OSPF enabled on all interfaces
+
+- R1 OSPF configuration, including ACL and distribute list to filter the routes from 192.168.2.x range:
+
+```
+R1(config)#do sh run | s access
+ip access-list standard 1
+ 10 remark OSPF_FILTER
+ 10 deny 192.168.2.0 0.0.0.255
+ 20 permit any
+
+router ospf 123
+ router-id 1.1.1.1
+ network 0.0.0.0 255.255.255.255 area 0
+ distribute-list 1 in
+
+```
+
+- Routing table of R1 now after filtering:
+
+```
+R1(config-router)#do sh ip ro ospf | b Gate
+Gateway of last resort is not set
+
+      2.0.0.0/32 is subnetted, 1 subnets
+O E2     2.2.2.2 [110/20] via 10.1.2.2, 00:04:26, Ethernet0/0
+      3.0.0.0/32 is subnetted, 1 subnets
+O E2     3.3.3.3 [110/20] via 10.1.3.3, 00:04:26, Ethernet0/1
+      10.0.0.0/8 is variably subnetted, 7 subnets, 2 masks
+O E2     10.2.4.0/24 [110/20] via 10.1.2.2, 00:04:26, Ethernet0/0
+O E2     10.3.5.0/24 [110/20] via 10.1.3.3, 00:04:26, Ethernet0/1
+O E2     10.24.35.0/24 [110/20] via 10.1.3.3, 00:04:26, Ethernet0/1
+                       [110/20] via 10.1.2.2, 00:04:26, Ethernet0/0
+      192.168.3.0/32 is subnetted, 3 subnets
+O E2     192.168.3.1 [110/20] via 10.1.3.3, 00:04:26, Ethernet0/1
+O E2     192.168.3.2 [110/20] via 10.1.3.3, 00:04:26, Ethernet0/1
+O E2     192.168.3.3 [110/20] via 10.1.3.3, 00:04:26, Ethernet0/1
+```
+
+- R2 OSPF configuration:
+
+```
+router ospf 123
+ router-id 2.2.2.2
+ redistribute connected
+ network 10.1.2.2 0.0.0.0 area 0
+```
+
+- R3, filtering the same OSPF routes as R1, but using a prefix list:
+
+```
+ip prefix-list OSPF_FILTER seq 5 deny 192.168.2.0/24 le 32
+ip prefix-list OSPF_FILTER seq 10 permit 0.0.0.0/0 le 32
+
+R3(config)#do sh run | s router ospf
+router ospf 123
+ router-id 3.3.3.3
+ redistribute connected
+ network 10.1.3.3 0.0.0.0 area 0
+ distribute-list prefix OSPF_FILTER in
+```
+
+- The result is the same, the prefixes are filtered from entering the routing table. The LSDB is the same.
+
+```
+R3(config-router)#do sh ip ro ospf | b Gate
+Gateway of last resort is not set
+
+      1.0.0.0/32 is subnetted, 1 subnets
+O        1.1.1.1 [110/2] via 10.1.3.1, 00:33:51, Ethernet0/1
+      2.0.0.0/32 is subnetted, 1 subnets
+O E2     2.2.2.2 [110/20] via 10.1.3.1, 00:33:51, Ethernet0/1
+      10.0.0.0/8 is variably subnetted, 8 subnets, 2 masks
+O        10.1.2.0/24 [110/2] via 10.1.3.1, 00:33:51, Ethernet0/1
+O E2     10.2.4.0/24 [110/20] via 10.1.3.1, 00:33:51, Ethernet0/1
+      192.168.1.0/32 is subnetted, 3 subnets
+O        192.168.1.1 [110/2] via 10.1.3.1, 00:33:51, Ethernet0/1
+O        192.168.1.2 [110/2] via 10.1.3.1, 00:33:51, Ethernet0/1
+O        192.168.1.3 [110/2] via 10.1.3.1, 00:33:51, Ethernet0/1
+
+R3(config-router)#do sh ip ospf database
+
+            OSPF Router with ID (3.3.3.3) (Process ID 123)
+
+                Router Link States (Area 0)
+
+Link ID         ADV Router      Age         Seq#       Checksum Link count
+1.1.1.1         1.1.1.1         904         0x80000006 0x00819A 8         
+2.2.2.2         2.2.2.2         1036        0x80000004 0x00A14C 2         
+3.3.3.3         3.3.3.3         1197        0x80000004 0x00855D 2         
+
+                Type-5 AS External Link States
+
+Link ID         ADV Router      Age         Seq#       Checksum Tag
+2.2.2.2         2.2.2.2         1276        0x80000002 0x004D42 0         
+3.3.3.3         3.3.3.3         1197        0x80000002 0x000186 0         
+10.2.4.0        2.2.2.2         1276        0x80000002 0x00E2A4 0         
+10.3.5.0        3.3.3.3         1197        0x80000002 0x00ADD3 0         
+10.24.35.0      2.2.2.2         1276        0x80000002 0x0083CE 0         
+10.24.35.0      3.3.3.3         1197        0x80000002 0x0065E8 0         
+192.168.2.1     2.2.2.2         1276        0x80000002 0x00D753 0         
+192.168.2.2     2.2.2.2         1276        0x80000002 0x00CD5C 0         
+192.168.2.3     2.2.2.2         1276        0x80000002 0x00C365 0         
+192.168.3.1     3.3.3.3         1197        0x80000002 0x00AE77 0         
+192.168.3.2     3.3.3.3         1197        0x80000002 0x00A480 0         
+192.168.3.3     3.3.3.3         1197        0x80000002 0x009A89 0         
+```
+
+- Using a prefix list with `gateway` keyword on R3:
+
+```
+conf t
+ router ospf 123
+  distribute-list prefix OSPF_FILTER gateway OSPF_GATEWAY in
+  exit
+ 
+ ip prefix-list OSPF_GATEWAY permit 10.1.3.1/32 !!! MATCH THE NEXT HOP ADDRESS FROM THE ROUTING TABLE   
+```
+
+- The effect is the same as for the prefix list without gateway from above
+
+```
+R3(config)#do sh ip ro ospf | b Gate
+Gateway of last resort is not set
+
+      1.0.0.0/32 is subnetted, 1 subnets
+O        1.1.1.1 [110/2] via 10.1.3.1, 00:02:54, Ethernet0/1
+      2.0.0.0/32 is subnetted, 1 subnets
+O E2     2.2.2.2 [110/20] via 10.1.3.1, 00:02:54, Ethernet0/1
+      10.0.0.0/8 is variably subnetted, 8 subnets, 2 masks
+O        10.1.2.0/24 [110/2] via 10.1.3.1, 00:02:54, Ethernet0/1
+O E2     10.2.4.0/24 [110/20] via 10.1.3.1, 00:02:54, Ethernet0/1
+      192.168.1.0/32 is subnetted, 3 subnets
+O        192.168.1.1 [110/2] via 10.1.3.1, 00:02:54, Ethernet0/1
+O        192.168.1.2 [110/2] via 10.1.3.1, 00:02:54, Ethernet0/1
+O        192.168.1.3 [110/2] via 10.1.3.1, 00:02:54, Ethernet0/1
+```
+
+- Filtering the prefixes on R2 using a route map
+
+```
+conf t
+ access-list 1 deny 192.168.3.0 0.0.0.255
+ acesss-list 1 permit any
+
+ route-map OSPF_FILTER permit 10
+  match ip address 1
+  exit
+ 
+ router ospf 123
+  distribute-list route-map OSPF_FILTER in
+```
+
+#### Route filtering using filter lists
+
+- Filter lists can be applied on the ABRs to filter prefixes from an area to another area
+
+- This filter list will be filtering our Type 3 LSAs from an area and prevent them from entering another area
+
+- When saying area X IN - you filter the prefixes from the specified area, from entering the area
+
+- When saying area X OUT - you filter the prefixes from the specified area to be advertised into another areas present on that router
+
+![area-filter-list-topology](./area-filter-list-topology.png)
+
+- We have OSPF area 0 between R1 and R3 and area 35 between R3 (e0/0 interface) and R5
+
+- We want to prevent the loopbacks of R5 (192.168.5.X) prefixes from entering Area 0.
+
+- We do this on ABR (R3)
+
+```
+conf t
+ router ospf 123
+  area 35 filter-list prefix OSPF_FILTER out
+
+ ip prefix-list OSPF_FILTER deny 192.168.5.0/24 le 32
+ ip prefix-list OSPF_FILTER permit 0.0.0.0/0 le 32
+```
+
+- At the moment, R5 has `redistribute connected subnets` in it's configuration, so these networks are Type 5 LSAs
+
+- In this situation the route filtering will not work
+
+- Area filter list command is used to filter Type 3 LSAs, not Type 5
+
+- R5:
+
+```
+R5(config-router)#do sh run | s router ospf
+router ospf 123
+ router-id 5.5.5.5
+ redistribute connected
+ network 10.3.5.5 0.0.0.0 area 35
+```
+
+- R3:
+
+```
+R3(config-router)#do sh run | s router ospf
+router ospf 123
+ router-id 3.3.3.3
+ area 35 filter-list prefix OSPF_FILTER out
+ network 10.1.3.3 0.0.0.0 area 0
+ network 10.3.5.3 0.0.0.0 area 35
+ exit
+
+ip prefix-list OSPF_FILTER seq 5 deny 192.168.5.0/24 le 32
+ip prefix-list OSPF_FILTER seq 10 permit 0.0.0.0/0 le 32
+```
+
+- Repairing this on R5:
+
+```
+conf t
+ router ospf 123
+  network 192.168.5.0 0.0.0.255 area 35
+```
+
+- Now we can see that the prefixes are filtered on R1 (area 0)
+
+```
+R1#sh ip ro ospf | b Gate
+Gateway of last resort is not set
+
+      5.0.0.0/32 is subnetted, 1 subnets
+O E2     5.5.5.5 [110/20] via 10.1.3.3, 00:24:22, Ethernet0/1
+      10.0.0.0/8 is variably subnetted, 7 subnets, 2 masks
+O IA     10.3.5.0/24 [110/2] via 10.1.3.3, 00:17:03, Ethernet0/1
+O E2     10.5.7.0/24 [110/20] via 10.1.3.3, 00:24:22, Ethernet0/1
+O E2     10.24.35.0/24 [110/20] via 10.1.3.3, 00:05:53, Ethernet0/1
+```
+
+- Verifying the Type 3 LSAs for Area 0 on R1:
+
+```
+R1(config-router)#do sh ip ospf data
+
+            OSPF Router with ID (1.1.1.1) (Process ID 1)
+
+                Router Link States (Area 0)
+
+Link ID         ADV Router      Age         Seq#       Checksum Link count
+1.1.1.1         1.1.1.1         100         0x80000007 0x00350B 7         
+1.1.1.100       1.1.1.100       2584        0x80000005 0x00F0AC 2         
+1.1.1.101       1.1.1.101       2583        0x80000006 0x00FE99 2         
+3.3.3.3         3.3.3.3         102         0x80000011 0x00686E 2         
+
+                Summary Net Link States (Area 0)
+
+Link ID         ADV Router      Age         Seq#       Checksum
+10.3.5.0        3.3.3.3         1923        0x80000001 0x005BC2
+
+                Summary ASB Link States (Area 0)
+
+Link ID         ADV Router      Age         Seq#       Checksum
+5.5.5.5         3.3.3.3         465         0x80000002 0x0042D7
+
+                Type-5 AS External Link States
+
+Link ID         ADV Router      Age         Seq#       Checksum Tag
+1.1.1.101       1.1.1.101       3351        0x80000001 0x00557A 0         
+5.5.5.5         5.5.5.5         487         0x80000002 0x00680F 0         
+10.5.7.0        5.5.5.5         487         0x80000002 0x004332 0         
+10.24.35.0      5.5.5.5         487         0x80000002 0x00291D 0         
+```
+
+- There are no 192.168.5.x prefixes to advertise into R1's LSDB
+
+- R3 have filtered them out from being advertised from Area 35 into Area 0
+
+```
+R3(config-router)#do sh ip ospf data
+
+            OSPF Router with ID (3.3.3.3) (Process ID 123)
+
+                Router Link States (Area 0)
+
+Link ID         ADV Router      Age         Seq#       Checksum Link count
+1.1.1.1         1.1.1.1         258         0x80000007 0x00350B 7         
+1.1.1.100       1.1.1.100       2740        0x80000005 0x00F0AC 2         
+1.1.1.101       1.1.1.101       2739        0x80000006 0x00FE99 2         
+3.3.3.3         3.3.3.3         258         0x80000011 0x00686E 2         
+
+                Summary Net Link States (Area 0)
+
+Link ID         ADV Router      Age         Seq#       Checksum
+10.3.5.0        3.3.3.3         120         0x80000002 0x0059C3
+
+                Summary ASB Link States (Area 0)
+
+Link ID         ADV Router      Age         Seq#       Checksum
+5.5.5.5         3.3.3.3         622         0x80000002 0x0042D7
+
+                Router Link States (Area 35)
+
+Link ID         ADV Router      Age         Seq#       Checksum Link count
+3.3.3.3         3.3.3.3         1410        0x80000003 0x00913B 2         
+5.5.5.5         5.5.5.5         643         0x80000005 0x001823 5         
+
+                Summary Net Link States (Area 35)
+
+Link ID         ADV Router      Age         Seq#       Checksum
+1.1.1.1         3.3.3.3         252         0x80000005 0x000D1A
+10.1.2.0        3.3.3.3         252         0x80000005 0x009687
+10.1.3.0        3.3.3.3         622         0x80000003 0x00859A
+192.168.1.1     3.3.3.3         252         0x80000005 0x00744B
+192.168.1.2     3.3.3.3         252         0x80000005 0x006A54
+192.168.1.3     3.3.3.3         252         0x80000005 0x00605D
+
+                Type-5 AS External Link States
+
+Link ID         ADV Router      Age         Seq#       Checksum Tag
+1.1.1.101       1.1.1.101       3507        0x80000001 0x00557A 0         
+5.5.5.5         5.5.5.5         643         0x80000002 0x00680F 0         
+10.5.7.0        5.5.5.5         643         0x80000002 0x004332 0         
+10.24.35.0      5.5.5.5         643         0x80000002 0x00291D 0         
+```
+
+- R3's routing table still has them:
+
+```
+R3(config-router)#do sh ip ro ospf | b Gate
+Gateway of last resort is not set
+
+      1.0.0.0/32 is subnetted, 1 subnets
+O        1.1.1.1 [110/2] via 10.1.3.1, 00:07:02, Ethernet0/1
+      5.0.0.0/32 is subnetted, 1 subnets
+O E2     5.5.5.5 [110/20] via 10.3.5.5, 00:37:28, Ethernet0/0
+      10.0.0.0/8 is variably subnetted, 8 subnets, 2 masks
+O        10.1.2.0/24 [110/2] via 10.1.3.1, 00:07:02, Ethernet0/1
+O E2     10.5.7.0/24 [110/20] via 10.3.5.5, 00:37:28, Ethernet0/0
+      192.168.1.0/32 is subnetted, 3 subnets
+O        192.168.1.1 [110/2] via 10.1.3.1, 00:07:02, Ethernet0/1
+O        192.168.1.2 [110/2] via 10.1.3.1, 00:07:02, Ethernet0/1
+O        192.168.1.3 [110/2] via 10.1.3.1, 00:07:02, Ethernet0/1
+      192.168.5.0/32 is subnetted, 3 subnets
+O        192.168.5.1 [110/2] via 10.3.5.5, 00:21:18, Ethernet0/0
+O        192.168.5.2 [110/2] via 10.3.5.5, 00:21:18, Ethernet0/0
+O        192.168.5.3 [110/2] via 10.3.5.5, 00:21:18, Ethernet0/0
+```
+
+- R1's routing table and LSDB does not have them, as shown above
+
+#### OSPF in VRF-LITE
+
+- OSPF needs to be in Area 0 whenever we configure a VRF
+
+- OSPF has a down bit (DN bit)
+
+- When distributing the routes from OSPF in something like MP-BGP (in MPLS environment) we will set the down bit on the routes 
+
+- Down bit says to BGP to not advertise these routes back in another point of redistribution because it may cause a loop
+
+![OSPF-vrf-topology](./OSPF-vrf-topology.png)
+
+- In this topology, only the link between R1 and R2 will be in Area 0 and the link between R2 and R4 will be in Area 24
+
+- To make this to work we may need to disable the DN bit check or create a virtual link
+
+- Configuration on R4:
+
+```
+conf t
+ ip vrf R2
+  exit
+
+ router ospf 1 vrf R2
+  router-id 4.4.4.4
+  network 10.2.4.4 0.0.0.0 area 24
+```
+
+- With this, only the routes from R2 are in the routing table of R4
+
+- The routes directly connected to R1 are not present in the routing table
+
+- This is part of the DN bit check
+
+```
+R4(config-router)#do sh ip ro vrf R2 ospf | b Gate 
+Gateway of last resort is not set
+
+      2.0.0.0/32 is subnetted, 1 subnets
+O E2     2.2.2.2 [110/20] via 10.2.4.2, 00:08:27, Ethernet0/1
+      10.0.0.0/8 is variably subnetted, 3 subnets, 2 masks
+O E2     10.24.35.0/24 [110/20] via 10.2.4.2, 00:08:27, Ethernet0/1
+      192.168.2.0/32 is subnetted, 3 subnets
+O E2     192.168.2.1 [110/20] via 10.2.4.2, 00:08:27, Ethernet0/1
+O E2     192.168.2.2 [110/20] via 10.2.4.2, 00:08:27, Ethernet0/1
+O E2     192.168.2.3 [110/20] via 10.2.4.2, 00:08:27, Ethernet0/1
+```
+
+- The links are present in the database, but not in the routing table
+
+```
+R4(config-router)#do sh ip ospf data 
+
+            OSPF Router with ID (4.4.4.4) (Process ID 1)
+
+                Router Link States (Area 24)
+
+Link ID         ADV Router      Age         Seq#       Checksum Link count
+2.2.2.2         2.2.2.2         555         0x80000004 0x006F6B 2         
+4.4.4.4         4.4.4.4         554         0x80000002 0x00AC28 2         
+
+                Summary Net Link States (Area 24)
+
+Link ID         ADV Router      Age         Seq#       Checksum
+1.1.1.1         2.2.2.2         962         0x80000001 0x0033FB
+10.1.2.0        2.2.2.2         962         0x80000001 0x00B274
+10.1.3.0        2.2.2.2         962         0x80000001 0x00B173
+192.168.1.1     2.2.2.2         962         0x80000001 0x009A2D
+192.168.1.2     2.2.2.2         962         0x80000001 0x009036
+192.168.1.3     2.2.2.2         962         0x80000001 0x00863F
+
+                Type-5 AS External Link States
+
+Link ID         ADV Router      Age         Seq#       Checksum Tag
+2.2.2.2         2.2.2.2         923         0x80000001 0x004F41 0         
+10.24.35.0      2.2.2.2         923         0x80000001 0x0085CD 0         
+192.168.2.1     2.2.2.2         923         0x80000001 0x00D952 0         
+192.168.2.2     2.2.2.2         923         0x80000001 0x00CF5B 0         
+192.168.2.3     2.2.2.2         923         0x80000001 0x00C564 0        
+```
+
+- What we can do is to enable `capability vrf-lite` on R4. This command disables the DN bit check
+
+```
+conf t
+ router ospf 1 vrf R2
+  capability vrf-lite
+```
+
+- Configure R3 and R5 in VRF with OSPFv3 with both IPv4 and IPv6
+
+- Configure VRF on R3:
+
+```
+conf t
+ ipv6 unicast-routing
+ vrf definition R5
+  rd 10.1.3.0:34
+  address-family ipv4
+  address-family ipv6
+
+ interface Ethernet0/0
+  bandwidth 1000000
+  vrf forwarding R5
+  ip address 10.3.5.3 255.255.255.0
+  ipv6 address 2017::3/64
+  ospfv3 network point-to-point
+  ospfv3 110 ipv4 area 0
+  ospfv3 110 ipv6 area 0
+
+ interface Loopback3
+  vrf forwarding R5
+  ip address 3.3.3.3 255.255.255.255
+  ipv6 address 2033::3/128
+  ospfv3 110 ipv4 area 0
+  ospfv3 110 ipv6 area 0
+
+ router ospfv3 110
+  router-id 3.3.3.3
+  !
+  address-family ipv4 unicast vrf R5
+  exit-address-family
+  !
+  address-family ipv6 unicast vrf R5
+  exit-address-family
+```
