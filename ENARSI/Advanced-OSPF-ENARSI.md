@@ -5421,3 +5421,732 @@ conf t
   address-family ipv6 unicast vrf R5
   exit-address-family
 ```
+
+#### OSPF - BGP redistribution
+
+- Topology:
+
+![ospf-bgp-redistribution-cml-topology](./ospf-bgp-redistribution-cml-topology.png)
+
+- Each router has 3 loopbacks in the 192.168.X.Y range, where X is the router number and Y can be 1, 2, or 3, with /32 masks each
+
+- R1, R2 and R3 use EIGRP to ensure the reachability between the loopback 3 interfaces. Loopback 3 has the IP as the router IDs used by the router. R1: 1.1.1.1, R2: 2.2.2.2, R3: 3.3.3.3 etc.
+
+- EBGP and IBGP sessions between R1, R2 and R3 is made over loopbacks
+
+- R6 and R7 advertise all their interfaces in the OSPF process with `network 0.0.0.0 255.255.255.255 area 0` - as O routes
+
+- R5 advertise it's prefixes (except the interfaces participating in OSPF) with `redistribute connected` - as O E2 routes
+
+- R5 advertise it's prefixes (except the interfaces participating in OSPF) with `redistribute connected metric-type 1`- as O E1 routes
+
+- The link with the switch in between is not advertised in OSPF
+
+- R7 configuration:
+
+```
+R7(config-if)#do sh ip int br | e ass
+Interface              IP-Address      OK? Method Status                Protocol
+Ethernet0/1            10.5.7.7        YES NVRAM  up                    up      
+Loopback0              192.168.7.1     YES NVRAM  up                    up      
+Loopback1              192.168.7.2     YES NVRAM  up                    up      
+Loopback2              192.168.7.3     YES NVRAM  up                    up      
+Loopback3              7.7.7.7         YES NVRAM  up                    up      
+Loopback67             172.16.67.7     YES manual up                    up      
+
+R7(config-if)#do sh run | s router ospf
+router ospf 110
+ router-id 7.7.7.7
+ network 0.0.0.0 255.255.255.255 area 0
+```
+
+- R6 configuration:
+
+```
+R6#sh ip int br | e ass
+Interface              IP-Address      OK? Method Status                Protocol
+Ethernet0/0            10.4.6.6        YES NVRAM  up                    up      
+Ethernet0/1            10.6.100.1      YES NVRAM  up                    up      
+Loopback0              192.168.6.1     YES NVRAM  up                    up      
+Loopback1              192.168.6.2     YES NVRAM  up                    up      
+Loopback2              192.168.6.3     YES NVRAM  up                    up      
+Loopback3              6.6.6.6         YES NVRAM  up                    up      
+
+R6#sh run | s router ospf
+router ospf 110
+ router-id 6.6.6.6
+ network 0.0.0.0 255.255.255.255 area 0
+```
+
+- R5 configuration:
+
+```
+R5(config-if)#do sh ip int br | e ass
+Interface              IP-Address      OK? Method Status                Protocol
+Ethernet0/0            10.3.5.5        YES NVRAM  up                    up      
+Ethernet0/1            10.5.7.5        YES NVRAM  up                    up      
+Ethernet0/2            10.24.35.5      YES NVRAM  up                    up      
+Loopback0              192.168.5.1     YES NVRAM  up                    up      
+Loopback1              192.168.5.2     YES NVRAM  up                    up      
+Loopback2              192.168.5.3     YES NVRAM  up                    up      
+Loopback3              5.5.5.5         YES NVRAM  up                    up      
+
+
+R5(config-if)#do sh run | s router ospf
+router ospf 110
+ router-id 5.5.5.5
+ redistribute connected
+ network 10.3.5.5 0.0.0.0 area 1
+ network 10.5.7.5 0.0.0.0 area 0
+```
+
+- R4 configuration:
+
+```
+R4(config-if)#do sh ip int br | e ass
+Interface              IP-Address      OK? Method Status                Protocol
+Ethernet0/0            10.4.6.4        YES NVRAM  up                    up      
+Ethernet0/1            10.2.4.4        YES NVRAM  up                    up      
+Ethernet0/2            10.24.35.4      YES NVRAM  up                    up      
+Loopback0              192.168.4.1     YES NVRAM  up                    up      
+Loopback1              192.168.4.2     YES NVRAM  up                    up      
+Loopback2              192.168.4.3     YES NVRAM  up                    up      
+Loopback3              4.4.4.4         YES NVRAM  up                    up      
+
+R4(config-if)#do sh run | s router ospf
+router ospf 110
+ router-id 4.4.4.4
+ redistribute connected metric-type 1
+ network 10.2.4.4 0.0.0.0 area 1
+ network 10.4.6.4 0.0.0.0 area 0
+```
+
+- R1 configuration:
+
+```
+R1#sh ip int br | e ass
+Interface              IP-Address      OK? Method Status                Protocol
+Ethernet0/0            10.1.2.1        YES NVRAM  up                    up      
+Ethernet0/1            10.1.3.1        YES NVRAM  up                    up      
+Ethernet0/2            10.100.1.1      YES NVRAM  administratively down down    
+Ethernet0/3            10.101.1.1      YES NVRAM  administratively down down    
+Loopback0              192.168.1.1     YES NVRAM  up                    up      
+Loopback1              192.168.1.2     YES NVRAM  up                    up      
+Loopback2              192.168.1.3     YES NVRAM  up                    up      
+Loopback3              1.1.1.1         YES NVRAM  up                    up      
+
+R1#sh run | s router eigrp
+router eigrp 110
+ network 1.1.1.1 0.0.0.0
+ network 10.1.2.1 0.0.0.0
+ network 10.1.3.1 0.0.0.0
+ eigrp router-id 1.1.1.1
+
+route-map REDIST permit 10 
+ match interface Loopback0 Loopback1 Loopback2
+
+R1#sh run | s router bgp
+router bgp 12
+ bgp router-id 1.1.1.1
+ bgp log-neighbor-changes
+ neighbor 2.2.2.2 remote-as 12
+ neighbor 2.2.2.2 update-source Loopback3
+ neighbor 3.3.3.3 remote-as 3
+ neighbor 3.3.3.3 ebgp-multihop 255
+ neighbor 3.3.3.3 update-source Loopback3
+ !
+ address-family ipv4
+  redistribute connected route-map REDIST
+  neighbor 2.2.2.2 activate
+  neighbor 3.3.3.3 activate
+ exit-address-family
+```
+
+- On R1 we can't just redistribute the connected routes into BGP
+
+- To maintain the reachability over the loopback interfaces in order to maintain the BGP peering the 1.1.1.1 route cannot be included in redistribution, as EBGP have an AD of 20 for routes and EIGRP has an AD of 90. To get around this a route-map that matches any loopback interfaces. except L3 on R1 is created and assigned as part of BGP redistribution of connected routes
+
+- R2 configuration:
+
+```
+R2#sh ip int br | e ass
+Interface              IP-Address      OK? Method Status                Protocol
+Ethernet0/0            10.1.2.2        YES NVRAM  up                    up      
+Ethernet0/1            10.2.4.2        YES NVRAM  up                    up      
+Ethernet0/2            10.24.35.2      YES NVRAM  up                    up      
+Loopback0              192.168.2.1     YES NVRAM  up                    up      
+Loopback1              192.168.2.2     YES NVRAM  up                    up      
+Loopback2              192.168.2.3     YES NVRAM  up                    up      
+Loopback3              2.2.2.2         YES NVRAM  up                    up      
+
+R2#sh run | s router eigrp
+router eigrp 110
+ network 2.2.2.2 0.0.0.0
+ network 10.1.2.2 0.0.0.0
+ passive-interface Ethernet0/2
+ eigrp router-id 2.2.2.2
+
+R2#sh run | s router ospf
+router ospf 110
+ router-id 2.2.2.2
+ network 10.2.4.2 0.0.0.0 area 1
+
+R2#sh run | s router bgp
+router bgp 12
+ bgp router-id 2.2.2.2
+ bgp log-neighbor-changes
+ neighbor 1.1.1.1 remote-as 12
+ neighbor 1.1.1.1 update-source Loopback3
+```
+
+- R3 configuration:
+
+```
+R3(config-router-af)#do sh ip int br | e ass
+Interface              IP-Address      OK? Method Status                Protocol
+Ethernet0/0            10.3.5.3        YES NVRAM  up                    up      
+Ethernet0/1            10.1.3.3        YES NVRAM  up                    up      
+Ethernet0/2            10.24.35.3      YES NVRAM  up                    up      
+Loopback0              192.168.3.1     YES NVRAM  up                    up      
+Loopback1              192.168.3.2     YES NVRAM  up                    up      
+Loopback2              192.168.3.3     YES NVRAM  up                    up      
+Loopback3              3.3.3.3         YES NVRAM  up                    up      
+
+R3(config-router-af)#do sh run | s router eigrp
+router eigrp 110
+ network 3.3.3.3 0.0.0.0
+ network 10.1.3.3 0.0.0.0
+ passive-interface Ethernet0/2
+ eigrp router-id 3.3.3.3
+
+R3(config-router-af)#do sh run | s router ospf
+router ospf 110
+ router-id 3.3.3.3
+ network 10.3.5.3 0.0.0.0 area 1
+
+R3(config-router-af)#do sh run | s router bgp
+router bgp 3
+ bgp router-id 3.3.3.3
+ bgp log-neighbor-changes
+ neighbor 1.1.1.1 remote-as 12
+ neighbor 1.1.1.1 ebgp-multihop 255
+ neighbor 1.1.1.1 update-source Loopback3
+ !
+ address-family ipv4
+  redistribute ospf 110 metric 100 match internal external 1 external 2
+  neighbor 1.1.1.1 activate
+ exit-address-family
+```
+
+- By default, when redistributing OSPF into BGP, the metric assigned to the routes is the same as the one that the route had in OSPF
+
+- It can be changed by setting a metric statically
+
+- Also by default, the external routes (O E1, O E2, O N1, O N2) are not included in redistribution
+
+- To tweak this, use `match internal nssa-external external` - or `match i n e` as part of redistribution command (adjust as needed, but consider enabling all types by default)
+
+- BGP table on R1 now:
+
+```
+R1#show ip bgp | b Net
+     Network          Next Hop            Metric LocPrf Weight Path
+ *>   5.5.5.5/32       3.3.3.3                100             0 3 ?
+ *>   7.7.7.7/32       3.3.3.3                100             0 3 ?
+ *>   10.3.5.0/24      3.3.3.3                100             0 3 ?
+ *>   10.5.7.0/24      3.3.3.3                100             0 3 ?
+ *>   172.16.67.7/32   3.3.3.3                100             0 3 ?
+ *>   192.168.1.1/32   0.0.0.0                  0         32768 ?
+ *>   192.168.1.2/32   0.0.0.0                  0         32768 ?
+ *>   192.168.1.3/32   0.0.0.0                  0         32768 ?
+ *>   192.168.5.1/32   3.3.3.3                100             0 3 ?
+ *>   192.168.5.2/32   3.3.3.3                100             0 3 ?
+ *>   192.168.5.3/32   3.3.3.3                100             0 3 ?
+ *>   192.168.7.1/32   3.3.3.3                100             0 3 ?
+ *>   192.168.7.2/32   3.3.3.3                100             0 3 ?
+ *>   192.168.7.3/32   3.3.3.3                100             0 3 ?
+```
+
+- Redistributing BGP into OSPF
+
+```
+R3(config-router)#do sh run | s router ospf
+router ospf 110
+ router-id 3.3.3.3
+ redistribute bgp 3
+ network 10.3.5.3 0.0.0.0 area 1
+```
+
+- On R5, view the OSPF routing table:
+
+```
+R5(config-if)#do sh ip ro ospf | b Gate
+Gateway of last resort is not set
+
+      7.0.0.0/32 is subnetted, 1 subnets
+O        7.7.7.7 [110/2] via 10.5.7.7, 01:07:41, Ethernet0/1
+      172.16.0.0/32 is subnetted, 1 subnets
+O        172.16.67.7 [110/2] via 10.5.7.7, 00:52:56, Ethernet0/1
+      192.168.1.0/32 is subnetted, 3 subnets
+O E2     192.168.1.1 [110/1] via 10.3.5.3, 00:01:19, Ethernet0/0
+O E2     192.168.1.2 [110/1] via 10.3.5.3, 00:01:19, Ethernet0/0
+O E2     192.168.1.3 [110/1] via 10.3.5.3, 00:01:19, Ethernet0/0
+      192.168.7.0/32 is subnetted, 3 subnets
+O        192.168.7.1 [110/2] via 10.5.7.7, 01:07:41, Ethernet0/1
+O        192.168.7.2 [110/2] via 10.5.7.7, 01:07:41, Ethernet0/1
+O        192.168.7.3 [110/2] via 10.5.7.7, 01:07:41, Ethernet0/1
+```
+
+- Now the loopbacks of R1 are advertised on R5 as O E2 routes
+
+- To change the route types, to O E1, on R3:
+
+```
+conf t
+ router ospf 110
+  redistribute bgp 3 metric-type 1
+```
+
+- View the routing table on R5 again:
+
+```
+R5(config-if)#do sh ip ro ospf | b Gate
+Gateway of last resort is not set
+
+      7.0.0.0/32 is subnetted, 1 subnets
+O        7.7.7.7 [110/2] via 10.5.7.7, 01:09:34, Ethernet0/1
+      172.16.0.0/32 is subnetted, 1 subnets
+O        172.16.67.7 [110/2] via 10.5.7.7, 00:54:49, Ethernet0/1
+      192.168.1.0/32 is subnetted, 3 subnets
+O E1     192.168.1.1 [110/2] via 10.3.5.3, 00:01:04, Ethernet0/0
+O E1     192.168.1.2 [110/2] via 10.3.5.3, 00:01:04, Ethernet0/0
+O E1     192.168.1.3 [110/2] via 10.3.5.3, 00:01:04, Ethernet0/0
+      192.168.7.0/32 is subnetted, 3 subnets
+O        192.168.7.1 [110/2] via 10.5.7.7, 01:09:34, Ethernet0/1
+O        192.168.7.2 [110/2] via 10.5.7.7, 01:09:34, Ethernet0/1
+O        192.168.7.3 [110/2] via 10.5.7.7, 01:09:34, Ethernet0/1
+```
+
+- IBGP to OSPF redistribution on R2
+
+- When redistributing OSPF into IBGP, the situation will be the same
+
+- R2:
+
+```
+conf t
+ router bgp 12
+  redistribute ospf 110 match i n e metric 25
+```
+
+- R1's BGP table now:
+
+```
+R1#show ip bgp summ
+BGP router identifier 1.1.1.1, local AS number 12
+BGP table version is 50, main routing table version 50
+25 network entries using 6200 bytes of memory
+25 path entries using 3400 bytes of memory
+3/3 BGP path/bestpath attribute entries using 912 bytes of memory
+1 BGP AS-PATH entries using 24 bytes of memory
+0 BGP route-map cache entries using 0 bytes of memory
+0 BGP filter-list cache entries using 0 bytes of memory
+BGP using 10536 total bytes of memory
+BGP activity 33/8 prefixes, 33/8 paths, scan interval 60 secs
+25 networks peaked at 17:14:23 Nov 10 2026 UTC (00:00:57.420 ago)
+
+Neighbor        V           AS MsgRcvd MsgSent   TblVer  InQ OutQ Up/Down  State/PfxRcd
+2.2.2.2         4           12      88      92       50    0    0 01:15:12       11
+3.3.3.3         4            3      93      86       50    0    0 01:15:12       11
+
+R1#show ip bgp 
+BGP table version is 50, local router ID is 1.1.1.1
+Status codes: s suppressed, d damped, h history, * valid, > best, i - internal, 
+              r RIB-failure, S Stale, m multipath, b backup-path, f RT-Filter, 
+              x best-external, a additional-path, c RIB-compressed, 
+              t secondary path, L long-lived-stale,
+Origin codes: i - IGP, e - EGP, ? - incomplete
+RPKI validation codes: V valid, I invalid, N Not found
+
+     Network          Next Hop            Metric LocPrf Weight Path
+ *>i  4.4.4.4/32       10.2.4.4                25    100      0 ?
+ *>   5.5.5.5/32       3.3.3.3                100             0 3 ?
+ *>i  6.6.6.6/32       10.2.4.4                25    100      0 ?
+ *>   7.7.7.7/32       3.3.3.3                100             0 3 ?
+ *>i  10.2.4.0/24      2.2.2.2                 25    100      0 ?
+ *>   10.3.5.0/24      3.3.3.3                100             0 3 ?
+ *>i  10.4.6.0/24      10.2.4.4                25    100      0 ?
+ *>   10.5.7.0/24      3.3.3.3                100             0 3 ?
+ *>i  10.6.100.0/24    10.2.4.4                25    100      0 ?
+ *>   172.16.67.7/32   3.3.3.3                100             0 3 ?
+ *>   192.168.1.1/32   0.0.0.0                  0         32768 ?
+ *>   192.168.1.2/32   0.0.0.0                  0         32768 ?
+ *>   192.168.1.3/32   0.0.0.0                  0         32768 ?
+     Network          Next Hop            Metric LocPrf Weight Path
+ *>i  192.168.4.1/32   10.2.4.4                25    100      0 ?
+ *>i  192.168.4.2/32   10.2.4.4                25    100      0 ?
+ *>i  192.168.4.3/32   10.2.4.4                25    100      0 ?
+ *>   192.168.5.1/32   3.3.3.3                100             0 3 ?
+ *>   192.168.5.2/32   3.3.3.3                100             0 3 ?
+ *>   192.168.5.3/32   3.3.3.3                100             0 3 ?
+ *>i  192.168.6.1/32   10.2.4.4                25    100      0 ?
+ *>i  192.168.6.2/32   10.2.4.4                25    100      0 ?
+ *>i  192.168.6.3/32   10.2.4.4                25    100      0 ?
+ *>   192.168.7.1/32   3.3.3.3                100             0 3 ?
+ *>   192.168.7.2/32   3.3.3.3                100             0 3 ?
+ *>   192.168.7.3/32   3.3.3.3                100             0 3 ?
+```
+
+- We can see the prefixes coming in with 'i' now, from IBGP
+
+```
+R1#show ip route bgp | b Gate
+Gateway of last resort is not set
+
+      4.0.0.0/32 is subnetted, 1 subnets
+B        4.4.4.4 [200/25] via 10.2.4.4, 00:02:21
+      5.0.0.0/32 is subnetted, 1 subnets
+B        5.5.5.5 [20/100] via 3.3.3.3, 00:59:30
+      6.0.0.0/32 is subnetted, 1 subnets
+B        6.6.6.6 [200/25] via 10.2.4.4, 00:02:21
+      7.0.0.0/32 is subnetted, 1 subnets
+B        7.7.7.7 [20/100] via 3.3.3.3, 00:59:30
+      10.0.0.0/8 is variably subnetted, 9 subnets, 2 masks
+B        10.2.4.0/24 [200/25] via 2.2.2.2, 00:02:26
+B        10.3.5.0/24 [20/100] via 3.3.3.3, 00:59:30
+B        10.4.6.0/24 [200/25] via 10.2.4.4, 00:02:21
+B        10.5.7.0/24 [20/100] via 3.3.3.3, 00:59:30
+B        10.6.100.0/24 [200/25] via 10.2.4.4, 00:02:21
+      172.16.0.0/32 is subnetted, 1 subnets
+B        172.16.67.7 [20/100] via 3.3.3.3, 00:59:30
+      192.168.4.0/32 is subnetted, 3 subnets
+B        192.168.4.1 [200/25] via 10.2.4.4, 00:02:21
+B        192.168.4.2 [200/25] via 10.2.4.4, 00:02:21
+B        192.168.4.3 [200/25] via 10.2.4.4, 00:02:21
+      192.168.5.0/32 is subnetted, 3 subnets
+B        192.168.5.1 [20/100] via 3.3.3.3, 00:36:06
+B        192.168.5.2 [20/100] via 3.3.3.3, 00:36:06
+B        192.168.5.3 [20/100] via 3.3.3.3, 00:36:06
+      192.168.6.0/32 is subnetted, 3 subnets
+B        192.168.6.1 [200/25] via 10.2.4.4, 00:02:21
+B        192.168.6.2 [200/25] via 10.2.4.4, 00:02:21
+B        192.168.6.3 [200/25] via 10.2.4.4, 00:02:21
+      192.168.7.0/32 is subnetted, 3 subnets
+B        192.168.7.1 [20/100] via 3.3.3.3, 00:59:30
+B        192.168.7.2 [20/100] via 3.3.3.3, 00:59:30
+B        192.168.7.3 [20/100] via 3.3.3.3, 00:59:30
+```
+
+- As you can see the next hop for the IBGP routes is E0/1's interface IP on R4
+
+- To correct this, on R2:
+
+```
+conf t
+ router bgp 12
+  neighbor 1.1.1.1 next-hop-self
+  do clear ip bgp * soft out
+```
+
+- Now the routing table has the next hop R2's IP address:
+
+```
+R1#show ip bgp               
+BGP table version is 60, local router ID is 1.1.1.1
+Status codes: s suppressed, d damped, h history, * valid, > best, i - internal, 
+              r RIB-failure, S Stale, m multipath, b backup-path, f RT-Filter, 
+              x best-external, a additional-path, c RIB-compressed, 
+              t secondary path, L long-lived-stale,
+Origin codes: i - IGP, e - EGP, ? - incomplete
+RPKI validation codes: V valid, I invalid, N Not found
+
+     Network          Next Hop            Metric LocPrf Weight Path
+ *>i  4.4.4.4/32       2.2.2.2                 25    100      0 ?
+ *>   5.5.5.5/32       3.3.3.3                100             0 3 ?
+ *>i  6.6.6.6/32       2.2.2.2                 25    100      0 ?
+ *>   7.7.7.7/32       3.3.3.3                100             0 3 ?
+ *>i  10.2.4.0/24      2.2.2.2                 25    100      0 ?
+ *>   10.3.5.0/24      3.3.3.3                100             0 3 ?
+ *>i  10.4.6.0/24      2.2.2.2                 25    100      0 ?
+ *>   10.5.7.0/24      3.3.3.3                100             0 3 ?
+ *>i  10.6.100.0/24    2.2.2.2                 25    100      0 ?
+ *>   172.16.67.7/32   3.3.3.3                100             0 3 ?
+ *>   192.168.1.1/32   0.0.0.0                  0         32768 ?
+ *>   192.168.1.2/32   0.0.0.0                  0         32768 ?
+ *>   192.168.1.3/32   0.0.0.0                  0         32768 ?
+     Network          Next Hop            Metric LocPrf Weight Path
+ *>i  192.168.4.1/32   2.2.2.2                 25    100      0 ?
+ *>i  192.168.4.2/32   2.2.2.2                 25    100      0 ?
+ *>i  192.168.4.3/32   2.2.2.2                 25    100      0 ?
+ *>   192.168.5.1/32   3.3.3.3                100             0 3 ?
+ *>   192.168.5.2/32   3.3.3.3                100             0 3 ?
+ *>   192.168.5.3/32   3.3.3.3                100             0 3 ?
+ *>i  192.168.6.1/32   2.2.2.2                 25    100      0 ?
+ *>i  192.168.6.2/32   2.2.2.2                 25    100      0 ?
+ *>i  192.168.6.3/32   2.2.2.2                 25    100      0 ?
+ *>   192.168.7.1/32   3.3.3.3                100             0 3 ?
+ *>   192.168.7.2/32   3.3.3.3                100             0 3 ?
+ *>   192.168.7.3/32   3.3.3.3                100             0 3 ?
+```
+
+- Redistribute IBGP routes into OSPF on R2:
+
+```
+conf t
+ router ospf 110
+  redistribute bgp 12 metric 25 metric-type 1
+```
+
+- On R4 we are still not getting any new prefixes in OSPF
+
+- IBGP has a rule - DO NOT REDISTRIBUTE INTO AN IGP
+
+- By default, IBGP will not do this
+
+- What we need to do, is to enable `redistribute-internal` under the BGP process:
+
+```
+conf t
+ router bgp 12
+  bgp redistribute-internal
+```
+
+- `bgp redistribute-internal` command will allow BGP to inject these BGP routes into an IGP
+
+- The OSPF routing table on R4 now:
+
+```
+4(config-if)#do sh ip route ospf | b Gate 
+Gateway of last resort is not set
+
+      5.0.0.0/32 is subnetted, 1 subnets
+O E1     5.5.5.5 [110/26] via 10.2.4.2, 00:00:20, Ethernet0/1
+      6.0.0.0/32 is subnetted, 1 subnets
+O        6.6.6.6 [110/2] via 10.4.6.6, 01:32:45, Ethernet0/0
+      7.0.0.0/32 is subnetted, 1 subnets
+O E1     7.7.7.7 [110/26] via 10.2.4.2, 00:00:20, Ethernet0/1
+      10.0.0.0/8 is variably subnetted, 9 subnets, 2 masks
+O E1     10.3.5.0/24 [110/26] via 10.2.4.2, 00:00:20, Ethernet0/1
+O E1     10.5.7.0/24 [110/26] via 10.2.4.2, 00:00:20, Ethernet0/1
+O        10.6.100.0/24 [110/2] via 10.4.6.6, 01:32:45, Ethernet0/0
+      172.16.0.0/32 is subnetted, 1 subnets
+O E1     172.16.67.7 [110/26] via 10.2.4.2, 00:00:20, Ethernet0/1
+      192.168.1.0/32 is subnetted, 3 subnets
+O E1     192.168.1.1 [110/26] via 10.2.4.2, 00:00:20, Ethernet0/1
+O E1     192.168.1.2 [110/26] via 10.2.4.2, 00:00:20, Ethernet0/1
+O E1     192.168.1.3 [110/26] via 10.2.4.2, 00:00:20, Ethernet0/1
+      192.168.5.0/32 is subnetted, 3 subnets
+O E1     192.168.5.1 [110/26] via 10.2.4.2, 00:00:20, Ethernet0/1
+O E1     192.168.5.2 [110/26] via 10.2.4.2, 00:00:20, Ethernet0/1
+O E1     192.168.5.3 [110/26] via 10.2.4.2, 00:00:20, Ethernet0/1
+      192.168.6.0/32 is subnetted, 3 subnets
+O        192.168.6.1 [110/2] via 10.4.6.6, 01:32:45, Ethernet0/0
+O        192.168.6.2 [110/2] via 10.4.6.6, 01:32:45, Ethernet0/0
+O        192.168.6.3 [110/2] via 10.4.6.6, 01:32:45, Ethernet0/0
+      192.168.7.0/32 is subnetted, 3 subnets
+O E1     192.168.7.1 [110/26] via 10.2.4.2, 00:00:20, Ethernet0/1
+O E1     192.168.7.2 [110/26] via 10.2.4.2, 00:00:20, Ethernet0/1
+O E1     192.168.7.3 [110/26] via 10.2.4.2, 00:00:20, Ethernet0/1
+```
+
+- At the moment we have full reachablility. R6 can ping the loopback interfaces in R7
+
+R6 (OSPF area 0) -> R4 (OSPF area 1) -> R2 (iBGP AS 12) -> R1 (EBGP AS 3) -> R3 (OSPF area 1) -> R5 (OSPF area 0) -> R7 (OSPF)
+
+```
+R6#ping 192.168.7.1 so l1
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 192.168.7.1, timeout is 2 seconds:
+Packet sent with a source address of 192.168.6.2 
+!!!!!
+Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/2 ms
+R6#
+R6#
+R6#ping 192.168.7.1 so l0
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 192.168.7.1, timeout is 2 seconds:
+Packet sent with a source address of 192.168.6.1 
+!!!!!
+Success rate is 100 percent (5/5), round-trip min/avg/max = 1/1/1 ms
+R6#
+```
+
+#### OSPF - EIGRP redistribution
+
+- Topology:
+
+![ospf-eigrp-redistribution-topology](./ospf-eigrp-redistribution-topology.png)
+
+- The goal is R7 should reach the loopback IP addresses on R6 (192.168.6.x) after redistribution in EIGRP and back in OSPF in R2 and R3
+
+- R4 and R5 have `redistribute connected subnets` commands enabled. R4 with `metric-type 1` and R5 with normal `metric-type 2`
+
+- R6 and R7 have OSPF enabled on all interfaces
+
+- R2 and R1 use EIGRP named mode, R3 uses EIGRP classic mode
+
+- R7 configuration:
+
+```
+R7#sh ip int br | e ass
+Interface              IP-Address      OK? Method Status                Protocol
+Ethernet0/1            10.5.7.7        YES NVRAM  up                    up      
+Loopback0              192.168.7.1     YES NVRAM  up                    up      
+Loopback1              192.168.7.2     YES NVRAM  up                    up      
+Loopback2              192.168.7.3     YES NVRAM  up                    up      
+Loopback3              7.7.7.7         YES NVRAM  up                    up      
+Loopback67             172.16.67.7     YES NVRAM  up                    up      
+
+R7#sh run | s router ospf
+router ospf 110
+ router-id 7.7.7.7
+ network 0.0.0.0 255.255.255.255 area 0
+```
+
+- R6 configuration:
+
+```
+R6#sh ip int br | e ass
+Interface              IP-Address      OK? Method Status                Protocol
+Ethernet0/0            10.4.6.6        YES NVRAM  up                    up      
+Ethernet0/1            10.6.100.1      YES NVRAM  up                    up      
+Loopback0              192.168.6.1     YES NVRAM  up                    up      
+Loopback1              192.168.6.2     YES NVRAM  up                    up      
+Loopback2              192.168.6.3     YES NVRAM  up                    up      
+Loopback3              6.6.6.6         YES NVRAM  up                    up      
+
+R6#sh run | s router ospf
+router ospf 110
+ router-id 6.6.6.6
+ network 0.0.0.0 255.255.255.255 area 0
+```
+
+- R4 configuration:
+
+```
+R4(config-router)#do sh ip int br | e ass
+Interface              IP-Address      OK? Method Status                Protocol
+Ethernet0/0            10.4.6.4        YES NVRAM  up                    up      
+Ethernet0/1            10.2.4.4        YES NVRAM  up                    up      
+Ethernet0/2            10.24.35.4      YES NVRAM  up                    up      
+Loopback0              192.168.4.1     YES NVRAM  up                    up      
+Loopback1              192.168.4.2     YES NVRAM  up                    up      
+Loopback2              192.168.4.3     YES NVRAM  up                    up      
+Loopback3              4.4.4.4         YES NVRAM  up                    up      
+
+R4(config-router)#do sh run | s router ospf
+router ospf 110
+ router-id 4.4.4.4
+ redistribute connected metric-type 1
+ passive-interface Ethernet0/2
+ network 10.2.4.4 0.0.0.0 area 0
+ network 10.4.6.4 0.0.0.0 area 0
+```
+
+- R5 configuration:
+
+```
+R5(config-router)#do sh ip int br | e ass
+Interface              IP-Address      OK? Method Status                Protocol
+Ethernet0/0            10.3.5.5        YES NVRAM  up                    up      
+Ethernet0/1            10.5.7.5        YES NVRAM  up                    up      
+Ethernet0/2            10.24.35.5      YES NVRAM  up                    up      
+Loopback0              192.168.5.1     YES NVRAM  up                    up      
+Loopback1              192.168.5.2     YES NVRAM  up                    up      
+Loopback2              192.168.5.3     YES NVRAM  up                    up      
+Loopback3              5.5.5.5         YES NVRAM  up                    up      
+
+R5(config-router)#do sh run | s router ospf
+router ospf 110
+ router-id 5.5.5.5
+ redistribute connected
+ passive-interface Ethernet0/2
+ network 10.5.7.5 0.0.0.0 area 0
+ network 10.3.5.5 0.0.0.0 area 0
+```
+
+- R3 OSPF configuration:
+
+```
+R3(config-router)#do sh ip int br | e ass
+Interface              IP-Address      OK? Method Status                Protocol
+Ethernet0/0            10.3.5.3        YES NVRAM  up                    up      
+Ethernet0/1            10.1.3.3        YES NVRAM  up                    up      
+Ethernet0/2            10.24.35.3      YES NVRAM  up                    up      
+Loopback0              192.168.3.1     YES NVRAM  up                    up      
+Loopback1              192.168.3.2     YES NVRAM  up                    up      
+Loopback2              192.168.3.3     YES NVRAM  up                    up      
+Loopback3              3.3.3.3         YES NVRAM  up                    up      
+
+R3(config-router)#do sh run | s router ospf 
+router ospf 110
+ router-id 3.3.3.3
+ passive-interface Ethernet0/2
+ network 10.3.5.3 0.0.0.0 area 0
+```
+
+- R2 OSPF configuration:
+
+```
+R2(config-router)#do sh ip int br | e ass
+Interface              IP-Address      OK? Method Status                Protocol
+Ethernet0/0            10.1.2.2        YES NVRAM  up                    up      
+Ethernet0/1            10.2.4.2        YES NVRAM  up                    up      
+Ethernet0/2            10.24.35.2      YES NVRAM  up                    up      
+Loopback0              192.168.2.1     YES NVRAM  up                    up      
+Loopback1              192.168.2.2     YES NVRAM  up                    up      
+Loopback2              192.168.2.3     YES NVRAM  up                    up      
+Loopback3              2.2.2.2         YES NVRAM  up                    up      
+
+R2(config-router)#do sh run | s router ospf
+router ospf 110
+ router-id 2.2.2.2
+ passive-interface Ethernet0/2
+ network 10.2.4.2 0.0.0.0 area 0
+```
+
+- R3: Redistribute OSPF routes into EIGRP:
+
+```
+conf t
+ router eigrp 123
+  network 10.1.3.3 0.0.0.0
+  network 192.168.3.0
+  redistribute ospf 110 metric 1000000 1 255 1 1500
+```
+
+- R3: Redistribute EIGRP routes into OSPF:
+
+```
+R3(config-router)#do sh run | s router ospf 
+router ospf 110
+ router-id 3.3.3.3
+ redistribute eigrp 123 metric-type 1
+ passive-interface Ethernet0/2
+ network 10.3.5.3 0.0.0.0 area 0
+```
+
+- R2: Redistribute OSPF routes into EIGRP named mode:
+
+```
+conf t
+ router eigrp REDIST
+  address-family ipv4 autonomous-system 123
+   topology base
+    redistribute ospf 110 metric 1000000 1 255 1 1500
+   exit
+   network 10.1.2.2 0.0.0.0
+   network 192.168.2.0
+   eigrp router-id 2.2.2.2
+```
+
+- R2: Redistribute EIGRP routes into OSPF:
+
+```
+conf t
+ router ospf 110
+  router-id 2.2.2.2
+  redistribute eigrp 123 metric-type 1
+  passive-interface Ethernet0/2
+  network 10.2.4.2 0.0.0.0 area 0
+```
