@@ -6105,6 +6105,19 @@ router ospf 110
  network 10.2.4.2 0.0.0.0 area 0
 ```
 
+- R1 - EIGRP configuration:
+
+```
+router eigrp REDIST
+ !
+ address-family ipv4 unicast autonomous-system 123
+  !
+  topology base
+  exit-af-topology
+  network 0.0.0.0
+ exit-address-family
+```
+
 - R3: Redistribute OSPF routes into EIGRP:
 
 ```
@@ -6150,3 +6163,474 @@ conf t
   passive-interface Ethernet0/2
   network 10.2.4.2 0.0.0.0 area 0
 ```
+
+#### OSPF - RIPv2 redistribution
+
+- RIPv2 uses hop count to calculate the metric for a specific route
+
+- OSPF uses the LSAs to calculate the metric
+
+- RIPv2 will not be able to understand the metric of the redistributed routes from OSPF, so it is indicated to set the metrics manually
+
+- Topology:
+
+![ospf-ripv2-redistribution-topology](./ospf-ripv2-redistribution-topology.png)
+
+- R1 and R3 run OSPF in area 0
+
+- R1 and R2 run RIPv2
+
+- Implement redistribution between RIPv2 and OSPF on R1
+
+- R1 - OSPF and RIP configuration:
+
+```
+R1#sh run | s router rip
+router rip
+ version 2
+ redistribute connected metric 5 route-map REDIST
+ redistribute ospf 110 metric 15
+ network 10.0.0.0
+ no auto-summary
+
+R1#sh run | s router ospf
+router ospf 110
+ router-id 1.1.1.1
+ redistribute connected metric-type 1
+ redistribute rip metric 125 metric-type 1
+ network 10.1.3.1 0.0.0.0 area 0
+
+route-map REDIST permit 10 
+ match interface Loopback1
+```
+
+- R2 - RIP configuration:
+
+```
+R2(config-router)#do sh run | s router rip
+router rip
+ version 2
+ redistribute connected
+ network 10.0.0.0
+ no auto-summary
+```
+
+- R3 - OSPF configuration:
+
+```
+R3(config-router)#do sh run | s router ospf
+router ospf 110
+ router-id 3.3.3.3
+ redistribute connected metric-type 1
+ network 10.1.3.3 0.0.0.0 area 0
+```
+
+#### OSPF BFD
+
+- BFD allows devices to detect failures on a link and report back to our IGP (in this case OSPF) or EGP (BGP)
+
+- It allows the routing protocol to cut that link immediately when a failure is reported
+
+- We do not have to wait for the entire dead timer to expire before cuting down an adjacency
+
+- The routing protocol will drop that neighbor and then will use maybe the redundant path to that network (if it exist)
+
+- It can take seconds (dead timers) and cut them down to miliseconds
+
+- BFD will use two different types of packets: Control packets and Echo packets
+
+- Echo packets are optional (can be disabled, but is not recommended)
+
+- The control packets will use UDP port 3784. These packets are basically negotiating different timers. These also can be considered keepalives, because they can be sent on a periodic level
+
+- Echo packets are equivalent with keepalives
+
+- When firstly enabling BFD on interfaces, the devices will send the control packets to one another
+
+- This will send/ negociate different timers:
+
+    - BFD interval - interval for sending BFD Echo packets (in miliseconds)
+
+    - Min_rx - How often I am prepared to receive a packet from you. Just in case you are configured differently, I am prepared to receive a BFD packet from you every 50 ms (as an example). Ideally the BFD interval and Min_rx interval can be the same
+
+    - Multiplier - Is basically a dead interval. I am prepared to lose 3 echo packets from you in order to declare that adjacency down
+
+- Steps to enable BFD:
+
+    1. Interface
+
+    2. Routing protocol
+
+- Once BFD is enabled on the routing protocol, the routing protocol makes a call to BFD configured on the interface 
+
+- Once we agreed the timers to use on the interface, we will start sending the Echo packets
+
+- The echo packets function very interesting: The L2 destination (MAC address) of these packets will be the neighbor's MAC
+
+- The destination L3 address, will going to be my IP address. When the destination router sees this packet, it will be looping the packet right back into the original router sending it
+
+- This is how we know that we have a fully functioning link
+
+- If I do not receive back the packets that I send, and I miss 3 (multiplier) of them, I will drop the BFD adjancency, report back to the routing protocol in cause. The third step here is that the protocol will be turning down the adjacency
+
+- BFD configuration in OSPF:
+
+- R1:
+
+```
+conf t
+ int e0/1
+  bfd interval 150 min_rx 150 multiplier 5
+  
+ router ospf 110
+  bfd all-interfaces
+```
+
+```
+R1#sh run int e0/1
+Building configuration...
+
+Current configuration : 157 bytes
+!
+interface Ethernet0/1
+ bandwidth 1000000
+ ip address 10.1.3.1 255.255.255.0
+ ip ospf network point-to-point
+ bfd interval 150 min_rx 150 multiplier 5
+end
+
+R1#sh run | s router ospf
+router ospf 110
+ router-id 1.1.1.1
+ network 10.1.3.1 0.0.0.0 area 0
+ bfd all-interfaces
+```
+
+- R3:
+
+```
+conf t
+ int e0/1
+  bfd interval 150 min_rx 150 multiplier 5
+
+ router ospf 110
+  bfd all-interfaces
+```
+
+```
+R3#sh run int e0/1
+Building configuration...
+
+Current configuration : 157 bytes
+!
+interface Ethernet0/1
+ bandwidth 1000000
+ ip address 10.1.3.3 255.255.255.0
+ ip ospf network point-to-point
+ bfd interval 150 min_rx 150 multiplier 5
+end
+
+R3#sh run int e0/0
+Building configuration...
+
+Current configuration : 136 bytes
+!
+interface Ethernet0/0
+ bandwidth 1000000
+ ip address 10.3.5.3 255.255.255.0
+ ip ospf network point-to-point
+ ip ospf bfd disable
+end
+
+
+R3#sh run | s router ospf
+router ospf 110
+ router-id 3.3.3.3
+ network 10.1.3.3 0.0.0.0 area 0
+ bfd all-interfaces
+```
+
+- Disabling BFD for OSPF on an unwanted interface on R3:
+
+```
+conf t
+ int e0/0
+  ip ospf bfd disable
+```
+
+#### OSPF Route-tagging
+
+- Topology:
+
+![OSPF-EIGRP-route-tagging](./ospf-eigrp-route-tagging-topology.png)
+
+- When both R2 and R3 redistibute External routes from one routing protocol to another, we might end up with suboptimal routing in our network and may cause routing loops (D EX -> O E2; O E2 -> D EX)
+
+- In case one of the routers have internal OSPF or EIGRP routes to redistribute we do not have this problem, as they will end up in the other routing protocol's routing table as External (D EX or O E1 or O E2 ...): D -> O E2; O -> D EX 
+
+- To prevent this we need to set up route tagging
+
+- R4 configuration:
+
+```
+R4(config-router)#do sh ip int br | e ass
+Interface              IP-Address      OK? Method Status                Protocol
+Ethernet0/0            10.4.6.4        YES NVRAM  up                    up      
+Ethernet0/1            10.2.4.4        YES NVRAM  up                    up      
+Ethernet0/2            10.24.35.4      YES NVRAM  up                    up      
+Loopback0              192.168.4.1     YES NVRAM  up                    up      
+Loopback1              192.168.4.2     YES NVRAM  up                    up      
+Loopback2              192.168.4.3     YES NVRAM  up                    up      
+Loopback3              4.4.4.4         YES NVRAM  up                    up      
+
+R4(config-router)#do sh run | s router ospf
+router ospf 110
+ router-id 4.4.4.4
+ network 0.0.0.0 255.255.255.255 area 0
+```
+
+- R5 configuration:
+
+```
+R5(config-router)# do sh ip int br | e ass
+Interface              IP-Address      OK? Method Status                Protocol
+Ethernet0/0            10.3.5.5        YES NVRAM  up                    up      
+Ethernet0/1            10.5.7.5        YES NVRAM  up                    up      
+Ethernet0/2            10.24.35.5      YES NVRAM  up                    up      
+Loopback0              192.168.5.1     YES NVRAM  up                    up      
+Loopback1              192.168.5.2     YES NVRAM  up                    up      
+Loopback2              192.168.5.3     YES NVRAM  up                    up      
+Loopback3              5.5.5.5         YES NVRAM  up                    up      
+
+R5(config-router)#do sh run | s router ospf
+router ospf 110
+ router-id 5.5.5.5
+ network 0.0.0.0 255.255.255.255 area 0
+
+R5(config-router)#do sh run | s router ospf
+router ospf 110
+ router-id 5.5.5.5
+ redistribute connected
+ network 10.3.5.5 0.0.0.0 area 0
+ network 10.24.35.5 0.0.0.0 area 0
+```
+
+- R1 - EIGRP configuration:
+
+```
+R1(config-if)#do sh ip int br | e ass
+Interface              IP-Address      OK? Method Status                Protocol
+Ethernet0/0            10.1.2.1        YES NVRAM  up                    up      
+Ethernet0/1            10.1.3.1        YES NVRAM  up                    up      
+Ethernet0/2            10.100.1.1      YES NVRAM  administratively down down    
+Ethernet0/3            10.101.1.1      YES NVRAM  administratively down down    
+Loopback0              192.168.1.1     YES NVRAM  up                    up      
+Loopback1              192.168.1.2     YES NVRAM  up                    up      
+Loopback2              192.168.1.3     YES NVRAM  up                    up      
+Loopback3              1.1.1.1         YES NVRAM  up                    up      
+
+R1(config-if)#do sh run | s router eigrp
+router eigrp TAG
+ !
+ address-family ipv4 unicast autonomous-system 123
+  !
+  topology base
+   redistribute connected
+  exit-af-topology
+  network 10.1.2.1 0.0.0.0
+  network 10.1.3.1 0.0.0.0
+ exit-address-family
+```
+
+- R3 - OSPF and EIGRP configuration
+
+```
+R3(config-router)#do sh ip int br | e ass
+Interface              IP-Address      OK? Method Status                Protocol
+Ethernet0/0            10.3.5.3        YES NVRAM  up                    up      
+Ethernet0/1            10.1.3.3        YES NVRAM  up                    up      
+Ethernet0/2            10.24.35.3      YES NVRAM  up                    up      
+Loopback0              192.168.3.1     YES NVRAM  up                    up      
+Loopback1              192.168.3.2     YES NVRAM  up                    up      
+Loopback2              192.168.3.3     YES NVRAM  up                    up      
+Loopback3              3.3.3.3         YES NVRAM  up                    up      
+
+R3(config-router)#do sh run | s router ospf
+router ospf 110
+ router-id 3.3.3.3
+ redistribute eigrp 123 route-map TAG
+ network 10.1.3.3 0.0.0.0 area 0
+ network 10.3.5.3 0.0.0.0 area 0
+ network 192.168.3.1 0.0.0.0 area 0
+ distribute-list route-map TAG in
+
+R3(config-router)#do sh run | s router eigrp
+router eigrp TAG
+ !
+ address-family ipv4 unicast autonomous-system 123
+  !
+  topology base
+   redistribute ospf 110 metric 1000000 1 255 1 1500 route-map TAG
+  exit-af-topology
+  network 10.1.3.3 0.0.0.0
+ exit-address-family
+
+route-map TAG deny 10 
+ match tag 2
+route-map TAG permit 20 
+ set tag 3
+```
+
+- EIGRP topology on R3:
+
+```
+R3(config-router)#do sh ip eigrp topo
+EIGRP-IPv4 VR(TAG) Topology Table for AS(123)/ID(192.168.3.3)
+Codes: P - Passive, A - Active, U - Update, Q - Query, R - Reply,
+       r - reply Status, s - sia Status 
+
+P 192.168.3.1/32, 1 successors, FD is 1310720, tag is 3
+        via Redistributed (1310720/0)
+P 192.168.1.3/32, 1 successors, FD is 66273280
+        via 10.1.3.1 (66273280/163840), Ethernet0/1
+P 4.4.4.4/32, 1 successors, FD is 1310720, tag is 3
+        via Redistributed (1310720/0)
+P 10.1.3.0/24, 1 successors, FD is 66191360
+        via Connected, Ethernet0/1
+P 192.168.4.3/32, 1 successors, FD is 1310720, tag is 3
+        via Redistributed (1310720/0)
+P 5.5.5.5/32, 1 successors, FD is 1310720, tag is 3
+        via Redistributed (1310720/0)
+P 10.1.2.0/24, 1 successors, FD is 131727360
+        via 10.1.3.1 (131727360/66191360), Ethernet0/1
+P 192.168.1.1/32, 1 successors, FD is 66273280
+        via 10.1.3.1 (66273280/163840), Ethernet0/1
+P 10.3.5.0/24, 1 successors, FD is 1310720, tag is 3
+        via Redistributed (1310720/0)
+P 10.2.4.0/24, 1 successors, FD is 1310720, tag is 3
+        via Redistributed (1310720/0)
+P 192.168.2.1/32, 1 successors, FD is 1310720, tag is 3
+        via Redistributed (1310720/0)
+P 192.168.4.2/32, 1 successors, FD is 1310720, tag is 3
+        via Redistributed (1310720/0)
+P 192.168.5.1/32, 1 successors, FD is 1310720, tag is 3
+        via Redistributed (1310720/0)
+P 192.168.4.1/32, 1 successors, FD is 1310720, tag is 3
+        via Redistributed (1310720/0)
+P 192.168.1.2/32, 1 successors, FD is 66273280
+        via 10.1.3.1 (66273280/163840), Ethernet0/1
+P 192.168.5.2/32, 1 successors, FD is 1310720, tag is 3
+        via Redistributed (1310720/0)
+P 192.168.5.3/32, 1 successors, FD is 1310720, tag is 3
+        via Redistributed (1310720/0)
+P 1.1.1.1/32, 1 successors, FD is 66273280
+        via 10.1.3.1 (66273280/163840), Ethernet0/1
+P 10.4.6.0/24, 1 successors, FD is 1310720, tag is 3
+        via Redistributed (1310720/0)
+P 10.5.7.0/24, 1 successors, FD is 1310720, tag is 3
+        via Redistributed (1310720/0)
+
+R3(config-router)#do sh ip ro 1.1.1.1 255.255.255.255
+Routing entry for 1.1.1.1/32
+  Known via "eigrp 123", distance 170, metric 517760, precedence routine (0), type external
+  Redistributing via ospf 110, eigrp 123
+  Advertised by ospf 110 subnets route-map TAG
+  Last update from 10.1.3.1 on Ethernet0/1, 00:14:26 ago
+  Routing Descriptor Blocks:
+  * 10.1.3.1, from 10.1.3.1, 00:14:26 ago, via Ethernet0/1
+      Route metric is 517760, traffic share count is 1
+      Total delay is 1001 microseconds, minimum bandwidth is 1000000 Kbit
+      Reliability 255/255, minimum MTU 1500 bytes
+      Loading 1/255, Hops 1
+```
+
+- R2 - OSPF and EIGRP configuration:
+
+```
+R2(config-router)#do sh ip int br | e ass
+Interface              IP-Address      OK? Method Status                Protocol
+Ethernet0/0            10.1.2.2        YES NVRAM  up                    up      
+Ethernet0/1            10.2.4.2        YES NVRAM  up                    up      
+Ethernet0/2            10.24.35.2      YES NVRAM  up                    up      
+Loopback0              192.168.2.1     YES NVRAM  up                    up      
+Loopback1              192.168.2.2     YES NVRAM  up                    up      
+Loopback2              192.168.2.3     YES NVRAM  up                    up      
+Loopback3              2.2.2.2         YES NVRAM  up                    up      
+
+
+R2(config-router)#do sh run | s router ospf
+router ospf 110
+ router-id 2.2.2.2
+ redistribute eigrp 123 route-map TAG
+ network 10.2.4.2 0.0.0.0 area 0
+ network 192.168.2.1 0.0.0.0 area 0
+ distribute-list route-map TAG in
+
+R2(config-router)#do sh run | s router eigrp
+router eigrp TAG
+ !
+ address-family ipv4 unicast autonomous-system 123
+  !
+  topology base
+   redistribute ospf 110 metric 1000000 1 255 1 1500 route-map TAG
+  exit-af-topology
+  network 10.1.2.2 0.0.0.0
+ exit-address-family
+
+route-map TAG deny 10 
+ match tag 3
+route-map TAG permit 20 
+ set tag 2
+```
+
+```
+R3(config-router)#do sh ip eigrp topology
+EIGRP-IPv4 VR(TAG) Topology Table for AS(123)/ID(192.168.3.3)
+Codes: P - Passive, A - Active, U - Update, Q - Query, R - Reply,
+       r - reply Status, s - sia Status 
+
+P 192.168.3.1/32, 1 successors, FD is 1310720, tag is 3
+        via Redistributed (1310720/0)
+P 192.168.1.3/32, 1 successors, FD is 66273280
+        via 10.1.3.1 (66273280/163840), Ethernet0/1
+P 4.4.4.4/32, 1 successors, FD is 1310720, tag is 3
+        via Redistributed (1310720/0)
+P 10.1.3.0/24, 1 successors, FD is 66191360
+        via Connected, Ethernet0/1
+P 192.168.4.3/32, 1 successors, FD is 1310720, tag is 3
+        via Redistributed (1310720/0)
+P 5.5.5.5/32, 1 successors, FD is 1310720, tag is 3
+        via Redistributed (1310720/0)
+P 10.1.2.0/24, 1 successors, FD is 131727360
+        via 10.1.3.1 (131727360/66191360), Ethernet0/1
+P 192.168.1.1/32, 1 successors, FD is 66273280
+        via 10.1.3.1 (66273280/163840), Ethernet0/1
+P 10.3.5.0/24, 1 successors, FD is 1310720, tag is 3
+        via Redistributed (1310720/0)
+P 10.2.4.0/24, 1 successors, FD is 1310720, tag is 3
+        via Redistributed (1310720/0)
+P 192.168.2.1/32, 1 successors, FD is 1310720, tag is 3
+        via Redistributed (1310720/0)
+P 192.168.4.2/32, 1 successors, FD is 1310720, tag is 3
+        via Redistributed (1310720/0)
+P 192.168.5.1/32, 1 successors, FD is 1310720, tag is 3
+        via Redistributed (1310720/0)
+P 192.168.4.1/32, 1 successors, FD is 1310720, tag is 3
+        via Redistributed (1310720/0)
+P 192.168.1.2/32, 1 successors, FD is 66273280
+        via 10.1.3.1 (66273280/163840), Ethernet0/1
+P 192.168.5.2/32, 1 successors, FD is 1310720, tag is 3
+        via Redistributed (1310720/0)
+P 192.168.5.3/32, 1 successors, FD is 1310720, tag is 3
+        via Redistributed (1310720/0)
+P 1.1.1.1/32, 1 successors, FD is 66273280
+        via 10.1.3.1 (66273280/163840), Ethernet0/1
+P 10.4.6.0/24, 1 successors, FD is 1310720, tag is 3
+        via Redistributed (1310720/0)
+P 10.5.7.0/24, 1 successors, FD is 1310720, tag is 3
+        via Redistributed (1310720/0)
+```
+
+- When applying a route map to a redistribution in OSPF, not necessarily it also filters the routes based on the set tags
+
+- In this case, we might also want to apply a distribute list in OSPF process to deny the unwanted routes based on a route map, as set above
