@@ -6634,3 +6634,351 @@ P 10.5.7.0/24, 1 successors, FD is 1310720, tag is 3
 - When applying a route map to a redistribution in OSPF, not necessarily it also filters the routes based on the set tags
 
 - In this case, we might also want to apply a distribute list in OSPF process to deny the unwanted routes based on a route map, as set above
+
+#### OSPF MD5 authentication
+
+- Can be made at the interface level, or ar the area level
+
+- Can be done configuring MD5 keys on an interface or using key chains
+
+- On interface level:
+
+- R2:
+
+```
+conf t
+ interface e0/1
+  ip ospf authentication message-digest
+  ip ospf message-digest-key 1 md5 OSPF?  !!!! ctrl + v - shift + ?
+```
+
+- R4:
+
+```
+conf t
+ int e0/1
+  ip ospf authentication message-digest
+  ip ospf message-digest-key 1 md5 OSPF?
+```
+
+- Configuring Area authentication:
+
+- First remove the `ip ospf authentication message-digest` command from the interface
+
+```
+conf t
+ int e0/1
+  no ip ospf authentication message-digest
+```
+
+- Enabling the authentication on the OSPF process for the area
+
+```
+conf t
+ router ospf 110
+  area 0 authentication message-digest
+```
+
+- Configuring MD5 auth using a key chain:
+
+```
+conf t
+ int e0/1
+  ip ospf authentication key-chain OSPF
+
+ key chain OSPF
+  key 1
+   key-string OSPF?
+   cryptographic-algorithm md5
+```
+
+#### OSPF HMAC-SHA256 authentication
+
+- This is not supported directly in OSPF, but within the key chain itself
+
+- To enable passwords to be shown as AES128 (type 6) in config, use the following commands:
+
+- This password is like a master password to encrypt all passwords shown in the running config
+
+```
+conf t
+ password encryption aes
+ key config-key password-encrypt <pass>
+```
+
+- Create a key chain and set cryptographic algorithm sha256
+
+```
+key chain HMAC-SHA
+ key 1
+  key-string <my-pass>
+  cryptographic algorithm hmac-sha-256
+```
+
+- When viewing the running config now the encryption is set to type 6 (still receive a warning about it - may be a IOL-XE problem?)
+
+```
+R4(config)#do sh run | s key chain         
+key chain HMAC-SHA
+ key 1
+  key-string 6 VCYQaJRhZSNfaEMIRZLLZ[^[DO_AAB
+  cryptographic-algorithm hmac-sha-256
+```
+
+- Apply the key chain for OSPF authentication on the interface:
+
+```
+conf t
+ int e0/0
+  ip ospf authentication key-chain HMAC-SHA
+```
+
+```
+R4(config)#do sh ip ospf int e0/0
+Ethernet0/0 is up, line protocol is up 
+  Internet Address 10.4.6.4/24, Interface ID 2, Area 0
+  Attached via Network Statement
+  Process ID 110, Router ID 4.4.4.4, Network Type POINT_TO_POINT, Cost: 1
+  Topology-MTID    Cost    Disabled    Shutdown      Topology Name
+        0           1         no          no            Base
+  Transmit Delay is 1 sec, State POINT_TO_POINT
+  Timer intervals configured, Hello 10, Dead 40, Wait 40, Retransmit 5
+    oob-resync timeout 40
+    Hello due in 00:00:00
+  Supports Link-local Signaling (LLS)
+  Cisco NSF helper support enabled
+  IETF NSF helper support enabled
+  Can be protected by per-prefix Loop-Free FastReroute
+  Can be used for per-prefix Loop-Free FastReroute repair paths
+  Not Protected by per-prefix TI-LFA
+  Index 1/1/1, flood queue length 0
+  Next 0x0(0)/0x0(0)/0x0(0)
+  Last flood scan length is 1, maximum is 7
+  Last flood scan time is 1 msec, maximum is 1 msec
+  Neighbor Count is 1, Adjacent neighbor count is 1 
+    Adjacent with neighbor 6.6.6.6
+  Suppress hello for 0 neighbor(s)
+  Cryptographic authentication enabled
+    Sending SA: Key 1, Algorithm HMAC-SHA-256 - key chain HMAC-SHA
+```
+
+#### OSPFv3 Authentication using IPsec
+
+- OSPFv3 uses build in IPsec security in IPv6 in order to do authentication. It does not rely anymore on the OSPF process for authentication
+
+- You still have per area or per interface authentication methods/types
+
+- It sets an encrypted session between the OSPFv3 neighbors
+
+- Setting this up between R1 and R2:
+
+- R1:
+
+```
+ ipv6 unicast-routing
+ router ospfv3 111
+  router-id 1.1.1.1
+  !
+  address-family ipv4 unicast
+  exit-address-family
+  !
+  address-family ipv6 unicast
+  exit-address-family
+
+ 1(config-if)#do sh run int e0/0
+Building configuration...
+
+Current configuration : 383 bytes
+!
+interface Ethernet0/0
+ bandwidth 1000000
+ ip address 10.1.2.1 255.255.255.0
+ ip ospf network point-to-point
+ ipv6 address 2017::1/64
+ ospfv3 encryption ipsec spi 256 esp aes-cbc 256 4E1F40C484F603EB77F22F2A1D79D67F80E0FA623925BC734B4440438B4F08CC sha1 B8CDA77C3E7B5DDA14699D47D790EFC95ECDFF88
+ ospfv3 111 network point-to-point
+ ospfv3 111 ipv4 area 0
+ ospfv3 111 ipv6 area 0
+end
+```
+
+- R2:
+
+```
+ipv6 unicast-routing
+
+R2#sh run int e0/0
+Building configuration...
+
+Current configuration : 408 bytes
+!
+interface Ethernet0/0
+ bandwidth 1000000
+ ip address 10.1.2.2 255.255.255.0
+ ip ospf network point-to-point
+ ipv6 address 2017::1/64
+ ipv6 address 2017::2/64
+ ospfv3 encryption ipsec spi 256 esp aes-cbc 256 4E1F40C484F603EB77F22F2A1D79D67F80E0FA623925BC734B4440438B4F08CC sha1 B8CDA77C3E7B5DDA14699D47D790EFC95ECDFF88
+ ospfv3 111 network point-to-point
+ ospfv3 111 ipv4 area 0
+ ospfv3 111 ipv6 area 0
+end
+
+R2#sh run | s router ospf   
+router ospfv3 111
+ router-id 2.2.2.2
+ !
+ address-family ipv4 unicast
+ exit-address-family
+ !
+ address-family ipv6 unicast
+ exit-address-family
+```
+
+- To generate hex strings as needed in linux do:
+
+```
+openssl rand -hex 32
+```
+
+- The last number is the number of bytes (the number of bytes is 2x less the number of required characters)
+
+```
+openssl rand -hex 32
+4e1f40c484f603eb77f22f2a1d79d67f80e0fa623925bc734b4440438b4f08cc
+openssl rand -hex 20
+b8cda77c3e7b5dda14699d47d790efc95ecdff88
+```
+
+- Verifying:
+
+```
+R2#sh ospfv3 ipv6 int e0/0
+Ethernet0/0 is up, line protocol is up 
+  Link Local Address FE80::A8BB:CCFF:FE00:4C00, Interface ID 1 (snmp-if-index)
+  Area 0, Process ID 111, Instance ID 0, Router ID 2.2.2.2
+  Network Type POINT_TO_POINT, Cost: 1
+  AES-CBC-256 encryption SHA-1 auth SPI 256, secure socket UP (errors: 0)
+  Transmit Delay is 1 sec, State POINT_TO_POINT
+  Timer intervals configured, Hello 10, Dead 40, Wait 40, Retransmit 5
+    Hello due in 00:00:03
+  Graceful restart helper support enabled
+  Index 1/1/1, flood queue length 0
+  Next 0x0(0)/0x0(0)/0x0(0)
+  Last flood scan length is 1, maximum is 1
+  Last flood scan time is 1 msec, maximum is 1 msec
+  Neighbor Count is 1, Adjacent neighbor count is 1 
+    Adjacent with neighbor 1.1.1.1
+  Suppress hello for 0 neighbor(s)
+
+R2#sh ospfv3 ipv4 int e0/0      
+Ethernet0/0 is up, line protocol is up 
+  Link Local Address FE80::A8BB:CCFF:FE00:4C00, Interface ID 1 (snmp-if-index)
+  Internet Address 10.1.2.2/24
+  Area 0, Process ID 111, Instance ID 64, Router ID 2.2.2.2
+  Network Type POINT_TO_POINT, Cost: 1
+  AES-CBC-256 encryption SHA-1 auth SPI 256, secure socket UP (errors: 0)
+  Transmit Delay is 1 sec, State POINT_TO_POINT
+  Timer intervals configured, Hello 10, Dead 40, Wait 40, Retransmit 5
+    Hello due in 00:00:07
+  Graceful restart helper support enabled
+  Index 1/1/1, flood queue length 0
+  Next 0x0(0)/0x0(0)/0x0(0)
+  Last flood scan length is 1, maximum is 1
+  Last flood scan time is 0 msec, maximum is 0 msec
+  Neighbor Count is 1, Adjacent neighbor count is 1 
+    Adjacent with neighbor 1.1.1.1
+  Suppress hello for 0 neighbor(s)
+
+R2#show crypto ipsec sa 
+
+interface: Ethernet0/0
+    Crypto map tag: Ethernet0/0-OSPF-MAP, local addr FE80::A8BB:CCFF:FE00:4C00
+
+   IPsecv6 policy name: OSPFv3-256
+
+   protected vrf: (none)
+   local  ident (addr/mask/prot/port): (FE80::/10/89/0)
+   remote ident (addr/mask/prot/port): (::/0/89/0)
+   current_peer FF02::5 port 500
+     PERMIT, flags={origin_is_acl,}
+    #pkts encaps: 204, #pkts encrypt: 204, #pkts digest: 204
+    #pkts decaps: 184, #pkts decrypt: 184, #pkts verify: 184
+    #pkts compressed: 0, #pkts decompressed: 0
+    #pkts not compressed: 0, #pkts compr. failed: 0
+    #pkts not decompressed: 0, #pkts decompress failed: 0
+    #send errors 0, #recv errors 0
+
+     local crypto endpt.: FE80::A8BB:CCFF:FE00:4C00,
+     remote crypto endpt.: FF02::5
+     plaintext mtu 1462, path mtu 1500, ipv6 mtu 1500, ipv6 mtu idb Ethernet0/0
+     current outbound spi: 0x100(256)
+     PFS (Y/N): N, DH group: none
+          
+     inbound esp sas:
+      spi: 0x100(256)
+        transform: esp-256-aes esp-sha-hmac ,
+        in use settings ={Transport, }
+        conn id: 1, flow_id: 1, sibling_flags FFFFFFFF80000001, crypto map: Ethernet0/0-OSPF-MAP, initiator : False
+        sa timing: remaining key lifetime (sec): 0
+        Kilobyte Volume Rekey has been disabled
+        IV size: 16 bytes
+        replay detection support: N
+        Status: ACTIVE(ACTIVE)
+
+     inbound ah sas:
+
+     inbound pcp sas:
+
+     outbound esp sas:
+      spi: 0x100(256)
+        transform: esp-256-aes esp-sha-hmac ,
+        in use settings ={Transport, }
+        conn id: 2, flow_id: 2, sibling_flags FFFFFFFF80000001, crypto map: Ethernet0/0-OSPF-MAP, initiator : False
+        sa timing: remaining key lifetime (sec): 0
+        Kilobyte Volume Rekey has been disabled
+        IV size: 16 bytes
+        replay detection support: N
+        Status: ACTIVE(ACTIVE)
+
+     outbound ah sas:
+
+     outbound pcp sas:
+```
+
+- Enabling this at area level
+
+- At area level there are 2 commands:
+
+```
+conf t
+ router ospfv3 111
+  R2(config-router)#area 0 ?
+  authentication  Enable authentication
+  encryption      Enable encryption
+```
+
+- Authentication keyword - uses AH with IPsec
+
+- Encryption keyword - uses ESP with IPsec
+
+```
+conf t
+ router ospfv3 111
+ area 0 encryption ipsec spi 256 esp aes-cbc 256 4e1f40c484f603eb77f22f2a1d79d67f80e0fa623925bc734b4440438b4f08cc sha1 b8cda77c3e7b5dda14699d47d790efc95ecdff88
+```
+
+- **IMPORTANT**: Cannot use the same SPI ID for both the interface and the area authentication
+
+- If you want to do both, you need to use a different SPI ID
+
+```
+R2(config-router)#$0438b4f08cc sha1 b8cda77c3e7b5dda14699d47d790efc95ecdff88 
+% OSPFv3: Encryption was not enabled
+R2(config-router)#
+R2(config-router)#
+R2(config-router)#
+R2(config-router)#$0438b4f08cc sha1 b8cda77c3e7b5dda14699d47d790efc95ecdff88 
+*Nov 14 18:06:58.247: %OSPFv3-3-IPSEC_POLICY_ALREADY_EXIST: OSPFv3 SPI 256 is already in use with ospf
+R2(config-router)#                                                           
+```
